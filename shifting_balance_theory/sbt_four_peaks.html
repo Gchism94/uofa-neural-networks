@@ -13,7 +13,7 @@
 
 <div class="wrap">
 <div class="lg" id="lg"></div>
-<canvas id="cv" style="width:100%;border-radius:8px;border:0.5px solid var(--color-border-tertiary)"></canvas>
+<canvas id="cv" style="width:640px;height:320px;max-width:100%;border-radius:8px;border:0.5px solid var(--color-border-tertiary)"></canvas>
 <div class="instr">Click a phase to step through the theory.</div>
 <div class="phtabs">
   <div class="phtab" id="tab0">0 · selection only</div>
@@ -27,10 +27,14 @@
 <script>
 (function(){
 const cv=document.getElementById('cv');
-cv.width=640;cv.height=320;
+const dpr=window.devicePixelRatio||1;
+const W=640,H=320;
+cv.width=W*dpr;cv.height=H*dpr;
 const ctx=cv.getContext('2d');
+ctx.scale(dpr,dpr);
+
 const PL=52,PR=16,PT=44,PB=56;
-const CW=cv.width-PL-PR,CH=cv.height-PT-PB;
+const CW=W-PL-PR,CH=H-PT-PB;
 function mx(x){return PL+x*CW;}
 function my(f){return PT+(1-f)*CH;}
 function fit(x){
@@ -88,7 +92,6 @@ function arrowhead(x1,y1,x2,y2,len,col){
   ctx.closePath();ctx.fill();
 }
 
-// yFit: fitness value at which to draw the bracket — sits inside the green fill area
 function drawBracket(xlo,xhi,col,label,yFit){
   const by=my(yFit);
   ctx.strokeStyle=col;ctx.lineWidth=1;ctx.setLineDash([]);
@@ -100,34 +103,32 @@ function drawBracket(xlo,xhi,col,label,yFit){
 }
 
 function drawFrame(){
-  ctx.clearRect(0,0,cv.width,cv.height);
+  ctx.clearRect(0,0,W,H);
   const t=ease(Math.min(1,prog));
 
-  // landscape fill
   ctx.beginPath();ctx.moveTo(mx(0),my(0));ctx.lineTo(mx(0),my(fit(0)));
   for(let i=1;i<=500;i++)ctx.lineTo(mx(i/500),my(fit(i/500)));
   ctx.lineTo(mx(1),my(0));ctx.closePath();
   ctx.fillStyle='rgba(29,158,117,.07)';ctx.fill();
-  // curve
+
   ctx.beginPath();ctx.moveTo(mx(0),my(fit(0)));
   for(let i=1;i<=500;i++)ctx.lineTo(mx(i/500),my(fit(i/500)));
   ctx.strokeStyle='#1D9E75';ctx.lineWidth=2;ctx.stroke();
-  // axes
+
   ctx.strokeStyle='rgba(136,135,128,.22)';ctx.lineWidth=1;
   ctx.beginPath();ctx.moveTo(mx(0),my(0)+1);ctx.lineTo(mx(1),my(0)+1);ctx.stroke();
   ctx.beginPath();ctx.moveTo(mx(0)-1,my(0));ctx.lineTo(mx(0)-1,my(.99));ctx.stroke();
-  // axis labels
+
   ctx.fillStyle='#888780';ctx.font='11px sans-serif';
   ctx.textAlign='center';ctx.fillText('allele frequency  p',mx(.5),my(0)+38);
   ctx.save();ctx.translate(13,my(.5));ctx.rotate(-Math.PI/2);
   ctx.fillText('mean fitness  f(p)',0,0);ctx.restore();
-  // peak labels
+
   [[.10,'low','#854F0B'],[.35,'low','#854F0B'],[.65,'high','#085041'],[.90,'high','#085041']].forEach(([px,lbl,c])=>{
     ctx.fillStyle=c;ctx.font='11px sans-serif';ctx.textAlign='center';
     ctx.fillText(lbl+' peak',mx(px),my(fit(px))-12);
   });
 
-  // Phase 0: tight-cluster annotation
   if(cur===0){
     const aa=Math.min(1,t*2);
     ctx.globalAlpha=aa;
@@ -143,19 +144,16 @@ function drawFrame(){
     ctx.globalAlpha=1;
   }
 
-  // Phase 1: drift balance bracket — floated up into the green fill area
   if(cur===1||(from===1&&t<.6)){
     const aa=cur===1?Math.min(1,t*1.8):Math.max(0,1-(t/.6));
     if(aa>.01){
       ctx.globalAlpha=aa;
       const allX=PHASES[1].flat();
-      const xlo=Math.min(...allX),xhi=Math.max(...allX);
-      drawBracket(xlo,xhi,'#185FA5','balance of mutation, drift, and selection  (all demes)',.075);
+      drawBracket(Math.min(...allX),Math.max(...allX),'#185FA5','balance of mutation, drift, and selection  (all demes)',.075);
       ctx.globalAlpha=1;
     }
   }
 
-  // Phase 2: shift arrows
   if(cur===2||(from===2&&t<.5)){
     const aa=cur===2?Math.min(1,t*2.5):Math.max(0,1-t/.5);
     ctx.globalAlpha=aa;
@@ -172,7 +170,6 @@ function drawFrame(){
     ctx.globalAlpha=1;
   }
 
-  // Phase 3: migration arrows + new balance bracket
   if(cur===3){
     const aa=Math.min(1,(t-.2)*1.6);
     if(aa>.01){
@@ -196,7 +193,6 @@ function drawFrame(){
     }
   }
 
-  // Individuals
   for(let d=0;d<4;d++){
     for(let i=0;i<7;i++){
       const x=lerp(PHASES[from][d][i],PHASES[cur][d][i],t);
