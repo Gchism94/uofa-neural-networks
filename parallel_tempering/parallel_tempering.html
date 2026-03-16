@@ -637,6 +637,7 @@ function render() {
     const topY  = (Math.min(sf.sy1, sf.sy2) - 45).toFixed(1);
     arc.setAttribute('d', `M${sf.sx1.toFixed(1)},${sf.sy1.toFixed(1)} Q${mx},${topY} ${sf.sx2.toFixed(1)},${sf.sy2.toFixed(1)}`);
     arc.setAttribute('stroke', col);
+    arc.setAttribute('stroke-dasharray', sf.accepted ? 'none' : '6 3');
     arc.setAttribute('opacity', '0.75');
     // Rings around swapping dots
     ra.setAttribute('cx', sf.sx1.toFixed(1)); ra.setAttribute('cy', sf.sy1.toFixed(1));
@@ -733,6 +734,7 @@ function doReset() {
   initSim();
   for (let k=0;k<4;k++) document.getElementById(`trail_${k}`).innerHTML = '';
   document.getElementById('swapArc').setAttribute('opacity','0');
+  document.getElementById('swapArc').setAttribute('stroke-dasharray','none');
   document.getElementById('swapRing_a').setAttribute('opacity','0');
   document.getElementById('swapRing_b').setAttribute('opacity','0');
   document.getElementById('swapInfo').textContent = '—';
