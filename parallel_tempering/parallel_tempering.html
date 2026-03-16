@@ -209,7 +209,13 @@ body {
 /* ── Responsive ──────────────────────────────────────── */
 @media (max-width: 540px) {
   body { padding: 0.7rem 0.7rem 1.2rem; }
-  .concept-bar { display: grid; grid-template-columns: 1fr 1fr; }
+  .concept-bar {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+  /* buttons 4 and 5 share the bottom row */
+  .cpt-btn:nth-child(4) { grid-column: 1 / 2; }
+  .cpt-btn:nth-child(5) { grid-column: 2 / 4; }
   .ctrl-grid   { grid-template-columns: 1fr; }
   .ctrl-pane   { border-right: none; border-bottom: 1px solid #d4e4d4; }
   .ctrl-pane:last-child { border-bottom: none; }
@@ -317,6 +323,7 @@ body {
     <button class="cpt-btn"        id="cb1" onclick="selectConcept(1)">swap mechanics</button>
     <button class="cpt-btn"        id="cb2" onclick="selectConcept(2)">cold chain benefit</button>
     <button class="cpt-btn"        id="cb3" onclick="selectConcept(3)">vs. SA and MCMC</button>
+    <button class="cpt-btn"        id="cb4" onclick="selectConcept(4)">why "tempering"?</button>
   </div>
   <div class="concept-desc" id="conceptDesc"></div>
 </div>
@@ -761,10 +768,12 @@ const CONCEPTS = [
 
   // 3 – vs. SA and MCMC
   'Unlike Simulated Annealing, Parallel Tempering requires <em>no cooling schedule</em> — all replicas run at fixed temperatures indefinitely. The cold chain benefits continuously from hot-chain exploration rather than relying on an early high-temperature phase that must eventually end. PT is also naturally <strong>parallelizable</strong>: replicas run independently between swap events. The tradeoff: PT requires K times more energy evaluations per step. For expensive objective functions this matters; for cheap ones like this demo, PT is often strictly better than SA. In <strong>Bayesian/MCMC</strong> applications, the cold chain is conventionally fixed at T = 1 rather than T &lt; 1, because at T = 1 the Metropolis–Hastings ratio recovers exact sampling from the target posterior — the hotter chains exist only to improve mixing, and only the cold chain\'s samples are kept.',
+  // 4 – why "tempering"?
+  'The name comes from <em>physical tempering</em> — a process for hardening glass or metal. In glass tempering, the entire pane is heated until soft, then the <strong>outside surfaces are rapidly cooled</strong> while the interior remains hot. This creates a sustained temperature gradient: cool exterior, hot interior. As the outside solidifies first and tries to contract, the still-pliable interior resists, and the resulting frozen tension makes the glass far stronger than if it had cooled uniformly. The key is that the <strong>interaction across the gradient</strong> — between regions at different temperatures — produces a property neither region could achieve alone. Parallel Tempering borrows exactly this logic: a gradient of temperatures is maintained deliberately, and the <em>interaction between replicas at different rungs</em> (the swap) is what allows the cold chain to achieve solutions it could never reach on its own. Just as the glass derives its strength from the tug between hot interior and cool exterior, the algorithm derives its power from the exchange between hot explorers and cold exploiters.',
 ];
 
 function selectConcept(idx) {
-  for (let i=0;i<4;i++) {
+  for (let i=0;i<5;i++) {
     document.getElementById('cb'+i).classList.toggle('active', i===idx);
   }
   document.getElementById('conceptDesc').innerHTML = CONCEPTS[idx];
