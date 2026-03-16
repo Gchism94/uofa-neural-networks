@@ -641,8 +641,8 @@ function render() {
     // Rings around swapping dots
     ra.setAttribute('cx', sf.sx1.toFixed(1)); ra.setAttribute('cy', sf.sy1.toFixed(1));
     rb.setAttribute('cx', sf.sx2.toFixed(1)); rb.setAttribute('cy', sf.sy2.toFixed(1));
-    ra.setAttribute('stroke', col); rb.setAttribute('stroke', col);
-    ra.setAttribute('opacity', '0.65'); rb.setAttribute('opacity', '0.65');
+    ra.setAttribute('stroke', COLORS[sf.i]); rb.setAttribute('stroke', COLORS[sf.j]);
+    ra.setAttribute('opacity', '0.80'); rb.setAttribute('opacity', '0.80');
     // Flash the ladder line
     const lineId = `lline_${sf.i}${sf.j}`;
     document.getElementById(lineId).setAttribute('stroke', col);
