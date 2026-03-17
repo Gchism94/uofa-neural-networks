@@ -74,11 +74,14 @@ p,span,div,label,button{font-family:var(--font-sans)}
 
 <div class="outer">
 <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:1.5rem;border-bottom:0.5px solid var(--color-border-tertiary)">
-  <div style="display:flex;gap:0">
+  <div style="display:flex;gap:0;flex-wrap:wrap">
     <button id="btn-sdm" onclick="switchTab('sdm')" style="padding:8px 18px;font-size:13px;background:none;border:none;border-bottom:2px solid var(--color-text-primary);cursor:pointer;color:var(--color-text-primary);font-weight:500;font-family:var(--font-sans)">Species distribution</button>
     <button id="btn-nlp" onclick="switchTab('nlp')" style="padding:8px 18px;font-size:13px;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;color:var(--color-text-secondary);font-family:var(--font-sans);font-weight:400">Language model</button>
   </div>
-  <span style="font-size:10px;color:var(--color-text-tertiary);padding-bottom:10px;white-space:nowrap">&copy; 2026 Theodore P. Pavlic &mdash; MIT License</span>
+  <div style="display:flex;flex-direction:column;align-items:flex-end;padding-bottom:8px;flex-shrink:0;margin-left:12px">
+    <span style="font-size:10px;color:var(--color-text-tertiary);white-space:nowrap">&copy; 2026 Theodore P. Pavlic</span>
+    <span style="font-size:10px;color:var(--color-text-tertiary);white-space:nowrap">MIT License</span>
+  </div>
 </div>
 
 <div id="tab-sdm" style="display:flex;gap:1.5rem;flex-wrap:wrap;align-items:flex-start">
