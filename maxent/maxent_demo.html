@@ -38,7 +38,9 @@
   --border-radius-lg:12px;
 }
 *{box-sizing:border-box;margin:0;padding:0;font-family:var(--font-sans)}
-.grid{display:grid;grid-template-columns:repeat(10,1fr);gap:2px;max-width:420px}
+.outer{max-width:860px}
+.grid{display:grid;grid-template-columns:repeat(10,1fr);gap:2px;width:100%}
+.grid-wrap{max-width:420px}
 .cell{aspect-ratio:1;border-radius:3px;cursor:pointer;border:2px solid transparent;position:relative;overflow:hidden;transition:border-color 0.1s}
 .cell.occ{border-color:var(--color-text-primary)}
 .cell.occ::after{content:'';position:absolute;top:25%;left:25%;width:50%;height:50%;border-radius:50%;background:var(--color-text-primary)}
@@ -70,20 +72,22 @@
 p,span,div,label,button{font-family:var(--font-sans)}
 </style>
 
-<div style="padding:1rem 0">
+<div class="outer" style="padding:1rem 0">
 <div style="display:flex;gap:0;margin-bottom:1.5rem;border-bottom:0.5px solid var(--color-border-tertiary)">
   <button id="btn-sdm" onclick="switchTab('sdm')" style="padding:8px 18px;font-size:13px;background:none;border:none;border-bottom:2px solid var(--color-text-primary);cursor:pointer;color:var(--color-text-primary);font-weight:500;font-family:var(--font-sans)">Species distribution</button>
   <button id="btn-nlp" onclick="switchTab('nlp')" style="padding:8px 18px;font-size:13px;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;color:var(--color-text-secondary);font-family:var(--font-sans);font-weight:400">Language model</button>
 </div>
 
-<div id="tab-sdm" style="display:flex;gap:1.5rem;flex-wrap:wrap">
-  <div style="flex:1;min-width:280px">
+<div id="tab-sdm" style="display:flex;gap:1.5rem;flex-wrap:wrap;align-items:flex-start">
+  <div style="flex:1;min-width:280px;max-width:460px">
     <p style="font-size:13px;color:var(--color-text-secondary);margin-bottom:0.75rem;line-height:1.6">Click cells to record species observations. In all views, <strong style="font-weight:500">darker = higher value</strong>: darker green = higher probability; darker amber/red/blue in the strip = higher elevation/temperature/moisture. The strip colors match the single-layer views exactly. Cells whose feature strip best matches the averages observed in your clicks receive the highest (darkest green) probability.</p>
-    <div class="grid" id="sdm-grid"></div>
-    <div class="legend-row">
-      <span>low prob</span>
-      <div class="legend-grad" style="background:linear-gradient(to right,rgb(234,243,222),rgb(23,52,4))"></div>
-      <span>high prob</span>
+    <div class="grid-wrap">
+      <div class="grid" id="sdm-grid"></div>
+      <div class="legend-row">
+        <span>low prob</span>
+        <div class="legend-grad" style="background:linear-gradient(to right,rgb(234,243,222),rgb(23,52,4))"></div>
+        <span>high prob</span>
+      </div>
     </div>
     <div style="margin-top:10px;font-size:12px;color:var(--color-text-secondary)">Entropy: <strong id="entropy-val" style="color:var(--color-text-primary)">4.605</strong> <span id="entropy-pct" style="color:var(--color-text-tertiary)">(100.0% of max)</span></div>
     <button class="clrbtn" onclick="clearOcc()">Clear observations</button>
@@ -116,8 +120,8 @@ p,span,div,label,button{font-family:var(--font-sans)}
   <p style="font-size:13px;color:var(--color-text-secondary);margin-bottom:0.75rem;line-height:1.6">Click words to add them to the corpus. Each word shows feature badges: <span style="background:#EAF3DE;color:#3B6D11;padding:1px 4px;border-radius:3px;font-size:11px;font-weight:500">N</span> nature word, <span style="background:#FAEEDA;color:#633806;padding:1px 4px;border-radius:3px;font-size:11px;font-weight:500">noun</span>, <span style="background:#E6F1FB;color:#0C447C;padding:1px 4px;border-radius:3px;font-size:11px;font-weight:500">long</span>. Hover a word to see which others share its features — those are outlined in blue and receive a probability boost from the same constraints.</p>
   <div id="word-btns" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:1rem;padding:4px"></div>
   <div id="hover-note" style="font-size:12px;color:var(--color-text-secondary);margin-bottom:1rem;height:2.8rem;overflow:hidden;line-height:1.6"></div>
-  <div style="display:flex;gap:1.5rem;flex-wrap:wrap">
-    <div style="flex:1;min-width:240px">
+  <div style="display:flex;gap:1.5rem;flex-wrap:wrap;align-items:flex-start">
+    <div style="flex:1;min-width:240px;max-width:460px">
       <div class="sl" style="margin-bottom:12px">Word probability</div>
       <div id="nlp-bars" style="padding:4px"></div>
       <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:8px;line-height:1.5">Vertical line = uniform (12.5%, no data). <span style="color:#3B6D11">Green</span> = above uniform; <span style="color:#A32D2D">red</span> = below.</div>
