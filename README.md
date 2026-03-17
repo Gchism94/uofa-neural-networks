@@ -26,7 +26,7 @@ as iframes.
 | [`ideal_free_distribution/`](ideal_free_distribution/) | Interactive visualization of the Ideal Free Distribution, motivating fitness sharing in multi-modal GAs |
 | [`evolution_as_movement_in_drift_field/`](evolution_as_movement_in_drift_field/) | Graphical explainer of selection, drift, and mutation as parallel forces pushing a population toward fixation |
 
-### Physics-Inspired Metaheuristics
+### Physics-Inspired Methods
 
 | Directory | Description |
 | --- | --- |

@@ -100,7 +100,7 @@ Current sections and their placeholder comments:
 | Section heading | Placeholder comment |
 | --- | --- |
 | Intuition Pumps for Genetic Algorithms | `<!-- Add more GA intuition demos here -->` |
-| Physics-Inspired Metaheuristics | `<!-- Add more physics-inspired demos here -->` |
+| Physics-Inspired Methods | `<!-- Add more physics-inspired demos here -->` |
 | Neural Networks | `<!-- Add more neural network demos here -->` |
 
 To add a **new section**, copy the structure of an existing `<section class="demo-section">`
@@ -132,7 +132,7 @@ Add a row to the appropriate table under `## Contents`:
 - `ideal_free_distribution/ifd_on_pond.html`
 - `evolution_as_movement_in_drift_field/evolution_as_movement_in_drift_field.html` *(static figure)*
 
-### Physics-Inspired Metaheuristics
+### Physics-Inspired Methods
 
 - `simulated_annealing/simulated_annealing_demo.html`
 - `parallel_tempering/parallel_tempering.html`
@@ -142,6 +142,35 @@ Add a row to the appropriate table under `## Contents`:
 ### Neural Networks
 
 - `radial_basis_function_nn/rbfnn_explorer.html`
+
+---
+
+## Course unit structure
+
+Use this to decide which section a new demo belongs in. Section titles deliberately match the
+course unit vocabulary so students can orient themselves.
+
+| Course unit | Topics | Index section |
+| --- | --- | --- |
+| Unit 1 | Genetic algorithms, evolutionary algorithms, genetic drift | Intuition Pumps for Genetic Algorithms |
+| Unit 2 | Evolution Strategies, CMA-ES, genetic/evolutionary programming, artificial immune systems | Intuition Pumps for Genetic Algorithms |
+| Unit 3 | Multi-objective optimization, MOEA, Pareto ranking, niching | Intuition Pumps for Genetic Algorithms |
+| Unit 4 | Multi-modal optimization, diversity/niching methods, distributed/parallel GAs | Intuition Pumps for Genetic Algorithms |
+| Unit 5 | Simulated Annealing, MaxEnt, Gibbs/softmax, Metropolis–Hastings, MCMC | Physics-Inspired Methods |
+| Unit 6 | Ant Colony Optimization, Bacterial Foraging, Particle Swarm Optimization | *(no section yet — add "Swarm Intelligence")* |
+| Unit 7 | Perceptrons, RNNs, Hebbian learning, STDP, spiking neural networks | Neural Networks |
+| Unit 8 *(if time)* | Cellular automata | *(no section yet)* |
+| Unit 9 *(if time)* | Stochastic policies, multi-scale robotics | *(no section yet)* |
+
+**Section title rationale:**
+
+- *"Intuition Pumps for Genetic Algorithms"* — these demos build conceptual intuition for GA
+  mechanics (population diversity, fitness landscape, drift) rather than demoing the GA itself.
+  The phrase "intuition pump" (Dennett) signals that these are conceptual tools, not algorithm demos.
+- *"Physics-Inspired Methods"* — matches Unit 5 phrasing exactly; covers both the metaheuristic
+  side (SA, PT) and the probabilistic/information-theoretic side (MaxEnt, Gibbs/softmax), all of
+  which share roots in statistical mechanics and the Boltzmann distribution.
+- *"Neural Networks"* — straightforward; covers Unit 7 content.
 
 ## Shared conventions
 
