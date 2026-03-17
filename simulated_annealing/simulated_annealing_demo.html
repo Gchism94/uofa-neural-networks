@@ -33,6 +33,28 @@ body {
   line-height: 1.5;
 }
 
+/* ── Landscape selector ──────────────────────────────── */
+.landscape-bar {
+  display: flex;
+  border-bottom: 1.5px solid #c4d8c4;
+}
+.land-btn {
+  flex: 1;
+  padding: 0.42rem 0.5rem;
+  font-family: inherit;
+  font-size: 0.80rem;
+  border: none;
+  border-right: 1px solid #c4d8c4;
+  background: #e8f5e8;
+  color: #2a4a2a;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  text-align: center;
+}
+.land-btn:last-child { border-right: none; }
+.land-btn:hover  { background: #d4eed4; }
+.land-btn.active { background: #1b5e2e; color: #fff; font-weight: 600; }
+
 /* ── Figure ─────────────────────────────────────────── */
 .fig-wrap {
   border: 1.5px solid #c4d8c4;
@@ -304,6 +326,10 @@ input[type="range"].t-slider::-webkit-slider-thumb:active { cursor: grabbing; }
 
 <!-- ── Energy landscape figure ────────────────────────────────── -->
 <div class="fig-wrap">
+  <div class="landscape-bar">
+    <button class="land-btn"        id="lb-smooth" onclick="selectLandscape('smooth')">smooth landscape · one clear basin</button>
+    <button class="land-btn active" id="lb-rough"  onclick="selectLandscape('rough')">rough landscape · many local minima</button>
+  </div>
   <svg id="mainSvg" viewBox="0 0 800 278" xmlns="http://www.w3.org/2000/svg">
     <defs>
       <linearGradient id="fillGrad" x1="0" y1="0" x2="0" y2="1">
@@ -452,32 +478,60 @@ const SIGMA  = 0.28;   // Gaussian proposal std-dev (in x-units)
 const TRAIL  = 60;     // trail length
 const STEPMS = 28;     // ~35 steps / s
 
-// ── Energy landscape ─────────────────────────────────────────────────────────
-function E(x) {
-  return (
-    1.40 * Math.sin(x * 1.10) +
-    0.85 * Math.sin(x * 2.90 + 0.80) +
-    0.55 * Math.sin(x * 5.80 + 1.50) +
-    0.30 * Math.sin(x * 11.70 + 2.70) +
-    0.18 * Math.sin(x * 23.20 + 0.40) -
-    3.10 * Math.exp(-0.70 * Math.pow(x - 7.85, 2))
-  );
-}
+// ── Energy landscapes ─────────────────────────────────────────────────────────
+const LANDSCAPES = {
+  rough: {
+    E(x) {
+      return (
+        1.40 * Math.sin(x * 1.10) +
+        0.85 * Math.sin(x * 2.90 + 0.80) +
+        0.55 * Math.sin(x * 5.80 + 1.50) +
+        0.30 * Math.sin(x * 11.70 + 2.70) +
+        0.18 * Math.sin(x * 23.20 + 0.40) -
+        3.10 * Math.exp(-0.70 * Math.pow(x - 7.85, 2))
+      );
+    },
+  },
+  smooth: {
+    // Two-basin landscape: a broad shallow local minimum near x≈2.5
+    // and a deeper global minimum near x≈7.5, separated by a gentle ridge.
+    // No high-frequency roughness — SA with moderate cooling reliably finds it.
+    E(x) {
+      return (
+        -2.20 * Math.exp(-0.30 * Math.pow(x - 7.50, 2)) +   // deep global basin
+         0.90 * Math.exp(-0.35 * Math.pow(x - 2.50, 2)) * (-1) +  // shallow local basin (negative = lower)
+         0.60 * Math.sin(x * 0.60 + 0.50) +                  // gentle long-wave undulation
+         0.18 * Math.sin(x * 1.50 + 1.20)                    // very mild texture
+      );
+    },
+  },
+};
 
-// Pre-sample curve
+// Active landscape id
+let activeLandscape = 'rough';
+function E(x) { return LANDSCAPES[activeLandscape].E(x); }
+
+// Mutable pre-sample data (recomputed on landscape switch)
 const NS = 1000;
 const Xs = Array.from({length: NS + 1}, (_, i) => XMIN + i * (XMAX - XMIN) / NS);
-const Ys = Xs.map(E);
-const E_RAW_MIN = Math.min(...Ys);
-const E_RAW_MAX = Math.max(...Ys);
-const ESPAN = E_RAW_MAX - E_RAW_MIN;
-const ELO   = E_RAW_MIN - ESPAN * 0.10;   // axis lower bound
-const EHI   = E_RAW_MAX + ESPAN * 0.10;   // axis upper bound
+let Ys, E_RAW_MIN, E_RAW_MAX, ESPAN, ELO, EHI, gIdx, GMIN_X, GMIN_E;
 
-// Locate global minimum
-let gIdx = 0;
-for (let i = 1; i < Ys.length; i++) if (Ys[i] < Ys[gIdx]) gIdx = i;
-const GMIN_X = Xs[gIdx], GMIN_E = Ys[gIdx];
+function resample() {
+  for (let i = 0; i <= NS; i++) Ys[i] = E(Xs[i]);
+  E_RAW_MIN = Math.min(...Ys);
+  E_RAW_MAX = Math.max(...Ys);
+  ESPAN = E_RAW_MAX - E_RAW_MIN;
+  ELO   = E_RAW_MIN - ESPAN * 0.10;
+  EHI   = E_RAW_MAX + ESPAN * 0.10;
+  gIdx  = 0;
+  for (let i = 1; i <= NS; i++) if (Ys[i] < Ys[gIdx]) gIdx = i;
+  GMIN_X = Xs[gIdx];
+  GMIN_E = Ys[gIdx];
+}
+
+// Initial sample
+Ys = new Array(NS + 1);
+resample();
 
 // ── Coordinate transforms ────────────────────────────────────────────────────
 function px(x) { return PL + (x - XMIN) / (XMAX - XMIN) * PW; }
@@ -502,8 +556,8 @@ function tempColor(t01) {
   return `rgb(${r},${g},${b})`;
 }
 
-// ── Build static SVG elements ────────────────────────────────────────────────
-(function buildStatic() {
+// ── Build/rebuild landscape SVG elements ─────────────────────────────────────
+function rebuildLandscape() {
   // Grid + y-tick labels
   const NGRID = 5;
   let gh = '';
@@ -517,7 +571,7 @@ function tempColor(t01) {
   }
   document.getElementById('gridLines').innerHTML = gh;
 
-  // X-tick marks + labels
+  // X-tick marks + labels (only needed once but harmless to redo)
   let th = '';
   for (let x = 0; x <= 10; x += 2) {
     const sx = px(x);
@@ -545,7 +599,7 @@ function tempColor(t01) {
   document.getElementById('minDot').setAttribute('cy', my);
   document.getElementById('minLabel').setAttribute('x', mx);
   document.getElementById('minLabel').setAttribute('y', (parseFloat(my) - 10).toFixed(1));
-})();
+}
 
 // ── Gaussian random number (Box-Muller) ──────────────────────────────────────
 function randn() {
@@ -914,7 +968,19 @@ function autoAnnotate() {
 // Unpin when slider moves
 sliderEl.addEventListener('input', () => { conceptPinned = false; });
 
+// ── Landscape selector ────────────────────────────────────────────────────────
+function selectLandscape(name) {
+  if (name === activeLandscape) return;
+  activeLandscape = name;
+  document.getElementById('lb-rough').classList.toggle('active',  name === 'rough');
+  document.getElementById('lb-smooth').classList.toggle('active', name === 'smooth');
+  resample();
+  rebuildLandscape();
+  doReset();   // reset clears particle, trail, best, redraws
+}
+
 // ── Boot ──────────────────────────────────────────────────────────────────────
+rebuildLandscape();
 render();
 showConcept(0);
 </script>
