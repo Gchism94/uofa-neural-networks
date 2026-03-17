@@ -18,6 +18,14 @@ as iframes.
 
 ## Contents
 
+### Intuition Pumps for Genetic Algorithms
+
+| Directory | Description |
+| --- | --- |
+| [`shifting_balance_theory/`](shifting_balance_theory/) | Interactive walkthrough of Sewall Wright's Shifting Balance Theory: genetic drift, within-deme selection, and interdemic migration |
+| [`ideal_free_distribution/`](ideal_free_distribution/) | Interactive visualization of the Ideal Free Distribution, motivating fitness sharing in multi-modal GAs |
+| [`evolution_as_movement_in_drift_field/`](evolution_as_movement_in_drift_field/) | Graphical explainer of selection, drift, and mutation as parallel forces pushing a population toward fixation |
+
 ### Physics-Inspired Metaheuristics
 
 | Directory | Description |
@@ -26,14 +34,6 @@ as iframes.
 | [`parallel_tempering/`](parallel_tempering/) | Interactive explainer for Parallel Tempering / REMC: fixed-temperature SA replicas at different temperatures with periodic configuration swaps |
 | [`softmax/`](softmax/) | Interactive explorer for the softmax (Gibbs) distribution: how temperature interpolates between uniform exploration and greedy exploitation, connecting MaxEnt methods to SA and reinforcement learning |
 | [`maxent/`](maxent/) | Interactive explainer for the Maximum Entropy principle: how MaxEnt selects the least-assumptive distribution consistent with known constraints, deriving the Gibbs/softmax distribution |
-
-### Intuition Pumps for Genetic Algorithms
-
-| Directory | Description |
-| --- | --- |
-| [`shifting_balance_theory/`](shifting_balance_theory/) | Interactive walkthrough of Sewall Wright's Shifting Balance Theory: genetic drift, within-deme selection, and interdemic migration |
-| [`ideal_free_distribution/`](ideal_free_distribution/) | Interactive visualization of the Ideal Free Distribution, motivating fitness sharing in multi-modal GAs |
-| [`evolution_as_movement_in_drift_field/`](evolution_as_movement_in_drift_field/) | Graphical explainer of selection, drift, and mutation as parallel forces pushing a population toward fixation |
 
 ### Neural Networks
 
