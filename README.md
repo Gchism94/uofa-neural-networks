@@ -1,4 +1,4 @@
-# Bio-Inspired AI & Optimization — Course Visualizations
+# Bio-Inspired AI & Optimization – Course Visualizations
 
 Supplemental web visualizations for **CSE/IEE 598: Bio-Inspired AI & Optimization** at
 [Arizona State University](https://www.asu.edu/), taught by
@@ -9,9 +9,9 @@ Supplemental web visualizations for **CSE/IEE 598: Bio-Inspired AI & Optimizatio
 **Live site:** <https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/>
 
 The course surveys algorithms for optimization and multi-agent control inspired by biological
-and physical systems — genetic algorithms, simulated annealing, swarm intelligence, neural
+and physical systems – genetic algorithms, simulated annealing, swarm intelligence, neural
 computation, and more. These visualizations are designed to build intuition for the concepts
-behind those algorithms, and to be usable both standalone and embedded in Canvas LMS pages
+behind those algorithms and to be usable both standalone and embedded in Canvas LMS pages
 as iframes.
 
 ---
@@ -55,10 +55,14 @@ For a new `my_demo.html`, the checklist is:
 
 1. **`<head>` metadata:**
 
-   * include `<title>`, `<meta name="description">`, and the full Open Graph + Twitter card block (see any existing demo for the template)
-   * Use the preview image as `og:image` and `twitter:image`; set width/height accurately. For Twitter/X, the image should be close to **2:1 aspect ratio** and under **5 MB**.
+   * Include `<title>`, `<meta name="description">`, and the full Open Graph + Twitter
+     card block (see any existing demo for the template)
+   * Use the preview image as `og:image` and `twitter:image`; set width/height
+     accurately
+   * For Twitter/X, the image should be close to **2:1 aspect ratio**
+     and under **5 MB**
 
-2. **Back-link footer** — add at the bottom of `<body>`:
+2. **Back-link footer** – add at the bottom of `<body>`:
 
    ```html
    <footer style="margin-top:1.5rem;padding-top:0.75rem;border-top:1px solid #e0e0e0;font-size:0.8rem;color:#888;">
@@ -69,7 +73,7 @@ For a new `my_demo.html`, the checklist is:
 
    The script hides the footer when the page is embedded in a Canvas iframe.
 
-3. **Index entry** — add a `<li>` to the appropriate `<section>` in [`index.html`](index.html),
+3. **Index entry** – add a `<li>` to the appropriate `<section>` in [`index.html`](index.html),
    following the existing pattern (thumbnail + title + one-sentence description).
 
 ---
