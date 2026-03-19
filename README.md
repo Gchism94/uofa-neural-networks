@@ -34,6 +34,7 @@ as iframes.
 | [`parallel_tempering/`](parallel_tempering/) | Interactive explainer for Parallel Tempering / REMC: fixed-temperature SA replicas at different temperatures with periodic configuration swaps |
 | [`softmax/`](softmax/) | Interactive explorer for the softmax (Gibbs) distribution: how temperature interpolates between uniform exploration and greedy exploitation, connecting MaxEnt methods to SA and reinforcement learning |
 | [`maxent/`](maxent/) | Interactive explainer for the Maximum Entropy principle: how MaxEnt selects the least-assumptive distribution consistent with known constraints, deriving the Gibbs/softmax distribution |
+| [`boltzmann_maxent/`](boltzmann_maxent/) | Interactive simulation of N agents trading random amounts of a conserved quantity — any initial distribution relaxes to the Boltzmann (exponential) equilibrium |
 
 ### Neural Networks
 
