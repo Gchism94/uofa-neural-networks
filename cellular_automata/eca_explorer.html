@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ECA Explorer — Elementary Cellular Automata</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:        #f7f7f5;
+  --surface:   #ffffff;
+  --surface2:  #f0f2ee;
+  --border:    #d4dace;
+  --border2:   #b8c4b0;
+  --green:     #1a5c38;
+  --green-mid: #2e7d52;
+  --green-lt:  #e8f0ea;
+  --green-bg:  #f2f6f2;
+  --amber:     #c05a00;
+  --amber-lt:  #fdf2e6;
+  --blue:      #1a4a7a;
+  --text:      #1a1a18;
+  --text-mid:  #4a5240;
+  --text-dim:  #7a8870;
+  --text-xdim: #aab4a0;
+  --radius:    6px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 20px 22px 28px;
+  min-width: 580px;
+}
+h1 { font-size: 1.2rem; font-weight: 700; margin-bottom: 3px; }
+.subtitle { font-size: 0.78rem; color: var(--text-dim); margin-bottom: 16px; }
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+.card-label {
+  font-size: 0.65rem; font-weight: 600;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--text-dim); margin-bottom: 10px;
+}
+/* ── Triplets ── */
+.triplets-row { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 2px; }
+.triplets-row::-webkit-scrollbar { height: 4px; }
+.triplets-row::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+.triplet-col {
+  flex: 1; min-width: 52px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 8px 4px 10px;
+  border: 1.5px solid var(--border); border-radius: var(--radius);
+  cursor: pointer; user-select: none; background: var(--surface);
+  transition: border-color 0.12s, background 0.12s;
+}
+.triplet-col:hover { border-color: var(--border2); background: var(--surface2); }
+.triplet-col.out1 { border-color: var(--amber); background: var(--amber-lt); }
+.tetris { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.t-top { display: flex; gap: 2px; }
+.t-bot { display: flex; justify-content: center; }
+.t-arrow { font-size: 0.6rem; color: var(--text-xdim); line-height: 1; }
+.tcell { width: 13px; height: 13px; border-radius: 2px; border: 1.5px solid var(--border2); transition: background 0.1s; }
+.tcell.on  { background: var(--green); border-color: var(--green); }
+.tcell.off { background: var(--surface); }
+.tcell.out-cell { width: 13px; height: 13px; border-radius: 2px; border: 1.5px solid var(--border2); transition: background 0.1s; }
+.tcell.out-cell.on  { background: var(--amber); border-color: var(--amber); }
+.tcell.out-cell.off { background: var(--surface); }
+.t-binlabel { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--text-mid); }
+.t-idxlabel { font-size: 0.55rem; color: var(--text-xdim); }
+.t-output-big { font-family: 'JetBrains Mono', monospace; font-size: 1.1rem; font-weight: 600; color: var(--text-xdim); line-height: 1; }
+.t-output-big.on { color: var(--amber); }
+/* ── Rule number ── */
+.rule-num-row { display: flex; align-items: flex-start; gap: 24px; margin-top: 14px; flex-wrap: wrap; }
+.rule-numbers { display: flex; gap: 20px; align-items: baseline; flex-wrap: wrap; }
+.rng-label { font-size: 0.62rem; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.09em; margin-bottom: 1px; }
+.rule-dec { font-family: 'JetBrains Mono', monospace; font-size: 2rem; font-weight: 600; color: var(--green); line-height: 1; }
+.rule-hex { font-family: 'JetBrains Mono', monospace; font-size: 1.1rem; font-weight: 600; color: var(--blue); }
+.rule-bin-display { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--text-dim); letter-spacing: 0.15em; }
+.rule-bin-display .b1 { color: var(--amber); font-weight: 600; }
+.rule-slider-block { flex: 1; min-width: 140px; padding-top: 2px; }
+.slider-label { font-size: 0.62rem; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.09em; margin-bottom: 6px; }
+input[type=range] { -webkit-appearance: none; width: 100%; height: 4px; background: var(--border); border-radius: 2px; cursor: pointer; outline: none; }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--green); border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+input[type=range].amber-thumb::-webkit-slider-thumb { background: var(--amber); }
+input[type=range].blue-thumb::-webkit-slider-thumb  { background: var(--blue); }
+.rule-desc { font-size: 0.72rem; color: var(--text-dim); margin-top: 6px; min-height: 1.3em; font-style: italic; }
+.rule-desc.notable { color: var(--green-mid); font-weight: 500; font-style: normal; }
+/* ── Notable ── */
+.notable-row { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 10px; align-items: center; }
+.notable-label { font-size: 0.65rem; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; margin-right: 2px; }
+.nbtn { font-family: 'Inter', sans-serif; font-size: 0.7rem; font-weight: 500; padding: 3px 10px; border-radius: 20px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text-mid); cursor: pointer; transition: all 0.12s; white-space: nowrap; }
+.nbtn:hover { border-color: var(--green-mid); color: var(--green); background: var(--green-bg); }
+.nbtn.active-rule { border-color: var(--green); background: var(--green); color: #fff; }
+/* ── Controls ── */
+.controls-strip { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.ctrl-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 11px 14px; min-width: 150px; }
+.ctrl-label { font-size: 0.65rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px; }
+.ctrl-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.btn { font-family: 'Inter', sans-serif; font-size: 0.78rem; font-weight: 500; padding: 5px 13px; border-radius: var(--radius); border: 1.5px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; transition: all 0.12s; white-space: nowrap; }
+.btn:hover { border-color: var(--green-mid); background: var(--green-bg); color: var(--green); }
+.btn.primary { background: var(--green); border-color: var(--green); color: #fff; }
+.btn.primary:hover { background: var(--green-mid); border-color: var(--green-mid); color: #fff; }
+.btn.go-active { background: var(--green); border-color: var(--green); color: #fff; }
+.btn.danger:hover { border-color: #b03030; color: #b03030; background: #fdf2f2; }
+.param-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 0.68rem; color: var(--text-dim); }
+.param-row input[type=range] { width: 80px; }
+.param-val { color: var(--text); font-weight: 500; min-width: 42px; font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; }
+.cell-sel { background: var(--surface); border: 1.5px solid var(--border); color: var(--text); font-family: 'Inter', sans-serif; font-size: 0.72rem; padding: 3px 6px; border-radius: 4px; cursor: pointer; outline: none; }
+.color-row { display: flex; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
+.color-item { display: flex; align-items: center; gap: 5px; font-size: 0.68rem; color: var(--text-dim); }
+input[type=color] { width: 26px; height: 20px; border: 1.5px solid var(--border); border-radius: 3px; cursor: pointer; padding: 1px; background: none; }
+.wrap-toggle { display: flex; align-items: center; gap: 6px; font-size: 0.7rem; color: var(--text-mid); cursor: pointer; user-select: none; margin-top: 8px; }
+.wrap-toggle input { cursor: pointer; accent-color: var(--green); }
+/* ── Canvas ── */
+.canvas-wrap { position: relative; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: #f8faf8; }
+#ca-canvas { display: block; width: 100%; image-rendering: pixelated; image-rendering: crisp-edges; cursor: crosshair; }
+.canvas-hint { position: absolute; bottom: 6px; right: 10px; font-size: 0.62rem; color: var(--text-xdim); pointer-events: none; }
+/* ── Stat bar ── */
+.stat-bar { display: flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface); margin-top: 10px; }
+.stat-item { flex: 1; padding: 10px 14px; border-right: 1px solid var(--border); }
+.stat-item:last-child { border-right: none; }
+.stat-name { font-size: 0.63rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 3px; }
+.stat-val { font-family: 'JetBrains Mono', monospace; font-size: 1.1rem; font-weight: 600; color: var(--text); }
+.stat-sub { font-size: 0.62rem; color: var(--text-xdim); margin-top: 1px; }
+.footnote { font-size: 0.68rem; color: var(--text-dim); margin-top: 10px; line-height: 1.65; }
+.footnote b { color: var(--text-mid); font-weight: 600; }
+.copyright { font-size: 0.62rem; color: var(--text-xdim); margin-top: 14px; text-align: right; }
+</style>
+</head>
+<body>
+
+<h1>ECA Explorer — Elementary Cellular Automata</h1>
+<div class="subtitle">Each cell's next state depends only on its own state and its two immediate neighbors (3-cell neighborhood → 8 patterns → 2<sup>8</sup> = 256 possible rules).</div>
+
+<!-- Rule Lookup Table -->
+<div class="card">
+  <div class="card-label">Rule Lookup Table — neighborhood pattern → new center cell (click any column to toggle its output)</div>
+  <div class="triplets-row" id="triplets-container"></div>
+
+  <div class="rule-num-row">
+    <div>
+      <div class="rule-numbers">
+        <div>
+          <div class="rng-label">Rule</div>
+          <div class="rule-dec" id="rule-dec">30</div>
+        </div>
+        <div>
+          <div class="rng-label">Hex</div>
+          <div class="rule-hex" id="rule-hex">0x1E</div>
+        </div>
+        <div>
+          <div class="rng-label">Binary (bit 7 → bit 0)</div>
+          <div class="rule-bin-display" id="rule-bin"></div>
+        </div>
+      </div>
+      <div class="rule-desc" id="rule-desc"></div>
+    </div>
+    <div class="rule-slider-block">
+      <div class="slider-label">Rule number (0 – 255)</div>
+      <input type="range" id="rule-slider" min="0" max="255" value="30">
+    </div>
+  </div>
+
+  <div class="notable-row">
+    <span class="notable-label">Notable:</span>
+    <button class="nbtn" onclick="setRule(30)">30 · chaos</button>
+    <button class="nbtn" onclick="setRule(45)">45 · quasi-random</button>
+    <button class="nbtn" onclick="setRule(51)">51 · toggle</button>
+    <button class="nbtn" onclick="setRule(54)">54 · complex</button>
+    <button class="nbtn" onclick="setRule(90)">90 · Sierpiński</button>
+    <button class="nbtn" onclick="setRule(105)">105 · complex</button>
+    <button class="nbtn" onclick="setRule(110)">110 · universal</button>
+    <button class="nbtn" onclick="setRule(126)">126 · nested</button>
+    <button class="nbtn" onclick="setRule(150)">150 · XOR</button>
+    <button class="nbtn" onclick="setRule(170)">170 · left shift</button>
+    <button class="nbtn" onclick="setRule(184)">184 · traffic</button>
+    <button class="nbtn" onclick="setRule(204)">204 · identity</button>
+    <button class="nbtn" onclick="setRule(232)">232 · majority</button>
+    <button class="nbtn" onclick="setRule(240)">240 · right shift</button>
+  </div>
+</div>
+
+<!-- Controls -->
+<div class="controls-strip">
+  <div class="ctrl-panel">
+    <div class="ctrl-label">Initial Condition</div>
+    <div class="ctrl-row">
+      <button class="btn primary" onclick="setupSingle()">Single cell</button>
+      <button class="btn" onclick="setupRandom()">Random</button>
+      <button class="btn danger" onclick="resetCanvas()">Reset</button>
+    </div>
+    <div class="param-row">
+      Density
+      <input type="range" class="amber-thumb" id="density-sl" min="1" max="99" value="30">
+      <span class="param-val" id="density-val">30%</span>
+    </div>
+  </div>
+
+  <div class="ctrl-panel">
+    <div class="ctrl-label">Playback</div>
+    <div class="ctrl-row">
+      <button class="btn primary" id="go-btn" onclick="toggleRun()">▶ Run</button>
+      <button class="btn" onclick="stepOnce()">Step</button>
+    </div>
+    <div class="param-row">
+      Speed
+      <input type="range" class="blue-thumb" id="speed-sl" min="1" max="120" value="20">
+      <span class="param-val" id="speed-val">20 r/s</span>
+    </div>
+  </div>
+
+  <div class="ctrl-panel">
+    <div class="ctrl-label">Display</div>
+    <div class="ctrl-row" style="gap:8px;font-size:0.72rem;color:var(--text-mid);">
+      Cell size
+      <select class="cell-sel" id="cell-sel" onchange="changeCellSize()">
+        <option value="2">2 px</option>
+        <option value="3">3 px</option>
+        <option value="4" selected>4 px</option>
+        <option value="6">6 px</option>
+        <option value="8">8 px</option>
+        <option value="10">10 px</option>
+      </select>
+      Height
+      <select class="cell-sel" id="height-sel" onchange="changeCanvasHeight()">
+        <option value="250">250 px</option>
+        <option value="360" selected>360 px</option>
+        <option value="480">480 px</option>
+        <option value="600">600 px</option>
+      </select>
+    </div>
+    <div class="color-row">
+      <div class="color-item">On color <input type="color" id="color-on" value="#1a5c38"></div>
+      <div class="color-item">Off color <input type="color" id="color-off" value="#f8faf8"></div>
+    </div>
+    <label class="wrap-toggle">
+      <input type="checkbox" id="wrap-chk" checked>
+      Periodic boundaries (wrap edges)
+    </label>
+  </div>
+</div>
+
+<!-- Spacetime Diagram -->
+<div class="canvas-wrap">
+  <canvas id="ca-canvas" height="360"></canvas>
+  <div class="canvas-hint">click or drag to toggle cells</div>
+</div>
+
+<!-- Stats -->
+<div class="stat-bar">
+  <div class="stat-item">
+    <div class="stat-name">Generation</div>
+    <div class="stat-val" id="gen-num">0</div>
+    <div class="stat-sub">rows computed</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-name">Grid width</div>
+    <div class="stat-val" id="width-num">—</div>
+    <div class="stat-sub">cells per row</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-name">Active cells</div>
+    <div class="stat-val" id="active-num">—</div>
+    <div class="stat-sub">in current row</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-name">Boundaries</div>
+    <div class="stat-val" id="wrap-stat">periodic</div>
+    <div class="stat-sub">edge condition</div>
+  </div>
+</div>
+
+<div class="footnote" style="margin-top:10px;">
+  <b>Reading the rule table:</b> each column shows one 3-cell neighborhood (top row, green = 1) and the new center cell it produces (bottom, amber = 1).
+  Columns run from <b>111</b> (index 7) on the left down to <b>000</b> (index 0) on the right.
+  The rule number is the 8-bit integer whose bits are exactly the output row read left-to-right (bit 7 → bit 0).
+  Viewing the rule in <b>hex</b> lets you immediately see which output bits are set without counting.
+  The slider, number display, and lookup table all stay synchronized — you can drive the rule from any of them.
+</div>
+
+<div class="copyright">© 2026 Theodore P. Pavlic · MIT License</div>
+
+<script>
+const NOTABLE_DESCS = {
+  0:   'All cells die immediately (all outputs = 0).',
+  18:  'Produces a fractal, left-leaning triangular pattern.',
+  30:  'Class III — chaotic; used as a PRNG in Mathematica.',
+  45:  'Class III — quasi-random, no obvious spatial symmetry.',
+  54:  'Class IV — complex, localized structures emerge.',
+  60:  'Additive rule (XOR of left and center neighbors); fractal output.',
+  90:  'Additive (XOR of left + right); classic Sierpiński triangle.',
+  105: 'Complex behavior; self-similar gliders.',
+  110: 'Class IV — proven Turing-complete (Cook, 2004).',
+  126: 'Complex nested pattern; related to rule 30 by reflection.',
+  150: 'Additive (XOR of all three); Sierpiński triangle variant.',
+  184: 'Models single-lane traffic flow; conserves particle count.',
+  255: 'All cells become 1 immediately (all outputs = 1).',
+  51:  'Toggle — every cell inverts each step regardless of neighbors (complement rule).',
+  170: 'Left shift — every cell copies its right neighbor; pattern slides left each generation.',
+  204: 'Identity — every cell copies itself; pattern is frozen in time.',
+  232: 'Majority vote — new state equals whichever value (0 or 1) appears most among the three neighbors.',
+  240: 'Right shift — every cell copies its left neighbor; pattern slides right each generation.',
+};
+
+let ruleNum = 30, ruleOut = new Array(8).fill(0);
+let cellSizePx = 4, canvasH = 360;
+let density = 0.30, speed = 20;
+let wrapEdges = true, running = false;
+let animId = null, lastTs = 0, accumMs = 0;
+let N = 200, rows = [], maxRows = 90;
+let colorOn = '#1a5c38', colorOff = '#f8faf8';
+let painting = false, paintValue = 1;
+
+const canvas = document.getElementById('ca-canvas');
+const ctx = canvas.getContext('2d');
+
+function init() {
+  recalcCanvas();
+  setRule(30);
+  buildTripletUI();
+  setupSingle();
+
+  document.getElementById('rule-slider').addEventListener('input', e => setRule(+e.target.value));
+  document.getElementById('density-sl').addEventListener('input', e => {
+    density = +e.target.value / 100;
+    document.getElementById('density-val').textContent = e.target.value + '%';
+  });
+  document.getElementById('speed-sl').addEventListener('input', e => {
+    speed = +e.target.value;
+    document.getElementById('speed-val').textContent = speed + ' r/s';
+  });
+  document.getElementById('color-on').addEventListener('input',  e => { colorOn  = e.target.value; redrawAll(); });
+  document.getElementById('color-off').addEventListener('input', e => { colorOff = e.target.value; redrawAll(); });
+  document.getElementById('wrap-chk').addEventListener('change', e => { wrapEdges = e.target.checked; updateStats(); });
+
+  canvas.addEventListener('mousedown', onCanvasDown);
+  canvas.addEventListener('mousemove', onCanvasMove);
+  canvas.addEventListener('mouseup',   () => { painting = false; });
+  canvas.addEventListener('mouseleave',() => { painting = false; });
+
+  window.addEventListener('resize', () => { recalcCanvas(); redrawAll(); });
+}
+
+function recalcCanvas() {
+  const w = canvas.parentElement.clientWidth - 2;
+  canvas.width = w; canvas.height = canvasH;
+  canvas.style.height = canvasH + 'px';
+  const newN = Math.max(1, Math.floor(w / cellSizePx));
+  maxRows    = Math.max(1, Math.floor(canvasH / cellSizePx));
+  if (newN !== N) { N = newN; rows = rows.map(r => resizeRow(r, N)); }
+  if (rows.length > maxRows) rows = rows.slice(rows.length - maxRows);
+  document.getElementById('width-num').textContent = N;
+}
+
+function resizeRow(row, newN) {
+  if (row.length === newN) return row;
+  const out = new Array(newN).fill(0);
+  const off = Math.floor((newN - row.length) / 2);
+  for (let i = 0; i < row.length; i++) { const idx = i + off; if (idx >= 0 && idx < newN) out[idx] = row[i]; }
+  return out;
+}
+
+function changeCellSize()   { cellSizePx = +document.getElementById('cell-sel').value;   recalcCanvas(); rows = rows.slice(Math.max(0, rows.length - maxRows)); redrawAll(); }
+function changeCanvasHeight(){ canvasH   = +document.getElementById('height-sel').value; recalcCanvas(); rows = rows.slice(Math.max(0, rows.length - maxRows)); redrawAll(); }
+
+function setRule(r) {
+  ruleNum = ((r % 256) + 256) % 256;
+  for (let i = 0; i < 8; i++) ruleOut[i] = (ruleNum >> i) & 1;
+
+  document.getElementById('rule-slider').value = ruleNum;
+  document.getElementById('rule-dec').textContent = ruleNum;
+  document.getElementById('rule-hex').textContent = '0x' + ruleNum.toString(16).toUpperCase().padStart(2,'0');
+
+  const bin = ruleNum.toString(2).padStart(8,'0');
+  document.getElementById('rule-bin').innerHTML =
+    bin.split('').map(b => b==='1' ? '<span class="b1">1</span>' : '0').join('&nbsp;');
+
+  const desc = NOTABLE_DESCS[ruleNum] || '';
+  const el = document.getElementById('rule-desc');
+  el.textContent = desc; el.className = 'rule-desc' + (desc ? ' notable' : '');
+
+  document.querySelectorAll('.nbtn').forEach(btn =>
+    btn.classList.toggle('active-rule', parseInt(btn.textContent) === ruleNum));
+
+  updateTripletUI();
+}
+
+function updateRuleFromOutputs() { let r = 0; for (let i = 0; i < 8; i++) r |= ruleOut[i] << i; setRule(r); }
+
+function buildTripletUI() {
+  const c = document.getElementById('triplets-container');
+  c.innerHTML = '';
+  for (let i = 7; i >= 0; i--) {
+    const col = document.createElement('div');
+    col.className = 'triplet-col'; col.id = 'tcol-' + i;
+    col.addEventListener('click', () => { ruleOut[i] ^= 1; updateRuleFromOutputs(); });
+
+    const tetris = document.createElement('div'); tetris.className = 'tetris';
+    const tTop   = document.createElement('div'); tTop.className   = 't-top';
+    [(i>>2)&1,(i>>1)&1,i&1].forEach(b => {
+      const cell = document.createElement('div');
+      cell.className = 'tcell ' + (b ? 'on' : 'off');
+      tTop.appendChild(cell);
+    });
+    const arr = document.createElement('div'); arr.className = 't-arrow'; arr.textContent = '↓';
+    const tBot = document.createElement('div'); tBot.className = 't-bot';
+    const outC = document.createElement('div'); outC.className = 'tcell out-cell'; outC.id = 'tc-out-' + i;
+    tBot.appendChild(outC);
+    tetris.append(tTop, arr, tBot);
+
+    const binL = document.createElement('div'); binL.className = 't-binlabel'; binL.textContent = i.toString(2).padStart(3,'0');
+    const idxL = document.createElement('div'); idxL.className = 't-idxlabel'; idxL.textContent = '2^' + i;
+    const outB = document.createElement('div'); outB.className = 't-output-big'; outB.id = 'tc-outbig-' + i;
+
+    col.append(tetris, binL, idxL, outB);
+    c.appendChild(col);
+  }
+  updateTripletUI();
+}
+
+function updateTripletUI() {
+  for (let i = 0; i < 8; i++) {
+    const col  = document.getElementById('tcol-' + i);
+    const outC = document.getElementById('tc-out-' + i);
+    const outB = document.getElementById('tc-outbig-' + i);
+    if (!col) continue;
+    const on = ruleOut[i] === 1;
+    col.className  = 'triplet-col' + (on ? ' out1' : '');
+    outC.className = 'tcell out-cell ' + (on ? 'on' : 'off');
+    outB.textContent = on ? '1' : '0';
+    outB.className   = 't-output-big' + (on ? ' on' : '');
+  }
+}
+
+function setupSingle() { stopRun(); const g = new Array(N).fill(0); g[Math.floor(N/2)] = 1; rows = [g]; updateStats(); redrawAll(); }
+function setupRandom()  { stopRun(); rows = [Array.from({length:N}, () => Math.random()<density?1:0)]; updateStats(); redrawAll(); }
+function resetCanvas()  { stopRun(); rows = [new Array(N).fill(0)]; updateStats(); redrawAll(); }
+
+function caStep() {
+  const prev = rows[rows.length-1], next = new Array(N).fill(0);
+  for (let i = 0; i < N; i++) {
+    const l = wrapEdges ? prev[(i-1+N)%N] : (i>0     ? prev[i-1] : 0);
+    const r = wrapEdges ? prev[(i+1)%N]   : (i<N-1   ? prev[i+1] : 0);
+    next[i] = ruleOut[(l<<2)|(prev[i]<<1)|r];
+  }
+  rows.push(next);
+  if (rows.length > maxRows) rows.shift();
+  updateStats(); redrawAll();
+}
+
+function redrawAll() {
+  ctx.fillStyle = colorOff; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = colorOn;
+  const cs = cellSizePx;
+  for (let r = 0; r < rows.length; r++) {
+    const y = r * cs;
+    for (let i = 0; i < rows[r].length; i++) if (rows[r][i]) ctx.fillRect(i*cs, y, cs, cs);
+  }
+}
+
+function toggleRun() { running ? stopRun() : startRun(); }
+function startRun() {
+  running = true;
+  const btn = document.getElementById('go-btn');
+  btn.textContent = '⏹ Stop'; btn.classList.add('go-active');
+  lastTs = performance.now(); accumMs = 0;
+  animId = requestAnimationFrame(runLoop);
+}
+function stopRun() {
+  running = false;
+  const btn = document.getElementById('go-btn');
+  btn.textContent = '▶ Run'; btn.classList.remove('go-active');
+  if (animId) { cancelAnimationFrame(animId); animId = null; }
+}
+function runLoop(ts) {
+  if (!running) return;
+  const dt = ts - lastTs; lastTs = ts; accumMs += dt;
+  const iv = 1000 / speed; let s = 0;
+  while (accumMs >= iv && s < 10) { caStep(); accumMs -= iv; s++; }
+  if (accumMs > iv * 10) accumMs = 0;
+  animId = requestAnimationFrame(runLoop);
+}
+function stepOnce() { stopRun(); caStep(); }
+
+function canvasCell(e) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    row: Math.floor((e.clientY - rect.top)  / cellSizePx),
+    col: Math.floor((e.clientX - rect.left) * (canvas.width / rect.width) / cellSizePx)
+  };
+}
+function onCanvasDown(e) {
+  e.preventDefault(); painting = true;
+  const {row, col} = canvasCell(e);
+  if (row<0||row>=rows.length||col<0||col>=N) return;
+  paintValue = rows[row][col]^1; rows[row][col] = paintValue; redrawAll();
+}
+function onCanvasMove(e) {
+  if (!painting) return;
+  const {row, col} = canvasCell(e);
+  if (row<0||row>=rows.length||col<0||col>=N) return;
+  rows[row][col] = paintValue; redrawAll();
+}
+
+function updateStats() {
+  document.getElementById('gen-num').textContent = rows.length - 1;
+  document.getElementById('width-num').textContent = N;
+  const cur = rows[rows.length-1] || [];
+  document.getElementById('active-num').textContent = cur.filter(Boolean).length;
+  document.getElementById('wrap-stat').textContent  = wrapEdges ? 'periodic' : 'fixed (0)';
+}
+
+window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
