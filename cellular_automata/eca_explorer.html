@@ -106,11 +106,11 @@ h1 { font-size: 1.2rem; font-weight: 700; margin-bottom: 3px; }
 .rule-bin-display .b1 { color: var(--amber); font-weight: 600; }
 .rule-slider-block { flex: 1; min-width: 140px; padding-top: 2px; }
 .slider-label { font-size: 0.62rem; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.09em; margin-bottom: 6px; }
-input[type=range] { -webkit-appearance: none; width: 100%; height: 4px; background: var(--border); border-radius: 2px; cursor: pointer; outline: none; }
+input[type=range] { appearance: none; -webkit-appearance: none; width: 100%; height: 4px; background: var(--border); border-radius: 2px; cursor: pointer; outline: none; }
 input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--green); border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
 input[type=range].amber-thumb::-webkit-slider-thumb { background: var(--amber); }
 input[type=range].blue-thumb::-webkit-slider-thumb  { background: var(--blue); }
-.rule-desc { font-size: 0.72rem; color: var(--text-dim); margin-top: 6px; min-height: 1.3em; font-style: italic; }
+.rule-desc { font-size: 0.72rem; color: var(--text-dim); margin-top: 6px; height: 1.3em; overflow: hidden; font-style: italic; }
 .rule-desc.notable { color: var(--green-mid); font-weight: 500; font-style: normal; }
 /* ── Notable ── */
 .notable-row { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 10px; align-items: center; }
@@ -270,7 +270,7 @@ input[type=color] { width: 26px; height: 20px; border: 1.5px solid var(--border)
 <!-- Spacetime Diagram -->
 <div class="canvas-wrap">
   <canvas id="ca-canvas" height="360"></canvas>
-  <div class="canvas-hint">click or drag to toggle cells</div>
+  <div class="canvas-hint" id="canvas-hint" style="top:18px;left:10px;bottom:auto;right:auto;"></div>
 </div>
 
 <!-- Stats -->
@@ -366,6 +366,7 @@ function init() {
   canvas.addEventListener('mouseleave',() => { painting = false; });
 
   window.addEventListener('resize', () => { recalcCanvas(); redrawAll(); });
+  updateCanvasCursor();
 }
 
 function recalcCanvas() {
@@ -404,7 +405,8 @@ function setRule(r) {
 
   const desc = NOTABLE_DESCS[ruleNum] || '';
   const el = document.getElementById('rule-desc');
-  el.textContent = desc; el.className = 'rule-desc' + (desc ? ' notable' : '');
+  el.innerHTML = desc || '&nbsp;';
+  el.className = 'rule-desc' + (desc ? ' notable' : '');
 
   document.querySelectorAll('.nbtn').forEach(btn =>
     btn.classList.toggle('active-rule', parseInt(btn.textContent) === ruleNum));
@@ -485,11 +487,18 @@ function redrawAll() {
   }
 }
 
+function updateCanvasCursor() {
+  canvas.style.cursor = running ? 'default' : 'crosshair';
+  document.getElementById('canvas-hint').textContent =
+    running ? 'stop playback to paint cells' : 'click or drag to paint cells in the top row (initial condition)';
+}
+
 function toggleRun() { running ? stopRun() : startRun(); }
 function startRun() {
   running = true;
   const btn = document.getElementById('go-btn');
   btn.textContent = '⏹ Stop'; btn.classList.add('go-active');
+  updateCanvasCursor();
   lastTs = performance.now(); accumMs = 0;
   animId = requestAnimationFrame(runLoop);
 }
@@ -497,6 +506,7 @@ function stopRun() {
   running = false;
   const btn = document.getElementById('go-btn');
   btn.textContent = '▶ Run'; btn.classList.remove('go-active');
+  updateCanvasCursor();
   if (animId) { cancelAnimationFrame(animId); animId = null; }
 }
 function runLoop(ts) {
@@ -517,13 +527,14 @@ function canvasCell(e) {
   };
 }
 function onCanvasDown(e) {
+  if (running) return;
   e.preventDefault(); painting = true;
   const {row, col} = canvasCell(e);
   if (row<0||row>=rows.length||col<0||col>=N) return;
   paintValue = rows[row][col]^1; rows[row][col] = paintValue; redrawAll();
 }
 function onCanvasMove(e) {
-  if (!painting) return;
+  if (!painting || running) return;
   const {row, col} = canvasCell(e);
   if (row<0||row>=rows.length||col<0||col>=N) return;
   rows[row][col] = paintValue; redrawAll();
