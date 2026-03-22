@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voter Model &amp; Consensus Dynamics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --page:#f7f5f0;--surface:#fff;--border:#d8d4ca;--border2:#c8c4ba;
+  --muted:#888070;--body:#2c2820;--head:#181410;
+  --green:#2b5a3a;--green2:#1e3f29;--amber:#b85a14;
+  --blue:#1a4a8a;--red:#8a1a2a;--red-lt:#f8e6e8;--lbl:#5a5448;--chip:#eeebe4;
+}
+body{background:var(--page);color:var(--body);font-family:'IBM Plex Sans',sans-serif;font-size:13px;line-height:1.5;}
+.phdr{padding:18px 24px 0;background:var(--surface);border-bottom:1px solid var(--border);}
+.phdr h1{font-size:18px;font-weight:600;color:var(--head);margin-bottom:4px;}
+.phdr p{font-size:12px;color:var(--muted);margin-bottom:12px;max-width:780px;}
+.phdr em{color:var(--lbl);font-style:italic;}
+.tabs{display:flex;gap:3px;}
+.tab{padding:7px 16px;border:1px solid var(--border);border-bottom:none;border-radius:5px 5px 0 0;
+  background:var(--chip);color:var(--muted);cursor:pointer;font-size:12px;
+  font-family:'IBM Plex Sans',sans-serif;font-weight:500;transition:background .12s,color .12s;}
+.tab.on{background:var(--surface);color:var(--head);border-color:var(--border2);}
+.tab:hover:not(.on){background:var(--page);color:var(--lbl);}
+.panel{display:none;padding:18px 24px;gap:16px;align-items:flex-start;}
+.panel.on{display:flex;flex-wrap:wrap;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:14px 16px;}
+.ctitle{font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:11px;}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:11px;}
+.btn{padding:5px 13px;border:1px solid var(--border2);border-radius:4px;background:var(--surface);
+  color:var(--lbl);cursor:pointer;font-size:12px;font-family:'IBM Plex Sans',sans-serif;
+  font-weight:500;transition:all .12s;user-select:none;}
+.btn:hover{background:var(--chip);color:var(--body);border-color:#aaa098;}
+.btn.primary{background:var(--green);border-color:var(--green2);color:#fff;}
+.btn.primary:hover{background:var(--green2);}
+.btn.primary.on{background:var(--amber);border-color:#8a4010;}
+.btn.on:not(.primary){background:var(--chip);border-color:#aaa098;color:var(--body);}
+.btn.danger{color:var(--red);border-color:#ddb8bc;}
+.btn.danger:hover{background:var(--red-lt);}
+.lbl{font-size:11px;font-weight:500;color:var(--lbl);}
+input[type=range]{width:80px;accent-color:var(--green);cursor:pointer;vertical-align:middle;}
+.sval{font-size:11px;color:var(--muted);font-family:'IBM Plex Mono',monospace;min-width:36px;}
+.statrow{display:flex;gap:16px;flex-wrap:wrap;padding-top:9px;border-top:1px solid var(--border);margin-top:9px;}
+.stat{font-size:11px;color:var(--muted);font-family:'IBM Plex Mono',monospace;}
+.stat b{color:var(--body);font-weight:600;}
+canvas{display:block;}
+.tracebox{background:var(--page);border:1px solid var(--border);border-radius:4px;padding:9px 11px;
+  font-size:11px;line-height:2;min-height:68px;color:var(--muted);font-family:'IBM Plex Mono',monospace;}
+.ca{color:#b85a14;font-weight:600;}
+.cb{color:#1a4a8a;font-weight:600;}
+.cc{color:#2b5a3a;font-weight:600;}
+.note{font-size:12px;line-height:1.85;color:var(--lbl);}
+.note b{color:var(--head);font-weight:600;}
+.note em{color:var(--green);font-style:italic;}
+.note .math{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);}
+.note .instr{background:#fdf0e6;border:1px solid #e8c8a8;border-radius:3px;
+  padding:6px 9px;font-size:11px;color:#7a3c10;margin-top:8px;line-height:1.75;}
+.coal-caption{font-size:11px;color:var(--lbl);margin-top:8px;line-height:1.75;}
+.coal-caption b{color:var(--head);}
+.coal-caption em{color:var(--green);font-style:italic;}
+/* Tab 3 grid layout */
+/* Tab 3 flex layout */
+.t3flex{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;}
+.t3wys{max-width:320px;}
+/* Narrow: all cards go full-width, canvases scale down */
+@media(max-width:640px){
+  .t3flex>.card{flex-basis:100%;max-width:100%;overflow:hidden;box-sizing:border-box;}
+  .t3flex canvas{max-width:100%;height:auto;}
+  .coal-card{max-width:100%;width:100%;}
+}
+.coal-card{max-width:636px;overflow:hidden;align-self:start;}
+.coal-card canvas{max-width:100%;height:auto;display:block;}
+@media(max-width:660px){
+  .coal-card{max-width:100%;width:100%;}
+}
+</style>
+</head>
+<body>
+
+<div class="phdr">
+  <h1>Voter Model &amp; Consensus Dynamics</h1>
+  <p>The voter model is a minimal model of opinion dynamics and neutral genetic drift: each cell copies a random neighbor's opinion with no selection or preference. Despite its simplicity it captures how topology shapes the spread of traits on a network — and how random takeover (fixation) is guaranteed in some geometries but not others. At each generation every cell copies a randomly chosen neighbor. Tab ① shows a 1D spacetime diagram; Tab ② shows a 2D grid. Both support ancestry tracing: click any cell to follow its opinion lineage backward in time. Tab ③ uses two random walkers in 2D vs. 3D to demonstrate <em>why</em> consensus (fixation by drift) is guaranteed in low dimensions but not on an infinite 3D lattice — the key is Pólya's theorem on when two independent random walks must eventually meet.</p>
+  <div style="text-align:right;font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--muted);margin-bottom:8px;">&copy; 2026 Theodore P. Pavlic &nbsp;&middot;&nbsp; MIT License</div>
+  <div class="tabs">
+    <button class="tab on" id="tb0" onclick="switchTab(0)">① 1D Voter Model &amp; Contact Tracing</button>
+    <button class="tab"   id="tb1" onclick="switchTab(1)">② 2D Voter Model &amp; Contact Tracing</button>
+    <button class="tab"   id="tb2" onclick="switchTab(2)">③ Why 3D Fails: Random Walkers</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════ TAB 0: 1D -->
+<div class="panel on" id="p0" style="flex-wrap:wrap;align-items:start;">
+
+  <div class="card">
+    <div class="ctitle">1D Voter Model — 200-cell ring — time flows downward</div>
+    <div class="row">
+      <button class="btn primary" id="b1run" onclick="t1Run()">&#9654; Run</button>
+      <button class="btn danger"  onclick="t1Reset()">&#10227; Reset</button>
+      <span class="lbl">speed</span>
+      <input type="range" id="sl1" min="0" max="20" value="1" oninput="t1Spd()">
+      <span class="sval" id="sv1">1 gen/frame</span>
+    </div>
+    <canvas id="cv1d" width="400" height="360"
+      style="border:1px solid var(--border);border-radius:3px;cursor:crosshair;image-rendering:pixelated;display:block;"></canvas>
+    <div style="margin-top:8px;">
+      <canvas id="cv1chart" width="400" height="56"
+        style="border:1px solid var(--border);border-radius:3px;display:block;"></canvas>
+    </div>
+    <div class="statrow">
+      <div class="stat">generation <b id="s1g">0</b></div>
+      <div class="stat">leader <b id="s1ldr">&#8212;</b></div>
+      <div class="stat">opinions active <b id="s1act">&#8212;</b></div>
+      <div class="stat">domain edges <b id="s1bnd">&#8212;</b></div>
+    </div>
+  </div>
+
+  <div class="card" style="flex:1 1 200px;max-width:296px;align-self:start;">
+    <div class="ctitle">What You're Seeing</div>
+    <div class="note">
+      Each row is one generation of a 200-cell <b>ring</b> with <b>6 opinions</b>. Time flows downward; colored stripes are domains of like opinion.
+      <br><br>
+      <b>Domain edges</b> &mdash; boundaries between unlike neighbors &mdash; each perform an independent random walk. When <b>two edges meet, they annihilate,</b> reducing the number of domains. Consensus is reached when the last edge annihilates.
+      <br><br>
+      This diagram uses the same spacetime format as ECA diagrams. The boundary random walks are directly visible.
+    </div>
+  </div>
+
+  <div style="flex-basis:100%;display:flex;gap:16px;flex-wrap:wrap;align-items:start;">
+    <div class="card" style="min-width:260px;max-width:320px;">
+      <div class="ctitle">Ancestry Trace (Contact Tracing / Dual Process)</div>
+      <div class="row">
+        <button class="btn danger" onclick="t1ClearTrace()">Clear traces</button>
+      </div>
+      <div class="tracebox" id="tbox1">
+        <em style="color:#b0a898">Click any cell in the diagram to trace its opinion ancestry (model pauses automatically). Each click adds a trace in a new color.</em>
+      </div>
+    </div>
+    <div class="card" style="max-width:280px;">
+      <div class="ctitle">Scaling &amp; Recurrence</div>
+      <div class="note">
+        Starting from random IC with ~N/2 domain edges, consensus takes <em>O(N)</em> generations (<span class="math">O(N&sup2;)</span> micro-steps) on a 1D ring.
+        <br><br>
+        On the infinite 1D line, two random walkers are trivially <em>recurrent</em> &mdash; they cannot indefinitely avoid each other on a line.
+        <br><br>
+        The ancestry traces are visualizations of the dual coalescing Markov chain. Their <span style="color:var(--green);font-weight:600">common ancestor</span> is the point where two lineages coalesce.
+      </div>
+    </div>
+  </div>
+
+  <div style="flex-basis:100%;height:0;margin:0;padding:0;"></div>
+  <div class="card coal-card">
+    <div class="ctitle">Reverse-Time Opinion Ancestry: Consensus Occurs When All Present-Day Lineages Converge to One Ancestor</div>
+    <canvas id="cvcoal0" width="600" height="175"
+      style="border:1px solid var(--border);border-radius:3px;display:block;max-width:100%;"></canvas>
+    <div class="coal-caption">
+      Each colored line is one cell's opinion lineage traced <b>backward</b> in time (left = present, right = initial time 0). When two lines reach the same position they <b>coalesce</b> &mdash; one path continues, one stops, shown as a V-shape with a <span style="color:var(--green);font-weight:600">green oval</span>. When all lineages coalesce, the <em>MRCA</em> (most recent common ancestor) is the common ancestor of every present-day cell. By symmetry, each of the N cells is equally likely to be that ancestor — giving each cell exactly <b>1/N probability of fixation</b>, the standard neutral drift result.
+    </div>
+  </div>
+
+</div><!-- end panel p0 -->
+
+<!-- ══════════════════════════ TAB 1: 2D -->
+<div class="panel" id="p1" style="flex-wrap:wrap;align-items:start;">
+
+  <div class="card">
+    <div class="ctitle">Voter Model &mdash; 2D Torus (24 &times; 24) &middot; one step = full asynchronous generation</div>
+    <div class="row">
+      <button class="btn primary" id="b2run" onclick="t2Run()">&#9654; Run</button>
+      <button class="btn danger" onclick="t2Reset()">&#10227; Reset</button>
+      <span class="lbl">speed</span>
+      <input type="range" id="sl2" min="0" max="30" value="1" oninput="t2Spd()">
+      <span class="sval" id="sv2">1 gen/frame</span>
+    </div>
+    <canvas id="cv2d" width="336" height="336"
+      style="border:1px solid var(--border);border-radius:3px;cursor:crosshair;display:block;"></canvas>
+    <div style="margin-top:8px;">
+      <canvas id="cv2chart" width="336" height="56"
+        style="border:1px solid var(--border);border-radius:3px;display:block;"></canvas>
+    </div>
+    <div class="statrow">
+      <div class="stat">generation <b id="s2g">0</b></div>
+      <div class="stat">leader <b id="s2ldr">&#8212;</b></div>
+      <div class="stat">opinions active <b id="s2act">&#8212;</b></div>
+      <div class="stat">domain edges <b id="s2bnd">&#8212;</b></div>
+    </div>
+  </div>
+
+  <div class="card" style="flex:1 1 200px;max-width:296px;align-self:start;">
+    <div class="ctitle">What You're Seeing</div>
+    <div class="note">
+      Each cell copies a random neighbor's opinion &mdash; unconditionally. With <b>6 opinions</b>, domains coarsen by pure drift; opinions go extinct one by one until one absorbs the lattice.
+      <br><br>
+      <b>Contact tracing</b> runs time in reverse: who did this cell copy from? This backward chain is the <b>dual coalescing random walk</b>. Two cells whose backward walks reach the same site share a common ancestor and carry the same opinion thereafter &mdash; so <b>consensus &harr; all lineages coalesce to one.</b>
+      <br><br>
+      By <b>P&oacute;lya's theorem</b>, random walks on <span class="math">&#x2124;<sup>2</sup></span> are <em>recurrent</em> &mdash; any two lineages must eventually meet &rarr; consensus guaranteed.
+    </div>
+  </div>
+
+  <div style="flex-basis:100%;display:flex;gap:16px;flex-wrap:wrap;align-items:start;">
+    <div class="card" style="min-width:260px;max-width:320px;">
+      <div class="ctitle">Ancestry Trace (Contact Tracing / Dual Process)</div>
+      <div class="row">
+        <button class="btn danger" onclick="t2ClearTrace()">Clear traces</button>
+      </div>
+      <div class="tracebox" id="tbox2">
+        <em style="color:#b0a898">Click any cell to trace its opinion ancestry (model pauses). Each click adds a trace in a new color. Note: history depth ~80 generations.</em>
+      </div>
+    </div>
+    <div class="card" style="max-width:280px;">
+      <div class="ctitle">Scaling &amp; Recurrence</div>
+      <div class="note">
+        Consensus takes <em>O(N log N)</em> generations on a 2D torus &mdash; longer than 1D because domain boundaries can take longer detours before annihilating.
+        <br><br>
+        The ancestry traces are visualizations of the dual coalescing Markov chain. Their <span style="color:var(--green);font-weight:600">common ancestor</span> is the point where two lineages coalesce. Trace depth is limited to ~80 generations of stored history.
+      </div>
+    </div>
+  </div>
+
+  <div style="flex-basis:100%;height:0;margin:0;padding:0;"></div>
+  <div class="card coal-card">
+    <div class="ctitle">Reverse-Time Opinion Ancestry: Consensus Occurs When All Present-Day Lineages Converge to One Ancestor</div>
+    <canvas id="cvcoal1" width="600" height="175"
+      style="border:1px solid var(--border);border-radius:3px;display:block;max-width:100%;"></canvas>
+    <div class="coal-caption">
+      Each colored line is one cell's opinion lineage traced <b>backward</b> in time (left = present, right = initial time 0). When two lines reach the same position they <b>coalesce</b> &mdash; one path continues, one stops. The ancestry traces on the grid above are single-lineage excerpts of this process. By symmetry each of the N cells is equally likely to be the MRCA (most recent common ancestor), giving each cell exactly <b>1/N probability of fixation</b> — the standard neutral drift result.
+    </div>
+  </div>
+
+</div><!-- end panel p1 -->
+
+<!-- ══════════════════════════ TAB 2: WALKERS -->
+<div class="panel" id="p2" style="flex-direction:column;gap:0;">
+
+  <div class="row" style="margin-bottom:4px;">
+    <button class="btn primary" id="b3run" onclick="t3Run()">▶ Run</button>
+    <button class="btn danger"  onclick="t3Reset()">⟳ Reset</button>
+    <span class="lbl">speed</span>
+    <input type="range" id="sl3" min="1" max="60" value="4" oninput="t3Spd()">
+    <span class="sval" id="sv3">4×</span>
+    <span class="lbl" style="margin-left:8px;color:var(--muted);">each trial = 2000 steps · walkers start at opposite corners</span>
+  </div>
+
+  <!-- Flex layout: items stack in DOM order on all screen widths -->
+  <div class="t3flex">
+
+    <!-- Row 1 (wide): 2D torus + 3D torus + WYS side by side -->
+    <div class="card">
+      <div class="ctitle">2D Torus — 20 × 20</div>
+      <canvas id="cv2w" width="280" height="280"
+        style="border:1px solid var(--border);border-radius:3px;"></canvas>
+      <div class="statrow">
+        <div class="stat">trial step <b id="w2s">0</b>/2000</div>
+        <div class="stat">trials <b id="w2tr">0</b></div>
+        <div class="stat">met <b id="w2m" style="color:var(--green)">—</b></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ctitle">3D Torus — 20 × 20 × 20</div>
+      <canvas id="cv3w" width="280" height="280"
+        style="border:1px solid var(--border);border-radius:3px;"></canvas>
+      <div class="statrow">
+        <div class="stat">trial step <b id="w3s">0</b>/2000</div>
+        <div class="stat">trials <b id="w3tr">0</b></div>
+        <div class="stat">met <b id="w3m" style="color:var(--amber)">—</b></div>
+      </div>
+    </div>
+
+    <div class="card coal-card t3wys">
+      <div class="ctitle">What You're Seeing</div>
+      <div class="note">
+        Each trial places two opinion lineages — walkers A (amber) and B (blue) — at opposite corners of their respective lattices. At each step both walk independently to a random neighbor. <b>A meeting</b> (same cell at the same time, flashing green) means the two lineages would coalesce: they share a common ancestor, and both cells would carry the same opinion from that point forward.
+        <br><br>
+        <b>Consensus requires every pair of lineages to coalesce.</b> On a 2D lattice, any two random walkers must eventually meet (Pólya recurrence). On an infinite 3D lattice they can wander indefinitely without meeting (transience) — so some pairs of lineages never coalesce, and consensus is not guaranteed.
+        <br><br>
+        The histogram tallies what fraction of trials end in a meeting within 2000 steps. Crank the speed slider to accumulate trials quickly.
+      </div>
+    </div>
+
+    <!-- Row 2 (wide): histogram + Pólya sit naturally after the torus cards -->
+    <div class="coal-card" style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;padding:0;background:transparent;border:none;">
+      <div class="card" style="align-self:start;">
+        <div class="ctitle">% Trials Meeting Within 2000 Steps</div>
+        <canvas id="cvhist" width="196" height="170"></canvas>
+      </div>
+      <div class="card" style="flex:1 1 180px;align-self:start;">
+        <div class="ctitle">Pólya's Theorem</div>
+        <div class="note">
+          <b>Pólya (1921):</b> Random walks on <span class="math">ℤ<sup>d</sup></span> are <em>recurrent</em> for <span class="math">d ≤ 2</span> (meet w.p. 1) but <em>transient</em> for <span class="math">d ≥ 3</span> (positive escape probability).
+          <br><br>
+          Consensus time on a <em>finite</em> torus:
+          <br>&emsp;<span class="math">1D: O(N²)</span>
+          <br>&emsp;<span class="math">2D: O(N log N)</span>
+          <br>&emsp;<span class="math">3D: O(N)</span>
+          <br><br>
+          3D converges <em>faster</em> on a finite lattice. But as <span class="math">N → ∞</span>, 3D walkers wander indefinitely → the infinite-lattice 3D voter model does <b>not</b> reach consensus.
+          <br><br>
+          <b>Note:</b> even a 20×20×20 finite torus shows lower meeting rates than 2D; the gap grows with lattice size.
+        </div>
+      </div>
+    </div>
+
+    <!-- Full-width rows: force new row with flex-basis:100% -->
+    <div style="flex-basis:100%;height:0;margin:0;padding:0;"></div>
+    <div class="card coal-card">
+      <div class="ctitle">Connection to Consensus &amp; Coalescing Lineages</div>
+      <div class="note">
+        In the voter model, tracing a cell's opinion ancestry backward in time produces a random walk through the lattice. Any two cells whose backward-time walks reach the same lattice site share a common ancestor — and carry the same opinion from that moment forward. <b>Consensus requires all N lineages to coalesce to one ancestor,</b> meaning every pair of lineages must eventually share a site.
+        <br><br>
+        This reduces "does the voter model reach consensus?" to "do any two independent random walks on this lattice eventually meet?" — exactly what Pólya's theorem answers. Walkers A and B above <em>are</em> two such lineages. In 2D they always meet (recurrence), so consensus is guaranteed. On the infinite 3D lattice, walkers have a nonzero probability of <em>never</em> meeting (transience), blocking consensus. The histogram accumulates this evidence trial by trial.
+      </div>
+    </div>
+
+    <div style="flex-basis:100%;height:0;margin:0;padding:0;"></div>
+    <div class="card coal-card">
+      <div class="ctitle">Reverse-Time Opinion Ancestry: Consensus Occurs When All Present-Day Lineages Converge to One Ancestor</div>
+      <canvas id="cvcoal2" width="600" height="175"
+        style="border:1px solid var(--border);border-radius:3px;display:block;max-width:100%;"></canvas>
+      <div class="coal-caption">
+        Each colored line is one cell's opinion lineage traced <b>backward</b> in time (left = present, right = initial time 0). When two lines reach the same position they <b>coalesce</b> — only one path continues. The walkers A and B represent any two lineages; Pólya's theorem determines whether they always meet. By symmetry each of the N cells has <b>probability 1/N of being the MRCA (most recent common ancestor)</b> — the neutral drift fixation result.
+      </div>
+    </div>
+
+  </div><!-- end t3flex -->
+
+</div>
+
+<script>
+'use strict';
+
+// ── shared ──────────────────────────────────────────────────────
+function switchTab(n){
+  if(n!==0&&t1run)t1Run();
+  if(n!==1&&run2)t2Run();
+  if(n!==2&&run3)t3Run();
+  [0,1,2].forEach(i=>{
+    document.getElementById('tb'+i).classList.toggle('on',i===n);
+    document.getElementById('p'+i).classList.toggle('on',i===n);
+  });
+}
+const ri=n=>(Math.random()*n)|0;
+const D4=[[0,1],[0,-1],[1,0],[-1,0]];
+const D6=[[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
+
+// K=6 opinion colors — same palette as coal diagram
+const K=6;
+const OP_RGB=[
+  [26,74,138],   // 0: blue
+  [184,90,20],   // 1: amber
+  [43,90,58],    // 2: green
+  [122,32,128],  // 3: purple
+  [16,120,112],  // 4: teal
+  [128,48,16],   // 5: brown
+];
+const OP_HEX=['#1a4a8a','#b85a14','#2b5a3a','#7a2080','#107870','#803010'];
+// Lighter boundary-highlight versions
+const OP_HEX_BND=['#4474b8','#d87828','#5a9a6a','#a452a8','#28a090','#b06030'];
+
+// ═══════════════════════════════════════════════════════════════
+// TAB 0 — 1D VOTER MODEL
+// ═══════════════════════════════════════════════════════════════
+const N1=200,CW=2,RH=2,CV1W=400,CV1H=360,NROWS=CV1H/RH;
+
+let g1d,t1gen=0,t1run=false,t1raf=null,t1spf=1,t1skip=false;
+let h1focal=[],h1src=[];
+let imgData1=null,pix1=null;
+let traces1=[],lastCoal1=null,traceIdx1=0;
+const TCOLS=['#e87020','#2060d8','#9030c8','#107870'];
+// fraction history for 1D chart: array of K fractions per generation
+let ofrac1=[];
+
+function t1IC(){
+  g1d=new Uint8Array(N1);
+  for(let i=0;i<N1;i++)g1d[i]=ri(K);
+}
+
+function t1Init(){
+  const cv=document.getElementById('cv1d');
+  imgData1=cv.getContext('2d').createImageData(CV1W,CV1H);
+  pix1=imgData1.data;
+  for(let i=0;i<pix1.length;i+=4){pix1[i]=247;pix1[i+1]=245;pix1[i+2]=240;pix1[i+3]=255;}
+  t1gen=0;h1focal=[];h1src=[];traces1=[];lastCoal1=null;ofrac1=[];
+  t1IC();
+  renderRow1(NROWS-1,g1d);flush1();chart1();stat1();renderTB1();
+}
+function t1Reset(){if(t1run)t1Run();t1Init();}
+
+function t1Run(){
+  t1run=!t1run;const b=document.getElementById('b1run');
+  b.textContent=t1run?'⏸ Pause':'▶ Run';b.classList.toggle('on',t1run);
+  if(t1run){t1ClearTrace();loop1();}else if(t1raf){cancelAnimationFrame(t1raf);t1raf=null;}
+}
+function loop1(){
+  if(!t1run)return;
+  // t1spf===0 means ½ gen/frame: skip every other frame
+  if(t1spf===0){t1skip=!t1skip;if(t1skip){t1raf=requestAnimationFrame(loop1);return;}}
+  let stopped=false;
+  const iters=t1spf===0?1:t1spf;
+  for(let f=0;f<iters;f++){
+    voterGen1D();scrollUp1();renderRow1(NROWS-1,g1d);
+    ofrac1.push(fracs1D());if(ofrac1.length>500)ofrac1.shift();
+    if(opinionsActive1D()===1){
+      t1run=false;stopped=true;const b=document.getElementById('b1run');b.textContent='▶ Run';b.classList.remove('on');break;
+    }
+  }
+  flush1();chart1();stat1();if(!stopped&&t1run)t1raf=requestAnimationFrame(loop1);
+}
+function t1Spd(){t1spf=+document.getElementById('sl1').value;document.getElementById('sv1').textContent=t1spf===0?'½ gen/frame':t1spf+' gen/frame';}
+
+function voterGen1D(){
+  const foc=new Uint8Array(N1),src=new Uint8Array(N1);
+  for(let k=0;k<N1;k++){
+    const idx=ri(N1),j=(idx+(Math.random()<.5?1:-1)+N1)%N1;
+    foc[k]=idx;src[k]=j;g1d[idx]=g1d[j];
+  }
+  h1focal.push(foc);h1src.push(src);
+  if(h1focal.length>NROWS){h1focal.shift();h1src.shift();}
+  t1gen++;
+}
+
+function fracs1D(){
+  const cnt=new Float32Array(K);
+  for(let i=0;i<N1;i++)cnt[g1d[i]]++;
+  for(let k=0;k<K;k++)cnt[k]/=N1;
+  return cnt;
+}
+function opinionsActive1D(){const s=new Set();for(let i=0;i<N1;i++)s.add(g1d[i]);return s.size;}
+function countEdges1D(){let b=0;for(let i=0;i<N1;i++)if(g1d[i]!==g1d[(i+1)%N1])b++;return b;}
+
+function scrollUp1(){
+  const rowBytes=CV1W*4*RH;
+  pix1.copyWithin(0,rowBytes);
+  const st=CV1W*4*(CV1H-RH);
+  const bg=[247,245,240];
+  for(let i=0;i<rowBytes;i+=4){pix1[st+i]=bg[0];pix1[st+i+1]=bg[1];pix1[st+i+2]=bg[2];pix1[st+i+3]=255;}
+}
+function renderRow1(rowIdx,state){
+  const yb=rowIdx*RH;
+  for(let c=0;c<N1;c++){
+    const op=state[c],rb=state[(c+1)%N1],isBnd=(op!==rb);
+    const col=isBnd?OP_RGB[op].map((v,i)=>Math.round(v*0.55+[200,200,200][i]*0.45)):OP_RGB[op];
+    const xb=c*CW;
+    for(let dy=0;dy<RH;dy++)for(let dx=0;dx<CW;dx++){
+      const px=((yb+dy)*CV1W+(xb+dx))*4;
+      pix1[px]=col[0];pix1[px+1]=col[1];pix1[px+2]=col[2];pix1[px+3]=255;
+    }
+  }
+}
+function flush1(){
+  const cv=document.getElementById('cv1d'),ctx=cv.getContext('2d');
+  ctx.putImageData(imgData1,0,0);drawTrace1(ctx);
+}
+function chart1(){
+  const cv=document.getElementById('cv1chart'),ctx=cv.getContext('2d'),W=cv.width,H=cv.height;
+  ctx.fillStyle='#f7f5f0';ctx.fillRect(0,0,W,H);
+  if(ofrac1.length<2)return;
+  const n=ofrac1.length;
+  // Stacked area: draw from opinion K-1 down to 0
+  for(let k=K-1;k>=0;k--){
+    ctx.beginPath();
+    // top edge of this band (cumulative sum up to k)
+    for(let i=0;i<n;i++){
+      let cum=0;for(let j=0;j<=k;j++)cum+=ofrac1[i][j];
+      const x=(i/(n-1))*W,y=H-cum*H;
+      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    }
+    // bottom edge (cumulative sum up to k-1), reversed
+    for(let i=n-1;i>=0;i--){
+      let cum=0;for(let j=0;j<k;j++)cum+=ofrac1[i][j];
+      const x=(i/(n-1))*W,y=H-cum*H;
+      ctx.lineTo(x,y);
+    }
+    ctx.closePath();
+    ctx.fillStyle=OP_HEX[k];ctx.globalAlpha=0.82;ctx.fill();
+  }
+  ctx.globalAlpha=1;
+}
+function stat1(){
+  document.getElementById('s1g').textContent=t1gen.toLocaleString();
+  const f=fracs1D();
+  let best=0;for(let k=1;k<K;k++)if(f[k]>f[best])best=k;
+  document.getElementById('s1ldr').innerHTML=`<span style="color:${OP_HEX[best]};font-weight:700">&#9632;</span> ${(f[best]*100).toFixed(1)}%`;
+  const act=opinionsActive1D();
+  document.getElementById('s1act').textContent=act;
+  document.getElementById('s1bnd').textContent=countEdges1D();
+}
+
+// ── 1D trace ────────────────────────────────────────────────────
+function t1ClearTrace(){traces1=[];lastCoal1=null;traceIdx1=0;renderTB1();flush1();}
+
+document.getElementById('cv1d').addEventListener('click',function(e){
+  if(t1run)t1Run(); // auto-pause
+  const rect=this.getBoundingClientRect();
+  const scX=CV1W/rect.width,scY=CV1H/rect.height;
+  const pxX=(e.clientX-rect.left)*scX,pxY=(e.clientY-rect.top)*scY;
+  const cellIdx=Math.min(N1-1,Math.max(0,Math.floor(pxX/CW)|0));
+  const rowFromBot=Math.min(NROWS-1,Math.max(0,NROWS-1-(Math.floor(pxY/RH)|0)));
+  if(rowFromBot>=h1focal.length)return; // ignore clicks in unrendered rows
+  const col=TCOLS[traceIdx1%TCOLS.length];traceIdx1++;
+  const path=trace1D(cellIdx,rowFromBot);
+  // Find coal with the most recent existing trace
+  let newCoal=null;
+  if(traces1.length>0){
+    newCoal=findCoal1(traces1[traces1.length-1].path,path);
+    if(newCoal)lastCoal1=newCoal;
+  }
+  traces1.push({cellIdx,rowFromBot,path,col,coal:newCoal});
+  if(traces1.length>8){
+    traces1.shift();
+    if(traces1.length>0)traces1[0].coal=null; // predecessor removed
+  }
+  // Recompute lastCoal1 from current traces only
+  lastCoal1=null;
+  for(let i=1;i<traces1.length;i++){if(traces1[i].coal)lastCoal1=traces1[i].coal;}
+  renderTB1();flush1();
+});
+
+function trace1D(startC,startG){
+  const path=[{gBack:startG,c:startC}];let cur=startC;const nH=h1focal.length;
+  const maxBack=Math.min(NROWS-1,nH);
+  for(let g=startG;g<startG+maxBack&&g<nH;g++){
+    const foc=h1focal[nH-1-g],src=h1src[nH-1-g];
+    for(let k=N1-1;k>=0;k--){if(foc[k]===cur){cur=src[k];break;}}
+    path.push({gBack:g+1,c:cur});
+  }
+  return path;
+}
+function findCoal1(pA,pB){
+  if(!pA||!pB)return null;
+  const map=new Map();pA.forEach(p=>{const k=p.gBack+','+p.c;if(!map.has(k))map.set(k,p);});
+  for(const p of pB){if(map.has(p.gBack+','+p.c))return{col:p.c,gBack:p.gBack};}
+  return null;
+}
+function p1toPx(gBack,c){return{x:c*CW+CW/2,y:(NROWS-1-gBack)*RH+RH/2};}
+function drawTrace1(ctx){
+  if(!traces1.length)return;
+  for(const tr of traces1){
+    const{path,col}=tr;
+    if(!path||!path.length)continue;
+    ctx.save();
+    ctx.strokeStyle=col;ctx.lineWidth=1.8;ctx.globalAlpha=0.88;
+    ctx.shadowColor=col;ctx.shadowBlur=1.5;
+    ctx.beginPath();let f=true;
+    for(const p of path){
+      if(p.gBack>NROWS-1)break;
+      const{x,y}=p1toPx(p.gBack,p.c);f?ctx.moveTo(x,y):ctx.lineTo(x,y);f=false;
+    }
+    ctx.stroke();
+    // Start dot
+    const{x,y}=p1toPx(path[0].gBack,path[0].c);
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=col;ctx.beginPath();ctx.arc(x,y,2.8,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  }
+  // Common ancestor rings (open, bright green) for each pairwise coal found
+  for(const tr of traces1){
+    if(!tr.coal||tr.coal.gBack>NROWS-1)continue;
+    const{x,y}=p1toPx(tr.coal.gBack,tr.coal.col);
+    ctx.save();ctx.strokeStyle='#18c048';ctx.lineWidth=2.5;ctx.globalAlpha=0.9;
+    ctx.beginPath();ctx.arc(x,y,6,0,Math.PI*2);ctx.stroke();ctx.restore();
+  }
+}
+function renderTB1(){
+  const el=document.getElementById('tbox1');
+  if(!traces1.length){
+    el.innerHTML='<em style="color:#b0a898">Click any cell in the diagram to trace its opinion ancestry (model pauses automatically). Each click adds a trace in a new color.</em>';return;
+  }
+  let h=`<em style="color:#888070">${traces1.length} trace${traces1.length>1?'s':''} active (up to 8 kept)</em>`;
+  // Collect all pairwise coalescences from current traces
+  const coals=traces1.filter(t=>t.coal).map(t=>t.coal);
+  if(coals.length){
+    h+='<br><br><b>Discovered coalescences:</b>';
+    for(const c of coals)
+      h+=`<br><span class="cc"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;border:2.5px solid #18c048;vertical-align:middle;margin-right:3px;"></span>col ${c.col}, ${c.gBack} gen back</span>`;
+  }else if(traces1.length>1)h+='<br><br><em style="color:#a07840">No coalescence in visible history. Run longer then re-trace.</em>';
+  else h+='<br><em style="color:#b0a898">Click another cell to find a shared ancestor.</em>';
+  el.innerHTML=h;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TAB 1 — 2D VOTER MODEL
+// ═══════════════════════════════════════════════════════════════
+const GN=24,GP=14;
+const MH=50000; // ~87 generations of history at 24x24=576 micro-steps/gen
+
+let grid2,hbuf2,hwr2,htot2,vgen2,ofrac2,cons2;
+let run2=false,raf2=null,spf2=1,t2skip=false;
+let traces2=[],lastCoal2=null,traceIdx2=0;
+
+function t2Init(){
+  grid2=new Uint8Array(GN*GN);for(let i=0;i<grid2.length;i++)grid2[i]=ri(K);
+  hbuf2=new Array(MH);hwr2=0;htot2=0;vgen2=0;ofrac2=[];cons2=false;
+  traces2=[];lastCoal2=null;renderTB2();
+}
+function t2Reset(){if(run2)t2Run();t2Init();g2Draw();chart2();stat2();}
+
+function voterGen2D(){
+  const N=GN*GN;
+  for(let k=0;k<N;k++){
+    const r=ri(GN),c=ri(GN),[dr,dc]=D4[ri(4)];
+    const sr=(r+dr+GN)%GN,sc=(c+dc+GN)%GN;
+    hbuf2[hwr2]=[vgen2,r,c,sr,sc];hwr2=(hwr2+1)%MH;htot2++;
+    grid2[r*GN+c]=grid2[sr*GN+sc];
+  }
+  vgen2++;
+}
+function t2Run(){
+  run2=!run2;const b=document.getElementById('b2run');
+  b.textContent=run2?'⏸ Pause':'▶ Run';b.classList.toggle('on',run2);
+  if(run2){t2ClearTrace();loop2();}else if(raf2){cancelAnimationFrame(raf2);raf2=null;}
+}
+function loop2(){
+  if(!run2)return;
+  if(spf2===0){t2skip=!t2skip;if(t2skip){raf2=requestAnimationFrame(loop2);return;}}
+  const iters2=spf2===0?1:spf2;
+  for(let i=0;i<iters2;i++){
+    voterGen2D();
+    ofrac2.push(fracs2D());if(ofrac2.length>600)ofrac2.shift();
+    if(opinionsActive2D()===1){cons2=true;run2=false;const b=document.getElementById('b2run');b.textContent='▶ Run';b.classList.remove('on');break;}
+  }
+  g2Draw();chart2();stat2();if(run2)raf2=requestAnimationFrame(loop2);
+}
+function t2Spd(){spf2=+document.getElementById('sl2').value;document.getElementById('sv2').textContent=spf2===0?'½ gen/frame':spf2+' gen/frame';}
+
+function fracs2D(){
+  const cnt=new Float32Array(K);
+  for(let i=0;i<grid2.length;i++)cnt[grid2[i]]++;
+  for(let k=0;k<K;k++)cnt[k]/=grid2.length;
+  return cnt;
+}
+function opinionsActive2D(){const s=new Set();for(let i=0;i<grid2.length;i++)s.add(grid2[i]);return s.size;}
+function countEdges2D(){let b=0;for(let r=0;r<GN;r++)for(let c=0;c<GN;c++){if(grid2[r*GN+c]!==grid2[r*GN+(c+1)%GN])b++;if(grid2[r*GN+c]!==grid2[((r+1)%GN)*GN+c])b++;}return b;}
+
+function g2Draw(){
+  const cv=document.getElementById('cv2d'),ctx=cv.getContext('2d'),S=GP;
+  ctx.fillStyle='#d8d4cc';ctx.fillRect(0,0,cv.width,cv.height);
+  // Draw cells by opinion color
+  for(let r=0;r<GN;r++)for(let c=0;c<GN;c++){
+    ctx.fillStyle=OP_HEX[grid2[r*GN+c]];
+    ctx.fillRect(c*S+1,r*S+1,S-1,S-1);
+  }
+  // Draw all accumulated traces
+  for(const tr of traces2){
+    const{ch,col}=tr;if(!ch||!ch.length)continue;
+    ctx.save();ctx.strokeStyle=col;ctx.lineWidth=1.8;ctx.globalAlpha=0.85;
+    ctx.shadowColor=col;ctx.shadowBlur=1.5;
+    ctx.beginPath();let f=true;
+    for(let i=0;i<ch.length;i++){
+      const p=ch[i],x=(p.c+.5)*S,y=(p.r+.5)*S;
+      if(i>0){const pp=ch[i-1];if(Math.abs(pp.c-p.c)<=1&&Math.abs(pp.r-p.r)<=1){if(f){ctx.moveTo((pp.c+.5)*S,(pp.r+.5)*S);f=false;}ctx.lineTo(x,y);}else f=true;}
+    }
+    ctx.stroke();
+    if(ch.length){
+      const p=ch[0],x=(p.c+.5)*S,y=(p.r+.5)*S;
+      ctx.globalAlpha=0.95;ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x,y,5,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle=col;ctx.beginPath();ctx.arc(x,y,3.5,0,Math.PI*2);ctx.fill();
+    }
+    ctx.restore();
+  }
+  // Common ancestor rings (open bright green)
+  for(const tr of traces2){
+    if(!tr.coal)continue;const p=tr.coal.cell,x=(p.c+.5)*S,y=(p.r+.5)*S;
+    ctx.save();ctx.strokeStyle='#18c048';ctx.lineWidth=2.5;ctx.globalAlpha=0.9;
+    ctx.beginPath();ctx.arc(x,y,6,0,Math.PI*2);ctx.stroke();ctx.restore();
+  }
+
+}
+
+function chart2(){
+  const cv=document.getElementById('cv2chart'),ctx=cv.getContext('2d'),W=cv.width,H=cv.height;
+  ctx.fillStyle='#f7f5f0';ctx.fillRect(0,0,W,H);
+  if(ofrac2.length<2)return;
+  const n=ofrac2.length;
+  for(let k=K-1;k>=0;k--){
+    ctx.beginPath();
+    for(let i=0;i<n;i++){
+      let cum=0;for(let j=0;j<=k;j++)cum+=ofrac2[i][j];
+      const x=(i/(n-1))*W,y=H-cum*H;
+      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    }
+    for(let i=n-1;i>=0;i--){
+      let cum=0;for(let j=0;j<k;j++)cum+=ofrac2[i][j];
+      const x=(i/(n-1))*W,y=H-cum*H;
+      ctx.lineTo(x,y);
+    }
+    ctx.closePath();
+    ctx.fillStyle=OP_HEX[k];ctx.globalAlpha=0.82;ctx.fill();
+  }
+  ctx.globalAlpha=1;
+}
+function stat2(){
+  document.getElementById('s2g').textContent=vgen2.toLocaleString();
+  const f=fracs2D();let best=0;for(let k=1;k<K;k++)if(f[k]>f[best])best=k;
+  document.getElementById('s2ldr').innerHTML=`<span style="color:${OP_HEX[best]};font-weight:700">&#9632;</span> ${(f[best]*100).toFixed(1)}%`;
+  const act=opinionsActive2D();document.getElementById('s2act').textContent=act;
+  document.getElementById('s2bnd').textContent=countEdges2D();
+}
+
+document.getElementById('cv2d').addEventListener('click',function(e){
+  if(run2)t2Run(); // auto-pause
+  const rect=this.getBoundingClientRect();
+  const c=Math.floor((e.clientX-rect.left)*(this.width/rect.width)/GP);
+  const r=Math.floor((e.clientY-rect.top)*(this.height/rect.height)/GP);
+  if(r<0||r>=GN||c<0||c>=GN)return;
+  const col=TCOLS[traceIdx2%TCOLS.length];traceIdx2++;
+  const ch=traceChain2(r,c);
+  let newCoal=null;
+  if(traces2.length>0){
+    newCoal=findCoal2(traces2[traces2.length-1].ch,ch);
+    if(newCoal)lastCoal2=newCoal;
+  }
+  traces2.push({r,c,ch,col,coal:newCoal});
+  if(traces2.length>8){
+    traces2.shift();
+    if(traces2.length>0)traces2[0].coal=null;
+  }
+  lastCoal2=null;
+  for(let i=1;i<traces2.length;i++){if(traces2[i].coal)lastCoal2=traces2[i].coal;}
+  renderTB2();g2Draw();
+});
+function traceChain2(sr,sc,maxD=120){
+  const ch=[{r:sr,c:sc,gen:vgen2}];let cr=sr,cc_=sc,bg=vgen2+1;
+  const n=Math.min(htot2,MH);
+  for(let i=0;i<n&&ch.length<maxD;i++){
+    const idx=((hwr2-1-i)%MH+MH)%MH,e=hbuf2[idx];if(!e)break;
+    const[gen,hr,hc,sr2,sc2]=e;if(gen>=bg)continue;
+    if(hr===cr&&hc===cc_){ch.push({r:sr2,c:sc2,gen});cr=sr2;cc_=sc2;bg=gen;}
+  }
+  return ch;
+}
+function findCoal2(ca,cb){
+  if(!ca||!cb)return null;
+  const map=new Map();ca.forEach(p=>{const k=p.r*GN+p.c;if(!map.has(k))map.set(k,{cell:p});});
+  for(const p of cb){const k=p.r*GN+p.c;if(map.has(k))return map.get(k);}
+  return null;
+}
+function t2ClearTrace(){traces2=[];lastCoal2=null;traceIdx2=0;renderTB2();g2Draw();}
+function renderTB2(){
+  const el=document.getElementById('tbox2');
+  if(!traces2.length){
+    el.innerHTML='<em style="color:#b0a898">Click any cell to trace its opinion ancestry (model pauses). Each click adds a trace in a new color. Note: history depth ~80 generations.</em>';return;
+  }
+  let h=`<em style="color:#888070">${traces2.length} trace${traces2.length>1?'s':''} active (up to 8 kept)</em>`;
+  const coals2=traces2.filter(t=>t.coal).map(t=>t.coal);
+  if(coals2.length){
+    h+='<br><br><b>Discovered coalescences:</b>';
+    for(const c of coals2){const p=c.cell,ago=vgen2-p.gen;h+=`<br><span class="cc"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;border:2.5px solid #18c048;vertical-align:middle;margin-right:3px;"></span>(${p.r},${p.c}) — ~${ago} gen ago</span>`;}
+  }else if(traces2.length>1)h+='<br><br><em style="color:#a07840">No coalescence in visible history. Run longer then re-trace.</em>';
+  else h+='<br><em style="color:#b0a898">Click another cell to find a shared ancestor.</em>';
+  el.innerHTML=h;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TAB 2 — RANDOM WALKERS
+// ═══════════════════════════════════════════════════════════════
+const NW2=20,NW3=20,TRAIL=50,TRIAL_LEN=2000,FLASH_DUR=12;
+
+let wa2,wb2,tr_a2,tr_b2,flash2=0,lastMeet2=null;
+let wa3,wb3,tr_a3,tr_b3,flash3=0,lastMeet3=null;
+let tStep=0,nTrials=0,met2=0,met3=0,tMet2=false,tMet3=false;
+let run3=false,raf3=null,spf3=4;
+
+function t3InitWalkers(){
+  // Both walkers on same sublattice (even coordinate sum)
+  wa2={r:0,c:0};wb2={r:NW2/2,c:NW2/2};
+  tr_a2=[];tr_b2=[];flash2=0;lastMeet2=null;tMet2=false;
+  wa3={x:0,y:0,z:0};wb3={x:NW3/2,y:NW3/2,z:NW3/2}; // sum=30 (even) ✓
+  tr_a3=[];tr_b3=[];flash3=0;lastMeet3=null;tMet3=false;
+}
+function t3Reset(){if(run3)t3Run();nTrials=0;met2=0;met3=0;tStep=0;t3InitWalkers();draw2w();draw3w();drawHist3();statW();}
+function t3Run(){
+  run3=!run3;const b=document.getElementById('b3run');
+  b.textContent=run3?'⏸ Pause':'▶ Run';b.classList.toggle('on',run3);
+  if(run3)loop3();else if(raf3){cancelAnimationFrame(raf3);raf3=null;}
+}
+function loop3(){
+  if(!run3)return;
+  for(let f=0;f<spf3;f++)stepWalkers();
+  if(flash2>0)flash2=Math.max(0,flash2-1);
+  if(flash3>0)flash3=Math.max(0,flash3-1);
+  draw2w();draw3w();statW();raf3=requestAnimationFrame(loop3);
+}
+function t3Spd(){spf3=+document.getElementById('sl3').value;document.getElementById('sv3').textContent=spf3+'×';}
+
+function stepWalkers(){
+  const[drA,dcA]=D4[ri(4)];wa2.r=(wa2.r+drA+NW2)%NW2;wa2.c=(wa2.c+dcA+NW2)%NW2;
+  tr_a2.push({r:wa2.r,c:wa2.c});if(tr_a2.length>TRAIL)tr_a2.shift();
+  const[drB,dcB]=D4[ri(4)];wb2.r=(wb2.r+drB+NW2)%NW2;wb2.c=(wb2.c+dcB+NW2)%NW2;
+  tr_b2.push({r:wb2.r,c:wb2.c});if(tr_b2.length>TRAIL)tr_b2.shift();
+  if(wa2.r===wb2.r&&wa2.c===wb2.c&&!tMet2){tMet2=true;flash2=FLASH_DUR;lastMeet2={r:wa2.r,c:wa2.c};}
+
+  const[dxA,dyA,dzA]=D6[ri(6)];wa3.x=(wa3.x+dxA+NW3)%NW3;wa3.y=(wa3.y+dyA+NW3)%NW3;wa3.z=(wa3.z+dzA+NW3)%NW3;
+  tr_a3.push({x:wa3.x,y:wa3.y,z:wa3.z});if(tr_a3.length>TRAIL)tr_a3.shift();
+  const[dxB,dyB,dzB]=D6[ri(6)];wb3.x=(wb3.x+dxB+NW3)%NW3;wb3.y=(wb3.y+dyB+NW3)%NW3;wb3.z=(wb3.z+dzB+NW3)%NW3;
+  tr_b3.push({x:wb3.x,y:wb3.y,z:wb3.z});if(tr_b3.length>TRAIL)tr_b3.shift();
+  if(wa3.x===wb3.x&&wa3.y===wb3.y&&wa3.z===wb3.z&&!tMet3){tMet3=true;flash3=FLASH_DUR;lastMeet3={x:wa3.x,y:wa3.y,z:wa3.z};}
+
+  tStep++;
+  if(tStep>=TRIAL_LEN){
+    nTrials++;if(tMet2)met2++;if(tMet3)met3++;
+    tStep=0;t3InitWalkers();drawHist3();
+  }
+}
+
+function draw2w(){
+  const cv=document.getElementById('cv2w'),ctx=cv.getContext('2d'),W=cv.width,H=cv.height,sz=W/NW2;
+  ctx.fillStyle='#f0ede6';ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='#d8d4cc';ctx.lineWidth=.5;
+  for(let i=0;i<=NW2;i++){ctx.beginPath();ctx.moveTo(i*sz,0);ctx.lineTo(i*sz,H);ctx.stroke();ctx.beginPath();ctx.moveTo(0,i*sz);ctx.lineTo(W,i*sz);ctx.stroke();}
+  for(let i=0;i<tr_a2.length;i++){ctx.globalAlpha=(i/tr_a2.length)*0.3;ctx.fillStyle='#b85a14';ctx.fillRect(tr_a2[i].c*sz+1,tr_a2[i].r*sz+1,sz-2,sz-2);}
+  for(let i=0;i<tr_b2.length;i++){ctx.globalAlpha=(i/tr_b2.length)*0.3;ctx.fillStyle='#1a4a8a';ctx.fillRect(tr_b2[i].c*sz+1,tr_b2[i].r*sz+1,sz-2,sz-2);}
+  ctx.globalAlpha=1;
+  // Flash ring
+  if(flash2>0&&lastMeet2){
+    const alpha=flash2/FLASH_DUR,fx=(lastMeet2.c+.5)*sz,fy=(lastMeet2.r+.5)*sz;
+    ctx.save();ctx.globalAlpha=alpha;ctx.strokeStyle='#18c048';ctx.lineWidth=2.5;
+    ctx.beginPath();ctx.arc(fx,fy,sz*1.5,0,Math.PI*2);ctx.stroke();ctx.restore();
+  }
+  const met=wa2.r===wb2.r&&wa2.c===wb2.c;
+  if(met){
+    const fx=(wa2.c+.5)*sz,fy=(wa2.r+.5)*sz;
+    ctx.fillStyle='#18c048';ctx.globalAlpha=0.45;ctx.beginPath();ctx.arc(fx,fy,sz*.55,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
+    ctx.fillStyle='#fff';ctx.font=`bold ${sz*.44|0}px 'IBM Plex Mono',monospace`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('A=B',fx,fy);
+  }else{
+    ctx.fillStyle='#b85a14';ctx.beginPath();ctx.arc((wa2.c+.5)*sz,(wa2.r+.5)*sz,sz*.4,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#1a4a8a';ctx.beginPath();ctx.arc((wb2.c+.5)*sz,(wb2.r+.5)*sz,sz*.4,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#fff';ctx.font=`bold ${sz*.44|0}px 'IBM Plex Mono',monospace`;ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText('A',(wa2.c+.5)*sz,(wa2.r+.5)*sz);ctx.fillText('B',(wb2.c+.5)*sz,(wb2.r+.5)*sz);
+  }
+  ctx.textAlign='left';ctx.textBaseline='alphabetic';
+}
+
+function iso3(x,y,z,cw,ox,oy){return{sx:ox+(x-y)*cw*.5,sy:oy+(x+y)*cw*.25-z*cw*.5};}
+function draw3w(){
+  const cv=document.getElementById('cv3w'),ctx=cv.getContext('2d'),W=cv.width,H=cv.height;
+  const cw=W/(NW3+1.6),ox=W*.5,oy=H*.5;
+  ctx.fillStyle='#f0ede6';ctx.fillRect(0,0,W,H);
+  const N=NW3;
+  const corn=[[0,0,0],[N,0,0],[0,N,0],[N,N,0],[0,0,N],[N,0,N],[0,N,N],[N,N,N]];
+  const edges=[[0,1],[0,2],[1,3],[2,3],[4,5],[4,6],[5,7],[6,7],[0,4],[1,5],[2,6],[3,7]];
+  ctx.strokeStyle='#c8c4ba';ctx.lineWidth=1;
+  edges.forEach(([a,b])=>{const pA=iso3(...corn[a],cw,ox,oy),pB=iso3(...corn[b],cw,ox,oy);ctx.beginPath();ctx.moveTo(pA.sx,pA.sy);ctx.lineTo(pB.sx,pB.sy);ctx.stroke();});
+  // lighter interior grid lines (every 5 cells)
+  ctx.strokeStyle='#dedad2';ctx.lineWidth=.35;
+  for(let i=5;i<N;i+=5){
+    let p0,p1;
+    p0=iso3(0,i,0,cw,ox,oy);p1=iso3(N,i,0,cw,ox,oy);ctx.beginPath();ctx.moveTo(p0.sx,p0.sy);ctx.lineTo(p1.sx,p1.sy);ctx.stroke();
+    p0=iso3(i,0,0,cw,ox,oy);p1=iso3(i,N,0,cw,ox,oy);ctx.beginPath();ctx.moveTo(p0.sx,p0.sy);ctx.lineTo(p1.sx,p1.sy);ctx.stroke();
+    p0=iso3(i,0,0,cw,ox,oy);p1=iso3(i,0,N,cw,ox,oy);ctx.beginPath();ctx.moveTo(p0.sx,p0.sy);ctx.lineTo(p1.sx,p1.sy);ctx.stroke();
+    p0=iso3(0,0,i,cw,ox,oy);p1=iso3(N,0,i,cw,ox,oy);ctx.beginPath();ctx.moveTo(p0.sx,p0.sy);ctx.lineTo(p1.sx,p1.sy);ctx.stroke();
+    p0=iso3(N,i,0,cw,ox,oy);p1=iso3(N,i,N,cw,ox,oy);ctx.beginPath();ctx.moveTo(p0.sx,p0.sy);ctx.lineTo(p1.sx,p1.sy);ctx.stroke();
+    p0=iso3(N,0,i,cw,ox,oy);p1=iso3(N,N,i,cw,ox,oy);ctx.beginPath();ctx.moveTo(p0.sx,p0.sy);ctx.lineTo(p1.sx,p1.sy);ctx.stroke();
+  }
+  for(let i=0;i<tr_a3.length;i++){const a=i/tr_a3.length,p=iso3(tr_a3[i].x,tr_a3[i].y,tr_a3[i].z,cw,ox,oy);ctx.globalAlpha=a*0.38;const r=cw*(0.18+a*0.07);ctx.fillStyle='#b85a14';ctx.fillRect(p.sx-r,p.sy-r,r*2,r*2);}
+  for(let i=0;i<tr_b3.length;i++){const a=i/tr_b3.length,p=iso3(tr_b3[i].x,tr_b3[i].y,tr_b3[i].z,cw,ox,oy);ctx.globalAlpha=a*0.38;const r=cw*(0.18+a*0.07);ctx.fillStyle='#1a4a8a';ctx.fillRect(p.sx-r,p.sy-r,r*2,r*2);}
+  ctx.globalAlpha=1;
+  const pA=iso3(wa3.x,wa3.y,wa3.z,cw,ox,oy),pB=iso3(wb3.x,wb3.y,wb3.z,cw,ox,oy);
+  if(flash3>0&&lastMeet3){
+    const alpha=flash3/FLASH_DUR,fp=iso3(lastMeet3.x,lastMeet3.y,lastMeet3.z,cw,ox,oy);
+    ctx.save();ctx.globalAlpha=alpha;ctx.strokeStyle='#18c048';ctx.lineWidth=2.5;
+    ctx.beginPath();ctx.arc(fp.sx,fp.sy,cw*1.5,0,Math.PI*2);ctx.stroke();ctx.restore();
+  }
+  const met3=wa3.x===wb3.x&&wa3.y===wb3.y&&wa3.z===wb3.z;
+  if(met3){
+    ctx.fillStyle='#18c048';ctx.globalAlpha=0.45;ctx.beginPath();ctx.arc(pA.sx,pA.sy,cw*.5,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
+    ctx.fillStyle='#fff';ctx.font=`bold ${cw*.46|0}px 'IBM Plex Mono',monospace`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('A=B',pA.sx,pA.sy);
+  }else{
+    ctx.fillStyle='#b85a14';ctx.beginPath();ctx.arc(pA.sx,pA.sy,cw*.32,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#1a4a8a';ctx.beginPath();ctx.arc(pB.sx,pB.sy,cw*.32,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#fff';ctx.font=`bold ${cw*.44|0}px 'IBM Plex Mono',monospace`;ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText('A',pA.sx,pA.sy);ctx.fillText('B',pB.sx,pB.sy);
+  }
+  ctx.textAlign='left';ctx.textBaseline='alphabetic';
+}
+
+function drawHist3(){
+  const cv=document.getElementById('cvhist'),ctx=cv.getContext('2d'),W=cv.width,H=cv.height;
+  ctx.fillStyle='#f7f5f0';ctx.fillRect(0,0,W,H);
+  if(nTrials===0){
+    ctx.fillStyle='#b0a898';ctx.font="11px 'IBM Plex Mono',monospace";ctx.textAlign='center';
+    ctx.fillText('Run to build histogram',W/2,H/2-20);ctx.fillText('(accumulates across trials)',W/2,H/2-6);ctx.fillStyle='#c0b8b0';ctx.fillText('Increase speed slider',W/2,H/2+12);ctx.fillText('to generate it sooner',W/2,H/2+26);ctx.textAlign='left';return;
+  }
+  const p2=met2/nTrials,p3=met3/nTrials,bY=H-30,maxH=H-48,bW=44,gap=30,x2=14,x3=x2+bW+gap;
+  ctx.strokeStyle='#d8d4cc';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(10,10);ctx.lineTo(10,bY);ctx.lineTo(W-6,bY);ctx.stroke();
+  ctx.setLineDash([2,4]);ctx.strokeStyle='#e8e4dc';ctx.beginPath();ctx.moveTo(10,10);ctx.lineTo(W-6,10);ctx.stroke();ctx.beginPath();ctx.moveTo(10,bY-maxH/2);ctx.lineTo(W-6,bY-maxH/2);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='#a09080';ctx.font="9px 'IBM Plex Mono',monospace";ctx.textAlign='right';ctx.fillText('100%',8,14);ctx.fillText('50%',8,bY-maxH/2+4);
+  ctx.fillStyle='#fdf0e6';ctx.fillRect(x2,bY-p2*maxH,bW,p2*maxH);ctx.strokeStyle='#b85a14';ctx.lineWidth=1;ctx.strokeRect(x2,bY-p2*maxH,bW,p2*maxH);
+  ctx.fillStyle='#b85a14';ctx.font="bold 12px 'IBM Plex Mono',monospace";ctx.textAlign='center';ctx.fillText(Math.round(p2*100)+'%',x2+bW/2,bY-p2*maxH-5);
+  ctx.fillStyle='#a09080';ctx.font="10px 'IBM Plex Mono',monospace";ctx.fillText('2D',x2+bW/2,bY+12);ctx.fillText('n='+nTrials,x2+bW/2,bY+23);
+  ctx.fillStyle='#e6edf8';ctx.fillRect(x3,bY-p3*maxH,bW,p3*maxH);ctx.strokeStyle='#1a4a8a';ctx.lineWidth=1;ctx.strokeRect(x3,bY-p3*maxH,bW,p3*maxH);
+  ctx.fillStyle='#1a4a8a';ctx.font="bold 12px 'IBM Plex Mono',monospace";ctx.textAlign='center';ctx.fillText(Math.round(p3*100)+'%',x3+bW/2,bY-p3*maxH-5);
+  ctx.fillStyle='#a09080';ctx.font="10px 'IBM Plex Mono',monospace";ctx.fillText('3D',x3+bW/2,bY+12);ctx.fillText('n='+nTrials,x3+bW/2,bY+23);
+  ctx.textAlign='left';
+}
+function statW(){
+  document.getElementById('w2s').textContent=tStep;document.getElementById('w3s').textContent=tStep;
+  document.getElementById('w2tr').textContent=nTrials;document.getElementById('w3tr').textContent=nTrials;
+  document.getElementById('w2m').textContent=nTrials>0?Math.round(100*met2/nTrials)+'%':'—';
+  document.getElementById('w3m').textContent=nTrials>0?Math.round(100*met3/nTrials)+'%':'—';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// COAL DIAGRAM — hard-coded, deterministic
+// LEFT (t..t-6): 6 chains, all distinct at t, one collision at t-2.
+// RIGHT (time 6..0): 4 chains, 3 staggered coalescences → MRCA at 0.
+// KEY: chains drawn up to and INCLUDING the coalescence step.
+//      No coalPt extension — the V-shape is natural because both
+//      the dying and surviving chain arrive at the same position
+//      at the collision step.
+// ═══════════════════════════════════════════════════════════════
+function drawCoalDiagram(canvasId){
+  const cv=document.getElementById(canvasId);
+  if(!cv)return;
+  const ctx=cv.getContext('2d'),W=cv.width,H=cv.height;
+  ctx.fillStyle='#f7f5f0';ctx.fillRect(0,0,W,H);
+
+  const RING=6,SL=7,SR=7;
+  const xPadL=42,yPadTop=24,yPadBot=28;
+  const stepW=36,breakW=60;
+  const xL0=xPadL, xLast=xL0+(SL-1)*stepW;
+  const xR0=xLast+breakW, xRLast=xR0+(SR-1)*stepW;
+  const yRange=H-yPadTop-yPadBot;
+  const yp=p=>yPadTop+p*(yRange/(RING-1));
+
+  // ── Background grid lines ──
+  for(let p=0;p<RING;p++){
+    ctx.strokeStyle='#ece9e2';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(xL0,yp(p));ctx.lineTo(xRLast+50,yp(p));ctx.stroke();
+  }
+  ctx.fillStyle='#c8c2ba';ctx.font="8px 'IBM Plex Mono',monospace";ctx.textAlign='right';
+  for(let p=0;p<RING;p++) ctx.fillText(p,xPadL-4,yp(p)+3);
+
+  // ── Section labels ──
+  ctx.fillStyle='#888070';ctx.font="9px 'IBM Plex Mono',monospace";
+  ctx.textAlign='left'; ctx.fillText('← PRESENT',xL0+2,yPadTop-8);
+  ctx.textAlign='right';ctx.fillText('← initial time (t=0) →',xRLast,yPadTop-8);
+
+  // ── Time axis labels ──
+  ctx.fillStyle='#a09080';ctx.font="9px 'IBM Plex Mono',monospace";ctx.textAlign='center';
+  for(let s=0;s<SL;s++) ctx.fillText(s===0?'t':`t-${s}`, xL0+s*stepW, H-8);
+  for(let s=0;s<SR;s++) ctx.fillText(String(SR-1-s), xR0+s*stepW, H-8);
+
+  // ── Break ellipsis ──
+  ctx.fillStyle='#b8b0a4';ctx.font="bold 14px serif";ctx.textAlign='center';
+  ctx.fillText('· · · · ·',xLast+breakW/2,H/2+5);
+  ctx.save();ctx.setLineDash([2,5]);ctx.strokeStyle='#ccc8c0';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(xLast+7,yPadTop+4);ctx.lineTo(xLast+7,H-yPadBot-4);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(xR0-7,yPadTop+4);ctx.lineTo(xR0-7,H-yPadBot-4);ctx.stroke();
+  ctx.restore();
+
+  // ─────────────────────────────────────────────────────────────
+  // LEFT WINDOW — RING=6, all 6 chains start at distinct positions 0–5.
+  // All moves verified as ±1 mod 6; no unintended collisions.
+  // Coalescence 1: step 2 (t-2) — ch5(brown) meets ch4(teal) at pos 4.
+  // Coalescence 2: step 5 (t-5) — ch4(teal) meets ch2(green) at pos 3.
+  // ─────────────────────────────────────────────────────────────
+  const LP = [
+    [0, 1, 2, 3, 4, 5],   // t      — all 6 chains at distinct positions 0–5
+    [0, 1, 2, 3, 4, 5],   // t-1    — no moves; clearly distinct
+    [0, 1, 2, 3, 4, 4],   // t-2    — ch5: 5→4; ch4=ch5=4: COALESCENCE ①
+    [1, 0, 3, 4, 5, 4],   // t-3    — ch5 dead; ch0:0→1, ch1:1→0, ch2:2→3, ch3:3→4, ch4:4→5
+    [0, 1, 2, 5, 4, 4],   // t-4    — ch0:1→0, ch1:0→1, ch2:3→2, ch3:4→5, ch4:5→4
+    [1, 2, 3, 4, 3, 4],   // t-5    — ch2:2→3, ch4:4→3; ch2=ch4=3: COALESCENCE ②
+    [2, 1, 4, 5, 3, 4],   // t-6    — ch4 dead; ch0:1→2, ch1:2→1, ch2:3→4, ch3:4→5
+  ];
+  const LA = [
+    [1,1,1,1,1,1],
+    [1,1,1,1,1,1],
+    [1,1,1,1,1,1],   // ch5 alive at step 2 (coalescence pt with ch4)
+    [1,1,1,1,1,0],   // ch5 dead
+    [1,1,1,1,1,0],
+    [1,1,1,1,1,0],   // ch4 alive at step 5 (coalescence pt with ch2)
+    [1,1,1,1,0,0],   // ch4 dead
+  ];
+  const L_COAL = [{s:2, pos:4}, {s:5, pos:3}];
+
+  // RIGHT WINDOW — 4 survivors: ch0(blue), ch1(amber), ch2(green), ch3(purple)
+  // Positions at t-6: ch0=2, ch1=1, ch2=4, ch3=5 (from LP[6])
+  // SR=7 steps (time 6..0). MRCA happens at time 2 (step 4), not at time 0.
+  // After MRCA, ch0(blue) continues alone to time 1 and time 0.
+  // Coalescence A: step 1 (time 5) — ch3 meets ch2 at pos 4.
+  // Coalescence B: step 3 (time 3) — ch1 meets ch0 at pos 1.
+  // Coalescence C: step 4 (time 2) — ch2 meets ch0 at pos 1. ← MRCA
+  // ─────────────────────────────────────────────────────────────
+  const R_IDX = [0, 1, 2, 3];
+  const RP = [
+    [2, 1, 4, 5],   // time 6 — matches LP[6]
+    [2, 1, 4, 4],   // time 5 — ch3:5→4; ch2=ch3=4: COALESCE A
+    [2, 1, 3, 4],   // time 4 — ch3 dead; ch2:4→3
+    [1, 1, 2, 4],   // time 3 — ch0:2→1, ch1:1 stays; ch0=ch1=1: COALESCE B; ch2:3→2
+    [1, 1, 1, 4],   // time 2 — ch1 dead; ch2:2→1; ch0=ch2=1: COALESCE C → MRCA
+    [2, 1, 1, 4],   // time 1 — ch2 dead; ch0 alone: 1→2
+    [1, 1, 1, 4],   // time 0 — ch0 alone: 2→1
+  ];
+  const RA = [
+    [1,1,1,1],
+    [1,1,1,1],   // ch3 alive at step 1 (coalesce A)
+    [1,1,1,0],   // ch3 dead
+    [1,1,1,0],   // ch1 alive at step 3 (coalesce B)
+    [1,0,1,0],   // ch1 dead; ch2 alive at step 4 (MRCA)
+    [1,0,0,0],   // ch2 dead; ch0 alone from here
+    [1,0,0,0],   // ch0 alone at time 0
+  ];
+  const R_COAL = [
+    {s:1, ri:3, pos:4},   // ch3 dies at time 5
+    {s:3, ri:1, pos:1},   // ch1 dies at time 3
+    {s:4, ri:2, pos:1},   // ch2 dies at time 2 → MRCA
+  ];
+
+  // ── Draw a chain segment, stopping at last alive step ──
+  // (No extension — the V-shape is visible because both the dying
+  //  chain and the survivor are at the same pos at the last alive step)
+  function drawSeg(xFn, posFn, aliveFn, nSteps, colIdx){
+    const col=OP_HEX[colIdx];
+    // Collect points up to last alive step
+    const pts=[];
+    for(let s=0;s<nSteps;s++){
+      if(s>0&&!aliveFn(s)) break;
+      pts.push({x:xFn(s), y:yp(posFn(s))});
+    }
+    if(!pts.length)return;
+    ctx.save();ctx.strokeStyle=col;ctx.lineWidth=2.2;ctx.globalAlpha=0.9;
+    ctx.beginPath();pts.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));
+    ctx.stroke();
+    // dots at each step
+    for(const p of pts){ctx.beginPath();ctx.arc(p.x,p.y,3.2,0,Math.PI*2);ctx.fillStyle=col;ctx.fill();}
+    ctx.restore();
+  }
+
+  // ── Draw left chains ──
+  for(let li=0;li<6;li++){
+    drawSeg(s=>xL0+s*stepW, s=>LP[s][li], s=>LA[s][li]===1, SL, li);
+  }
+  // ── Draw right chains ──
+  for(let ri=0;ri<4;ri++){
+    drawSeg(s=>xR0+s*stepW, s=>RP[s][ri], s=>RA[s][ri]===1, SR, R_IDX[ri]);
+  }
+
+  // ── Coalescence ovals (at the actual collision positions) ──
+  ctx.save();ctx.strokeStyle='#18c048';ctx.lineWidth=2.5;ctx.globalAlpha=0.9;
+  for(const c of L_COAL){
+    ctx.beginPath();ctx.ellipse(xL0+c.s*stepW, yp(c.pos), 11, 7, 0, 0, Math.PI*2);ctx.stroke();
+  }
+  for(const c of R_COAL){
+    ctx.beginPath();ctx.ellipse(xR0+c.s*stepW, yp(c.pos), 11, 7, 0, 0, Math.PI*2);ctx.stroke();
+  }
+  ctx.restore();
+
+  // ── Annotations ──
+  // Left: "after collision, one path continues →" — with background
+  const lc=L_COAL[0];
+  const lx=xL0+lc.s*stepW, ly=yp(lc.pos)>H*0.55?yp(lc.pos)-34:yp(lc.pos)+14;
+  ctx.font="8.5px 'IBM Plex Sans',sans-serif";
+  const annL1='after collision,', annL2='one path continues \u2192';
+  const annW=Math.max(ctx.measureText(annL1).width, ctx.measureText(annL2).width);
+  ctx.save();
+  ctx.fillStyle='rgba(247,245,240,0.9)';ctx.strokeStyle='#ccc8c0';ctx.lineWidth=0.8;
+  const rx=lx-3,ry=ly-9,rw=annW+8,rh=24;
+  ctx.beginPath();ctx.rect(rx,ry,rw,rh);ctx.fill();ctx.stroke();
+  ctx.fillStyle='#444038';ctx.textAlign='left';
+  ctx.fillText(annL1,lx,ly);ctx.fillText(annL2,lx,ly+11);
+  ctx.restore();
+
+  // Right: per-coalescence "merge" labels, individually positioned to avoid trace overlap
+  ctx.fillStyle='#888070';ctx.font="8.5px 'IBM Plex Sans',sans-serif";
+  // t=5 (s=1, pos=4): lower half → place text BELOW the oval
+  {const c=R_COAL[0],xc=xR0+c.s*stepW,yc=yp(c.pos);
+   ctx.textAlign='center';ctx.fillText('merge',xc,yc+18);}
+  // t=3 (s=3, pos=1): upper half → place text ABOVE, left-aligned from oval
+  {const c=R_COAL[1],xc=xR0+c.s*stepW,yc=yp(c.pos);
+   ctx.textAlign='right';ctx.fillText('merge',xc-4,yc-8);}
+  // t=2 / MRCA (s=4, pos=1): upper half → place text ABOVE, right of oval
+  {const c=R_COAL[2],xc=xR0+c.s*stepW,yc=yp(c.pos);
+   ctx.textAlign='left';ctx.fillText('merge',xc+14,yc-8);}
+
+  // ── Post-MRCA continuation: ch0 (blue) walks alone to time 0 ──
+  {
+    const col=OP_HEX[0];
+    ctx.save();ctx.strokeStyle=col;ctx.lineWidth=1.5;ctx.globalAlpha=0.45;ctx.setLineDash([3,3]);
+    ctx.beginPath();
+    for(let s=4;s<SR;s++){
+      const x=xR0+s*stepW,y=yp(RP[s][0]);
+      s===4?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    }
+    ctx.stroke();ctx.setLineDash([]);
+    // small dot at each post-MRCA step
+    for(let s=5;s<SR;s++){
+      ctx.globalAlpha=0.35;
+      ctx.beginPath();ctx.arc(xR0+s*stepW,yp(RP[s][0]),2.5,0,Math.PI*2);
+      ctx.fillStyle=col;ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // ── MRCA marker: open green ring (consistent with coalescence ovals) ──
+  const mrcaX=xR0+4*stepW, mrcaY=yp(RP[4][0]);
+  ctx.save();
+  ctx.strokeStyle='#18c048';ctx.lineWidth=2.5;ctx.globalAlpha=0.9;
+  ctx.beginPath();ctx.arc(mrcaX,mrcaY,8,0,Math.PI*2);ctx.stroke();
+  ctx.globalAlpha=1;
+  ctx.fillStyle='#2b5a3a';ctx.font="bold 9px 'IBM Plex Mono',monospace";ctx.textAlign='left';
+  ctx.fillText('MRCA',mrcaX+14,mrcaY+4);ctx.restore();
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+t1Init();stat1();
+t2Init();g2Draw();chart2();stat2();renderTB2();
+t3InitWalkers();draw2w();draw3w();drawHist3();statW();
+drawCoalDiagram('cvcoal0');
+drawCoalDiagram('cvcoal1');
+drawCoalDiagram('cvcoal2');
+</script>
+</body>
+</html>
