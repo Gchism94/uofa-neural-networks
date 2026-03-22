@@ -80,13 +80,46 @@ canvas{display:block;}
 .coal-caption b{color:var(--head);}
 .coal-caption em{color:var(--green);font-style:italic;}
 /* Tab 3 grid layout */
-/* Tab 3 flex layout */
-.t3flex{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;}
-.t3wys{max-width:320px;}
-/* Narrow: all cards go full-width, canvases scale down */
+/* Tab 3 grid — 3 breakpoints */
+.t3grid{
+  display:grid;
+  gap:16px;
+  align-items:start;
+  /* Wide (≥900px): 3 cols — torus, torus, hist in row1; wys(x2) + pol in row2; conn; coal */
+  grid-template-columns:auto auto 1fr;
+  grid-template-areas:
+    "w2d  w3d  hist"
+    "wys  wys  pol"
+    "conn conn conn"
+    "coal coal coal";
+}
+.t3grid .g-w2d  {grid-area:w2d;}
+.t3grid .g-w3d  {grid-area:w3d;}
+.t3grid .g-hist {grid-area:hist;align-self:start;}
+.t3grid .g-wys  {grid-area:wys; align-self:start;}
+.t3grid .g-pol  {grid-area:pol; align-self:start;}
+.t3grid .g-conn {grid-area:conn;align-self:start;}
+.t3grid .g-coal {grid-area:coal;align-self:start;width:fit-content;}
+/* Medium (640–900px): 2 cols — both tori in row1; hist+pol in row2; rest full-width */
+@media(max-width:900px){
+  .t3grid{
+    grid-template-columns:auto 1fr;
+    grid-template-areas:
+      "w2d  w3d"
+      "hist pol"
+      "wys  wys"
+      "conn conn"
+      "coal coal";
+  }
+}
+/* Narrow (<640px): single column, DOM order */
 @media(max-width:640px){
-  .t3flex>.card{flex-basis:100%;max-width:100%;overflow:hidden;box-sizing:border-box;}
-  .t3flex canvas{max-width:100%;height:auto;}
+  .t3grid{
+    grid-template-columns:1fr;
+    grid-template-areas:"w2d""w3d""hist""wys""pol""conn""coal";
+  }
+  .t3grid .g-coal canvas,.t3grid .g-conn,.t3grid .g-wys{max-width:100%;overflow:hidden;}
+  .t3grid canvas{max-width:100%;height:auto;}
   .coal-card{max-width:100%;width:100%;}
 }
 .coal-card{max-width:636px;overflow:hidden;align-self:start;}
@@ -249,7 +282,8 @@ canvas{display:block;}
 </div><!-- end panel p1 -->
 
 <!-- ══════════════════════════ TAB 2: WALKERS -->
-<div class="panel" id="p2" style="flex-direction:column;gap:0;">
+<div class="panel" id="p2" style="flex-direction:column;">
+  <div style="max-width:920px;width:100%;"><!-- cap width -->
 
   <div class="row" style="margin-bottom:4px;">
     <button class="btn primary" id="b3run" onclick="t3Run()">▶ Run</button>
@@ -260,11 +294,11 @@ canvas{display:block;}
     <span class="lbl" style="margin-left:8px;color:var(--muted);">each trial = 2000 steps · walkers start at opposite corners</span>
   </div>
 
-  <!-- Flex layout: items stack in DOM order on all screen widths -->
-  <div class="t3flex">
+  <!-- Responsive 3-col → 2-col → 1-col grid -->
+  <div class="t3grid">
 
     <!-- Row 1 (wide): 2D torus + 3D torus + WYS side by side -->
-    <div class="card">
+    <div class="card g-w2d">
       <div class="ctitle">2D Torus — 20 × 20</div>
       <canvas id="cv2w" width="280" height="280"
         style="border:1px solid var(--border);border-radius:3px;"></canvas>
@@ -275,7 +309,7 @@ canvas{display:block;}
       </div>
     </div>
 
-    <div class="card">
+    <div class="card g-w3d">
       <div class="ctitle">3D Torus — 20 × 20 × 20</div>
       <canvas id="cv3w" width="280" height="280"
         style="border:1px solid var(--border);border-radius:3px;"></canvas>
@@ -286,7 +320,7 @@ canvas{display:block;}
       </div>
     </div>
 
-    <div class="card coal-card t3wys">
+    <div class="card g-wys">
       <div class="ctitle">What You're Seeing</div>
       <div class="note">
         Each trial places two opinion lineages — walkers A (amber) and B (blue) — at opposite corners of their respective lattices. At each step both walk independently to a random neighbor. <b>A meeting</b> (same cell at the same time, flashing green) means the two lineages would coalesce: they share a common ancestor, and both cells would carry the same opinion from that point forward.
@@ -298,31 +332,29 @@ canvas{display:block;}
     </div>
 
     <!-- Row 2 (wide): histogram + Pólya sit naturally after the torus cards -->
-    <div class="coal-card" style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;padding:0;background:transparent;border:none;">
-      <div class="card" style="align-self:start;">
-        <div class="ctitle">% Trials Meeting Within 2000 Steps</div>
-        <canvas id="cvhist" width="196" height="170"></canvas>
-      </div>
-      <div class="card" style="flex:1 1 180px;align-self:start;">
-        <div class="ctitle">Pólya's Theorem</div>
-        <div class="note">
-          <b>Pólya (1921):</b> Random walks on <span class="math">ℤ<sup>d</sup></span> are <em>recurrent</em> for <span class="math">d ≤ 2</span> (meet w.p. 1) but <em>transient</em> for <span class="math">d ≥ 3</span> (positive escape probability).
-          <br><br>
-          Consensus time on a <em>finite</em> torus:
-          <br>&emsp;<span class="math">1D: O(N²)</span>
-          <br>&emsp;<span class="math">2D: O(N log N)</span>
-          <br>&emsp;<span class="math">3D: O(N)</span>
-          <br><br>
-          3D converges <em>faster</em> on a finite lattice. But as <span class="math">N → ∞</span>, 3D walkers wander indefinitely → the infinite-lattice 3D voter model does <b>not</b> reach consensus.
-          <br><br>
-          <b>Note:</b> even a 20×20×20 finite torus shows lower meeting rates than 2D; the gap grows with lattice size.
-        </div>
+    <div class="card g-hist">
+      <div class="ctitle">% Trials Meeting Within 2000 Steps</div>
+      <canvas id="cvhist" width="196" height="170"></canvas>
+    </div>
+
+    <div class="card g-pol">
+      <div class="ctitle">Pólya's Theorem</div>
+      <div class="note">
+        <b>Pólya (1921):</b> Random walks on <span class="math">ℤ<sup>d</sup></span> are <em>recurrent</em> for <span class="math">d ≤ 2</span> (meet w.p. 1) but <em>transient</em> for <span class="math">d ≥ 3</span> (positive escape probability).
+        <br><br>
+        Consensus time on a <em>finite</em> torus:
+        <br>&emsp;<span class="math">1D: O(N²)</span>
+        <br>&emsp;<span class="math">2D: O(N log N)</span>
+        <br>&emsp;<span class="math">3D: O(N)</span>
+        <br><br>
+        3D converges <em>faster</em> on a finite lattice. But as <span class="math">N → ∞</span>, 3D walkers wander indefinitely → the infinite-lattice 3D voter model does <b>not</b> reach consensus.
+        <br><br>
+        <b>Note:</b> even a 20×20×20 finite torus shows lower meeting rates than 2D; the gap grows with lattice size.
       </div>
     </div>
 
     <!-- Full-width rows: force new row with flex-basis:100% -->
-    <div style="flex-basis:100%;height:0;margin:0;padding:0;"></div>
-    <div class="card coal-card">
+    <div class="card g-conn">
       <div class="ctitle">Connection to Consensus &amp; Coalescing Lineages</div>
       <div class="note">
         In the voter model, tracing a cell's opinion ancestry backward in time produces a random walk through the lattice. Any two cells whose backward-time walks reach the same lattice site share a common ancestor — and carry the same opinion from that moment forward. <b>Consensus requires all N lineages to coalesce to one ancestor,</b> meaning every pair of lineages must eventually share a site.
@@ -331,8 +363,7 @@ canvas{display:block;}
       </div>
     </div>
 
-    <div style="flex-basis:100%;height:0;margin:0;padding:0;"></div>
-    <div class="card coal-card">
+    <div class="card g-coal">
       <div class="ctitle">Reverse-Time Opinion Ancestry: Consensus Occurs When All Present-Day Lineages Converge to One Ancestor</div>
       <canvas id="cvcoal2" width="600" height="175"
         style="border:1px solid var(--border);border-radius:3px;display:block;max-width:100%;"></canvas>
@@ -341,7 +372,8 @@ canvas{display:block;}
       </div>
     </div>
 
-  </div><!-- end t3flex -->
+  </div><!-- end t3grid -->
+  </div><!-- end 920px cap -->
 
 </div>
 
