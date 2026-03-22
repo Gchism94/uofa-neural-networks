@@ -6,6 +6,21 @@ Optimization** at Arizona State University, taught by Theodore P. Pavlic. The li
 
 ---
 
+## Registering an existing visualization
+
+When a user asks to add an existing demo to the index/README/CLAUDE.md, **always also audit
+the demo's HTML file itself** before finishing:
+
+1. Check that `<head>` has a `<meta name="description">`, the full OG block, and the Twitter/X
+   card block. If any are missing, add them (use the preview image dimensions from the actual
+   file; aspect ratio should be close to 2:1 for Twitter).
+2. Check that the bottom of `<body>` has the standard back-link `<footer>` and the
+   iframe-hiding `<script>`. If missing, add them.
+
+Do this proactively — the user should not have to ask separately.
+
+---
+
 ## Adding a new visualization — full checklist
 
 Each visualization lives in its own subdirectory:
@@ -148,6 +163,7 @@ Add a row to the appropriate table under `## Contents`:
 ### Cellular Automata
 
 - `cellular_automata/eca_explorer.html`
+- `cellular_automata/voter_model.html`
 
 ---
 

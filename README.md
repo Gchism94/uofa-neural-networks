@@ -46,7 +46,8 @@ as iframes.
 
 | Directory | Description |
 | --- | --- |
-| [`cellular_automata/`](cellular_automata/) | Interactive explorer for all 256 of Wolfram's elementary cellular automaton rules — seed the first row and watch simple local rules generate complex emergent patterns |
+| [`cellular_automata/eca_explorer.html`](cellular_automata/eca_explorer.html) | Interactive explorer for all 256 of Wolfram's elementary cellular automaton rules — seed the first row and watch simple local rules generate complex emergent patterns |
+| [`cellular_automata/voter_model.html`](cellular_automata/voter_model.html) | Interactive voter model simulation — cells adopt neighbors' opinions via local copying rules, illustrating consensus dynamics, coexistence, and fragmentation |
 
 ---
 
