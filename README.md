@@ -18,7 +18,7 @@ as iframes.
 
 ## Contents
 
-### Intuition Pumps for Genetic Algorithms
+### Evolution and Evolutionary Algorithms
 
 | Directory | Description |
 | --- | --- |

@@ -114,7 +114,7 @@ Current sections and their placeholder comments:
 
 | Section heading | Placeholder comment |
 | --- | --- |
-| Intuition Pumps for Genetic Algorithms | `<!-- Add more GA intuition demos here -->` |
+| Evolution and Evolutionary Algorithms | `<!-- Add more evolution and evolutionary algorithm demos here -->` |
 | Physics-Inspired Methods | `<!-- Add more physics-inspired demos here -->` |
 | Neural Networks | `<!-- Add more neural network demos here -->` |
 | Cellular Automata | `<!-- Add more cellular automata demos here -->` |
@@ -142,7 +142,7 @@ Add a row to the appropriate table under `## Contents`:
 
 ## Current sections and demos
 
-### Intuition Pumps for Genetic Algorithms
+### Evolution and Evolutionary Algorithms
 
 - `shifting_balance_theory/sbt_four_peaks.html`
 - `ideal_free_distribution/ifd_on_pond.html`
@@ -174,10 +174,10 @@ course unit vocabulary so students can orient themselves.
 
 | Course unit | Topics | Index section |
 | --- | --- | --- |
-| Unit 1 | Genetic algorithms, evolutionary algorithms, genetic drift | Intuition Pumps for Genetic Algorithms |
-| Unit 2 | Evolution Strategies, CMA-ES, genetic/evolutionary programming, artificial immune systems | Intuition Pumps for Genetic Algorithms |
-| Unit 3 | Multi-objective optimization, MOEA, Pareto ranking, niching | Intuition Pumps for Genetic Algorithms |
-| Unit 4 | Multi-modal optimization, diversity/niching methods, distributed/parallel GAs | Intuition Pumps for Genetic Algorithms |
+| Unit 1 | Genetic algorithms, evolutionary algorithms, genetic drift | Evolution and Evolutionary Algorithms |
+| Unit 2 | Evolution Strategies, CMA-ES, genetic/evolutionary programming, artificial immune systems | Evolution and Evolutionary Algorithms |
+| Unit 3 | Multi-objective optimization, MOEA, Pareto ranking, niching | Evolution and Evolutionary Algorithms |
+| Unit 4 | Multi-modal optimization, diversity/niching methods, distributed/parallel GAs | Evolution and Evolutionary Algorithms |
 | Unit 5 | Simulated Annealing, MaxEnt, Gibbs/softmax, Metropolis–Hastings, MCMC | Physics-Inspired Methods |
 | Unit 6 | Ant Colony Optimization, Bacterial Foraging, Particle Swarm Optimization | *(no section yet — add "Swarm Intelligence")* |
 | Unit 7 | Perceptrons, RNNs, Hebbian learning, STDP, spiking neural networks | Neural Networks |
@@ -186,9 +186,9 @@ course unit vocabulary so students can orient themselves.
 
 **Section title rationale:**
 
-- *"Intuition Pumps for Genetic Algorithms"* — these demos build conceptual intuition for GA
-  mechanics (population diversity, fitness landscape, drift) rather than demoing the GA itself.
-  The phrase "intuition pump" (Dennett) signals that these are conceptual tools, not algorithm demos.
+- *"Evolution and Evolutionary Algorithms"* — covers Units 1–4: GAs, Evolution Strategies,
+  multi-objective and multi-modal optimization, and supporting conceptual tools (fitness landscape,
+  drift, diversity).
 - *"Physics-Inspired Methods"* — matches Unit 5 phrasing exactly; covers both the metaheuristic
   side (SA, PT) and the probabilistic/information-theoretic side (MaxEnt, Gibbs/softmax), all of
   which share roots in statistical mechanics and the Boltzmann distribution.
