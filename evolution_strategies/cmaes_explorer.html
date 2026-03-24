@@ -99,10 +99,10 @@ body {
   pointer-events:none;
 }
 #bottom-row { height:130px; flex-shrink:0; display:flex; gap:8px; }
-#fitness-wrap { flex:1; min-width:0; }
-#fitness-canvas { position:absolute; top:0; left:0; }
-#surface-wrap { width:200px; flex-shrink:0; }
-#surface-canvas { position:absolute; top:0; left:0; }
+#fitness-wrap  { flex:1; min-width:0; height:130px; }
+#fitness-canvas { position:absolute; top:0; left:0; width:100%; height:100%; }
+#surface-wrap  { width:200px; flex-shrink:0; height:130px; }
+#surface-canvas { position:absolute; top:0; left:0; width:100%; height:100%; }
 
 /* ── Controls: CSS grid layout ──
    Row 1: [left col: Cov+Paths+Ctrl] [right col: Func+Display]
@@ -153,9 +153,9 @@ body {
 /* ── Responsive: these MUST come after the base grid rules above ── */
 /* Stack bottom row on narrow screens */
 @media (max-width:560px) {
-  #bottom-row { height:auto; flex-direction:column; gap:6px; }
-  #fitness-wrap { height:100px; }
-  #surface-wrap { width:100%; height:100px; }
+  #bottom-row   { height:auto; flex-direction:column; gap:6px; }
+  #fitness-wrap { width:100%; flex:none; height:100px; }
+  #surface-wrap { width:100%; flex:none; height:100px; }
 }
 /* Collapse ctrl to single column on narrow screens */
 @media (max-width:600px) {
@@ -787,7 +787,8 @@ function drawLandscapeLegend(ctx,W,H,showEll,showAxes,showPth,showTrl) {
 let LC, FC, SC, LX, FX, SX;
 
 function renderLandscape() {
-  const ls=logSize.get(LC); if(!ls)return;
+  if(!LC||!wraps.landscape)return;
+  const ls=syncCanvas(LC,wraps.landscape); if(!ls)return;
   const W=ls.w,H=ls.h,ctx=LX,s=S;
   if(!s)return;
   const dpr=window.devicePixelRatio||1;
@@ -902,7 +903,8 @@ function renderLandscape() {
 }
 
 function renderFitnessPlot() {
-  const ls=logSize.get(FC); if(!ls)return;
+  if(!FC||!wraps.fitness)return;
+  const ls=syncCanvas(FC,wraps.fitness); if(!ls)return;
   const W=ls.w,H=ls.h,ctx=FX,s=S;
   const dpr=window.devicePixelRatio||1;
   ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -1000,7 +1002,8 @@ function renderFitnessPlot() {
 }
 
 function renderSurface3D() {
-  const ls=logSize.get(SC); if(!ls)return;
+  if(!SC||!wraps.surface)return;
+  const ls=syncCanvas(SC,wraps.surface); if(!ls)return;
   const W=ls.w,H=ls.h,ctx=SX,s=S;
   if(!s||W===0||H===0)return;
   const dpr=window.devicePixelRatio||1;
@@ -1162,23 +1165,29 @@ function syncLegendBar() {
 // Logical canvas dimensions (CSS pixels) — render functions use these, not cv.width/height
 const logSize = new WeakMap(); // canvas → {w, h}
 
-function resizeAll() {
+// syncCanvas: reads live DOM size and updates buffer if needed. Self-healing on reflow.
+const wraps = {};
+function syncCanvas(cv, wrapEl) {
   const dpr = window.devicePixelRatio || 1;
-  for(const[wrap,cv]of[
-    [document.getElementById('landscape-wrap'),LC],
-    [document.getElementById('fitness-wrap'),FC],
-    [document.getElementById('surface-wrap'),SC],
-  ]){
-    const w=wrap.clientWidth, h=wrap.clientHeight;
-    if(w>0&&h>0){
-      cv.width  = Math.round(w * dpr);
-      cv.height = Math.round(h * dpr);
-      cv.style.width  = w + 'px';
-      cv.style.height = h + 'px';
-      logSize.set(cv, {w, h});
-    }
+  const w = wrapEl.clientWidth, h = wrapEl.clientHeight;
+  if (w <= 0 || h <= 0) return logSize.get(cv) || null;
+  const needW = Math.round(w * dpr), needH = Math.round(h * dpr);
+  if (cv.width !== needW || cv.height !== needH) {
+    cv.width = needW; cv.height = needH;
+    cv.style.width  = w + 'px';
+    cv.style.height = h + 'px';
   }
-  hmCache=null; sfCache=null;
+  const ls = {w, h};
+  logSize.set(cv, ls);
+  return ls;
+}
+
+function resizeAll() {
+  if (!LC) return;
+  syncCanvas(LC, wraps.landscape);
+  syncCanvas(FC, wraps.fitness);
+  syncCanvas(SC, wraps.surface);
+  hmCache = null; sfCache = null;
 }
 
 const ro=new ResizeObserver(()=>{resizeAll();if(S)render();});
@@ -1187,9 +1196,12 @@ window.addEventListener('load',()=>{
   LC=document.getElementById('landscape-canvas'); LX=LC.getContext('2d');
   FC=document.getElementById('fitness-canvas');   FX=FC.getContext('2d');
   SC=document.getElementById('surface-canvas');   SX=SC.getContext('2d');
-  ro.observe(document.getElementById('landscape-wrap'));
-  ro.observe(document.getElementById('fitness-wrap'));
-  ro.observe(document.getElementById('surface-wrap'));
+  wraps.landscape = document.getElementById('landscape-wrap');
+  wraps.fitness   = document.getElementById('fitness-wrap');
+  wraps.surface   = document.getElementById('surface-wrap');
+  ro.observe(wraps.landscape);
+  ro.observe(wraps.fitness);
+  ro.observe(wraps.surface);
   resizeAll(); doReset(); syncLegendBar();
 });
 </script>
