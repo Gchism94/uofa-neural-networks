@@ -241,7 +241,7 @@ select:focus { outline:none; border-color:var(--green); }
       <div class="li"><span class="sym" style="color:#ffee88;font-size:13px;">●</span>best sample</div>
       <div class="li"><span class="sym" style="color:rgba(190,40,40,.9);font-size:14px;">●</span>best-ever ★</div>
       <div class="li"><span class="sym" style="font-size:11px;color:rgba(255,255,255,.85);">⊕</span>optimum</div>
-      <div class="li"><span class="sym" style="font-size:10px;color:rgba(255,255,255,.55);">○</span>σ circle = parent step size</div>
+      <div class="li"><span class="sym" style="font-size:10px;color:rgba(255,255,255,.55);">○</span>parent σ range</div>
     </div>
     <div id="bottom-row">
       <div class="cpanel" id="fitness-wrap">
@@ -647,7 +647,7 @@ function drawLandscapeLegend(ctx,W,H) {
   if(showParents) items.push({type:'dot',col:'rgba(255,220,80,.7)',r:4,ring:true,label:'selected parents (μ)'});
   items.push({type:'dot',col:'rgba(80,200,65,.8)',r:3,label:'offspring (λ)'});
   items.push({type:'opt',label:'global optima'});
-  if(showCirc)    items.push({type:'circ',label:'σ circle = parent step size'});
+  if(showCirc)    items.push({type:'circ',label:'parent σ range'});
   if(showTrail)   items.push({type:'line',col:'rgba(160,100,210,.8)',lw:2,label:'best-ever trail'});
   if(showOld)     items.push({type:'dot',col:'rgba(70,160,60,.3)',r:3,label:'prior gen (faded)'});
   if(rotMode)     items.push({type:'line',col:'#c07010',lw:1.5,dash:[3,3],label:'mutation axes θ'});
