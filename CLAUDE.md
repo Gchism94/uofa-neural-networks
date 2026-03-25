@@ -114,7 +114,9 @@ Current sections and their placeholder comments:
 
 | Section heading | Placeholder comment |
 | --- | --- |
-| Evolution and Evolutionary Algorithms | `<!-- Add more evolution and evolutionary algorithm demos here -->` |
+| Genetic Algorithms | `<!-- Add more genetic algorithm demos here -->` |
+| Evolution Strategies | `<!-- Add more evolution strategies demos here -->` |
+| Evolutionary Programming | `<!-- Add more evolutionary programming demos here -->` |
 | Physics-Inspired Methods | `<!-- Add more physics-inspired demos here -->` |
 | Neural Networks | `<!-- Add more neural network demos here -->` |
 | Cellular Automata | `<!-- Add more cellular automata demos here -->` |
@@ -142,14 +144,20 @@ Add a row to the appropriate table under `## Contents`:
 
 ## Current sections and demos
 
-### Evolution and Evolutionary Algorithms
+### Genetic Algorithms
 
 - `shifting_balance_theory/sbt_four_peaks.html`
 - `ideal_free_distribution/ifd_on_pond.html`
 - `evolution_as_movement_in_drift_field/evolution_as_movement_in_drift_field.html` *(static figure)*
 - `genetic_algorithms/ga_explorer.html`
+
+### Evolution Strategies
+
 - `evolution_strategies/es_explorer.html`
 - `evolution_strategies/cmaes_explorer.html`
+
+### Evolutionary Programming
+
 - `evolutionary_programming/evolprog_representations.html`
 
 ### Physics-Inspired Methods
@@ -178,10 +186,10 @@ course unit vocabulary so students can orient themselves.
 
 | Course unit | Topics | Index section |
 | --- | --- | --- |
-| Unit 1 | Genetic algorithms, evolutionary algorithms, genetic drift | Evolution and Evolutionary Algorithms |
-| Unit 2 | Evolution Strategies, CMA-ES, genetic/evolutionary programming, artificial immune systems | Evolution and Evolutionary Algorithms |
-| Unit 3 | Multi-objective optimization, MOEA, Pareto ranking, niching | Evolution and Evolutionary Algorithms |
-| Unit 4 | Multi-modal optimization, diversity/niching methods, distributed/parallel GAs | Evolution and Evolutionary Algorithms |
+| Unit 1 | Genetic algorithms, evolutionary algorithms, genetic drift | Genetic Algorithms |
+| Unit 2 | Evolution Strategies, CMA-ES, genetic/evolutionary programming, artificial immune systems | Evolution Strategies; Evolutionary Programming |
+| Unit 3 | Multi-objective optimization, MOEA, Pareto ranking, niching | Genetic Algorithms |
+| Unit 4 | Multi-modal optimization, diversity/niching methods, distributed/parallel GAs | Genetic Algorithms |
 | Unit 5 | Simulated Annealing, MaxEnt, Gibbs/softmax, Metropolis–Hastings, MCMC | Physics-Inspired Methods |
 | Unit 6 | Ant Colony Optimization, Bacterial Foraging, Particle Swarm Optimization | *(no section yet — add "Swarm Intelligence")* |
 | Unit 7 | Perceptrons, RNNs, Hebbian learning, STDP, spiking neural networks | Neural Networks |
@@ -190,9 +198,14 @@ course unit vocabulary so students can orient themselves.
 
 **Section title rationale:**
 
-- *"Evolution and Evolutionary Algorithms"* — covers Units 1–4: GAs, Evolution Strategies,
-  multi-objective and multi-modal optimization, and supporting conceptual tools (fitness landscape,
-  drift, diversity).
+- *"Genetic Algorithms"* — covers Units 1, 3, 4: canonical GA, multi-objective (MOEA/Pareto),
+  multi-modal optimization, niching, island model, and supporting conceptual foundations (fitness
+  landscape, drift, diversity, Ideal Free Distribution).
+- *"Evolution Strategies"* — covers the ES/CMA-ES strand of Unit 2: self-adaptive step sizes,
+  correlated mutations, and covariance matrix adaptation.
+- *"Evolutionary Programming"* — covers the EP/AIS strand of Unit 2: non-standard representations
+  (ASTs, linear GP, FSMs) and, when built, artificial immune system methods. Rename section to
+  *"Evolutionary Programming & Artificial Immune Systems"* when AIS demos arrive.
 - *"Physics-Inspired Methods"* — matches Unit 5 phrasing exactly; covers both the metaheuristic
   side (SA, PT) and the probabilistic/information-theoretic side (MaxEnt, Gibbs/softmax), all of
   which share roots in statistical mechanics and the Boltzmann distribution.
