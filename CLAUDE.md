@@ -116,7 +116,7 @@ Current sections and their placeholder comments:
 | --- | --- |
 | Genetic Algorithms | `<!-- Add more genetic algorithm demos here -->` |
 | Evolution Strategies | `<!-- Add more evolution strategies demos here -->` |
-| Evolutionary Programming | `<!-- Add more evolutionary programming demos here -->` |
+| Evolutionary Programming &amp; Artificial Immune Systems | `<!-- Add more evolutionary programming and AIS demos here -->` |
 | Physics-Inspired Methods | `<!-- Add more physics-inspired demos here -->` |
 | Neural Networks | `<!-- Add more neural network demos here -->` |
 | Cellular Automata | `<!-- Add more cellular automata demos here -->` |
@@ -156,9 +156,10 @@ Add a row to the appropriate table under `## Contents`:
 - `evolution_strategies/es_explorer.html`
 - `evolution_strategies/cmaes_explorer.html`
 
-### Evolutionary Programming
+### Evolutionary Programming & Artificial Immune Systems
 
 - `evolutionary_programming/evolprog_representations.html`
+- `artificial_immune_systems/ais_explorer.html`
 
 ### Physics-Inspired Methods
 
@@ -187,7 +188,7 @@ course unit vocabulary so students can orient themselves.
 | Course unit | Topics | Index section |
 | --- | --- | --- |
 | Unit 1 | Genetic algorithms, evolutionary algorithms, genetic drift | Genetic Algorithms |
-| Unit 2 | Evolution Strategies, CMA-ES, genetic/evolutionary programming, artificial immune systems | Evolution Strategies; Evolutionary Programming |
+| Unit 2 | Evolution Strategies, CMA-ES, genetic/evolutionary programming, artificial immune systems | Evolution Strategies; Evolutionary Programming &amp; Artificial Immune Systems |
 | Unit 3 | Multi-objective optimization, MOEA, Pareto ranking, niching | Genetic Algorithms |
 | Unit 4 | Multi-modal optimization, diversity/niching methods, distributed/parallel GAs | Genetic Algorithms |
 | Unit 5 | Simulated Annealing, MaxEnt, Gibbs/softmax, Metropolis–Hastings, MCMC | Physics-Inspired Methods |
@@ -203,9 +204,8 @@ course unit vocabulary so students can orient themselves.
   landscape, drift, diversity, Ideal Free Distribution).
 - *"Evolution Strategies"* — covers the ES/CMA-ES strand of Unit 2: self-adaptive step sizes,
   correlated mutations, and covariance matrix adaptation.
-- *"Evolutionary Programming"* — covers the EP/AIS strand of Unit 2: non-standard representations
-  (ASTs, linear GP, FSMs) and, when built, artificial immune system methods. Rename section to
-  *"Evolutionary Programming & Artificial Immune Systems"* when AIS demos arrive.
+- *"Evolutionary Programming & Artificial Immune Systems"* — covers the EP/AIS strand of Unit 2:
+  non-standard representations (ASTs, linear GP, FSMs) and immune-inspired algorithms (NSA, CLONALG).
 - *"Physics-Inspired Methods"* — matches Unit 5 phrasing exactly; covers both the metaheuristic
   side (SA, PT) and the probabilistic/information-theoretic side (MaxEnt, Gibbs/softmax), all of
   which share roots in statistical mechanics and the Boltzmann distribution.

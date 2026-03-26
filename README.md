@@ -34,11 +34,12 @@ as iframes.
 | [`evolution_strategies/es_explorer.html`](evolution_strategies/es_explorer.html) | Interactive (μ,λ)- or (μ+λ)-ES explorer: per-individual step-size self-adaptation on a 1-D multimodal landscape, with optional correlated mutations |
 | [`evolution_strategies/cmaes_explorer.html`](evolution_strategies/cmaes_explorer.html) | Interactive CMA-ES explorer: watch the algorithm adapt its mean, step size (CSA), and full covariance matrix (rank-1/rank-μ updates) on a 2-D landscape in real time |
 
-### Evolutionary Programming
+### Evolutionary Programming & Artificial Immune Systems
 
 | Directory | Description |
 | --- | --- |
 | [`evolutionary_programming/evolprog_representations.html`](evolutionary_programming/evolprog_representations.html) | Side-by-side explorer for three EP representation families — Abstract Syntax Trees, Linear Genetic Programs, and Finite-State Machines — with interactive variation operators and a cross-representation comparison |
+| [`artificial_immune_systems/ais_explorer.html`](artificial_immune_systems/ais_explorer.html) | Interactive explorer for Negative Selection (NSA) and CLONALG: train detectors on self-data to flag anomalies, and watch clonal selection and affinity maturation build a pattern-recognition repertoire |
 
 ### Physics-Inspired Methods
 
