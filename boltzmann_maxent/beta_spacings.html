@@ -11,7 +11,7 @@
 <meta property="og:title" content="Beta Distribution Explorer — interactive explainer">
 <meta property="og:description" content="Adjust α and β to reshape the Beta(α,β) distribution, draw N samples, and watch how their order statistics and spacings reveal the deep connection between uniform random variables and the Beta distribution.">
 <meta property="og:image" content="https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/boltzmann_maxent/beta_spacings-preview.png">
-<meta property="og:image:width" content="2162">
+<meta property="og:image:width" content="2180">
 <meta property="og:image:height" content="1084">
 <meta property="og:url" content="https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/boltzmann_maxent/beta_spacings.html">
 <meta property="fb:app_id" content="2385695445236853">
@@ -238,7 +238,11 @@ input[type=range]::-moz-range-thumb {
 .preset.active { background:var(--accent); border-color:var(--accent); color:#fff; }
 
 /* ── Sample card ─────────────────────────────────────────── */
-.resample-row { display:flex; justify-content:flex-end; margin-bottom:11px; }
+.sec-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 13px;
+}
+.sec-header .sec-label { margin-bottom: 0; }
 .btn-resample {
   font-family:var(--font); font-size:11.5px; font-weight:500;
   background:var(--accent-lt); border:1px solid var(--accent); color:var(--accent);
@@ -250,10 +254,28 @@ input[type=range]::-moz-range-thumb {
 .sub-label .nc { text-transform: none; letter-spacing: 0; }
 
 #strip-canvas {
-  width:100%; height:52px; display:block;
-  border:1px solid var(--border); border-radius:5px;
-  background:#f8f9fd; margin-bottom:15px;
+  width:100%; height:40px; display:block;
+  background:#ffffff; margin-bottom:3px; cursor:crosshair;
 }
+.strip-legend {
+  font-family: var(--mono); font-size: 9px; color: #9aa0b8;
+  text-align: right; margin-bottom: 4px; letter-spacing: 0.03em;
+}
+#strip-tooltip {
+  display: none;
+  position: absolute;
+  font-family: var(--mono); font-size: 10px;
+  background: rgba(20,30,50,0.82);
+  color: #e8f0f8;
+  border-radius: 4px;
+  padding: 4px 8px;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 100;
+  line-height: 1.6;
+}
+.card { position: relative; }
+#lbl-strip { text-align: center; }
 .chart-note { font-size:11.5px; color:var(--muted); margin-top:8px; line-height:1.6; font-style:italic; }
 
 /* ── Footer ──────────────────────────────────────────────── */
@@ -370,12 +392,14 @@ input[type=range]::-moz-range-thumb {
 
   <!-- CARD 2: SAMPLE DISPLAY -->
   <div class="card">
-    <div class="sec-label">Sample</div>
-    <div class="resample-row">
+    <div class="sec-header">
+      <div class="sec-label">Sample</div>
       <button class="btn-resample" id="btn-resample">↺ &nbsp;Resample</button>
     </div>
-    <div class="sub-label" id="lbl-strip">N points drawn from Beta(α, β) on [0, 1]</div>
+    <div class="sub-label" id="lbl-strip">N sorted points (order statistics) from Beta(α, β) on [0, 1]</div>
     <canvas id="strip-canvas"></canvas>
+    <div class="strip-legend">&Delta;x (gaps between adjacent sorted samples): light = small &nbsp;&middot;&nbsp; dark = large &nbsp;(rank-normalized)</div>
+    <div id="strip-tooltip"></div>
     <div class="sub-label" id="lbl-sample-hist">Sample histogram &nbsp;·&nbsp; Beta(α, β) PDF</div>
     <canvas id="chart-sample" height="180"></canvas>
   </div>
@@ -521,47 +545,182 @@ function updateStats() {
 }
 
 // ═══════════════════════════════════════════════════════
-//  Strip / rug-plot
+//  Gap color ramp (module-level so hover handler can use it)
+//  Desaturated teal: pale #d4ecea → medium #3a9990
 // ═══════════════════════════════════════════════════════
 
-function drawStrip() {
+function gapColor(t, highlight) {
+  const r = Math.round(212 + t * (40  - 212));
+  const g = Math.round(236 + t * (153 - 236));
+  const b = Math.round(234 + t * (144 - 234));
+  if (highlight) return `rgb(${Math.max(0,r-40)},${Math.min(255,g+10)},${Math.min(255,b+10)})`;
+  return `rgb(${r},${g},${b})`;
+}
+
+// Strip layout state — populated by drawStrip, read by hover handler
+let stripState = null;
+
+// ═══════════════════════════════════════════════════════
+//  Redraw just the Δx gap band (used by hover handler)
+// ═══════════════════════════════════════════════════════
+
+function redrawGapBand(highlightIdx) {
+  if (!stripState) return;
+  const { boundaries, sp, ranks, maxRank,
+          xLeft, span, gapTop, gapH, W } = stripState;
+  const canvas = document.getElementById('strip-canvas');
+  const ctx = canvas.getContext('2d');
+  ctx.save();
+
+  // Clear gap band (coordinates are already in CSS-pixel space via the
+  // dpr scale set once in drawStrip — do NOT re-scale here)
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, gapTop - 1, W, gapH + 4);
+
+  // Redraw all segments
+  for (let i = 0; i < sp.length; i++) {
+    const x0 = xLeft + boundaries[i]   * span;
+    const x1 = xLeft + boundaries[i+1] * span;
+    const t  = ranks[i] / maxRank;
+    ctx.fillStyle = gapColor(t, false);
+    ctx.fillRect(x0, gapTop, Math.max(x1 - x0, 0.5), gapH);
+  }
+
+  // Highlight the hovered gap
+  if (highlightIdx >= 0 && highlightIdx < sp.length) {
+    const x0 = xLeft + boundaries[highlightIdx]   * span;
+    const x1 = xLeft + boundaries[highlightIdx+1] * span;
+    const t  = ranks[highlightIdx] / maxRank;
+    // Slightly brighter fill + white outline
+    ctx.fillStyle = gapColor(t, true);
+    ctx.fillRect(x0, gapTop, Math.max(x1 - x0, 0.5), gapH);
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = 1.5;
+    const w = Math.max(x1 - x0, 2);
+    ctx.strokeRect(x0 + 0.75, gapTop + 0.75, w - 1.5, gapH - 1.5);
+  }
+
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════════════════
+//  Strip / rug-plot  (called from sample chart's afterRender)
+// ═══════════════════════════════════════════════════════
+
+function drawStrip(chartArea, chartCanvas) {
   document.getElementById('lbl-strip').innerHTML =
-    `${N} points drawn from <span class="nc">Beta(&alpha;&thinsp;=&thinsp;${A.toFixed(1)}, &beta;&thinsp;=&thinsp;${B.toFixed(1)})</span> on [0,&thinsp;1]`;
+    `${N} points from <span class="nc">Beta(&alpha;&thinsp;=&thinsp;${A.toFixed(1)}, &beta;&thinsp;=&thinsp;${B.toFixed(1)})</span> on [0,&thinsp;1]`;
+
   const canvas = document.getElementById('strip-canvas');
   const dpr = window.devicePixelRatio || 1;
-  const W = canvas.clientWidth || 760;
-  const H = canvas.clientHeight || 52;
+  const W = canvas.clientWidth;
+  const H = canvas.clientHeight;
   canvas.width  = W * dpr;
   canvas.height = H * dpr;
   const ctx = canvas.getContext('2d');
   ctx.scale(dpr, dpr);
 
-  ctx.fillStyle = '#f8f9fd';
+  // Align x-range to sample chart's data area
+  let xLeft, xRight;
+  if (chartArea && chartCanvas) {
+    const scaleX = W / (chartCanvas.width / dpr);
+    xLeft  = chartArea.left  * scaleX;
+    xRight = chartArea.right * scaleX;
+  } else {
+    xLeft = 8; xRight = W - 8;
+  }
+  const span = xRight - xLeft;
+
+  // ── Layout: top band = rug marks, bottom band = gap color ──
+  // Gap band reduced to ~38% of height
+  const GAP_SPLIT = Math.round(H * 0.62);
+  const RUG_PAD   = 2;
+  const BOX_PAD   = 1;
+
+  // Fill entire canvas with card white
+  ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, W, H);
 
-  const mid = H / 2;
-  const PAD = 8;
-  const span = W - 2*PAD;
+  // Data-area background for rug zone — very subtle blue tint
+  ctx.fillStyle = 'rgba(92,107,192,0.06)';
+  ctx.fillRect(xLeft, RUG_PAD, span, GAP_SPLIT - RUG_PAD);
 
-  // axis line
-  ctx.strokeStyle = '#c6cde0';
+  // ── Compute N+1 spacings and rank-normalize ──────────────
+  const boundaries = [0, ...pts, 1];
+  const sp = [];
+  for (let i = 0; i < boundaries.length - 1; i++)
+    sp.push(boundaries[i+1] - boundaries[i]);
+
+  const order = sp.map((v, i) => ({v, i})).sort((a, b) => a.v - b.v);
+  const ranks = new Array(sp.length);
+  order.forEach(({i}, rank) => { ranks[i] = rank; });
+  const maxRank = sp.length - 1;
+
+  // ── Draw gap segments (bottom band) ─────────────────────
+  const gapTop = GAP_SPLIT + 1;
+  const gapH   = H - gapTop - BOX_PAD;
+  for (let i = 0; i < sp.length; i++) {
+    const x0 = xLeft + boundaries[i]   * span;
+    const x1 = xLeft + boundaries[i+1] * span;
+    ctx.fillStyle = gapColor(ranks[i] / maxRank, false);
+    ctx.fillRect(x0, gapTop, Math.max(x1 - x0, 0.5), gapH);
+  }
+
+  // ── Divider between rug and gap zones ────────────────────
+  ctx.strokeStyle = '#d0d6e8';
+  ctx.lineWidth = 0.75;
+  ctx.beginPath();
+  ctx.moveTo(xLeft, GAP_SPLIT + 0.5);
+  ctx.lineTo(xRight, GAP_SPLIT + 0.5);
+  ctx.stroke();
+
+  // ── Reference ticks (full height) ───────────────────────
+  ctx.strokeStyle = 'rgba(80,90,130,0.25)';
   ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(PAD, mid); ctx.lineTo(W-PAD, mid); ctx.stroke();
-
-  // reference ticks
   for (const t of [0, 0.25, 0.5, 0.75, 1]) {
-    const x = PAD + t*span;
-    ctx.strokeStyle = '#a8b0c8'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(x, mid-5); ctx.lineTo(x, mid+5); ctx.stroke();
+    const x = xLeft + t * span;
+    ctx.beginPath(); ctx.moveTo(x, RUG_PAD); ctx.lineTo(x, H - BOX_PAD); ctx.stroke();
   }
 
-  // rug marks (keep them crisp even at high N)
-  ctx.strokeStyle = 'rgba(92,107,192,0.32)';
-  ctx.lineWidth = 1.2;
+  // ── Rug marks (top zone, clipped) ────────────────────────
+  const rugMid  = (RUG_PAD + GAP_SPLIT) / 2;
+  const rugHalf = (GAP_SPLIT - RUG_PAD) * 0.44;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(xLeft, RUG_PAD, span, GAP_SPLIT - RUG_PAD);
+  ctx.clip();
+  ctx.strokeStyle = 'rgba(92,107,192,0.70)';
+  ctx.lineWidth = 0.9;
   for (const p of pts) {
-    const x = PAD + p * span;
-    ctx.beginPath(); ctx.moveTo(x, mid-10); ctx.lineTo(x, mid+10); ctx.stroke();
+    const x = xLeft + p * span;
+    ctx.beginPath();
+    ctx.moveTo(x, rugMid - rugHalf);
+    ctx.lineTo(x, rugMid + rugHalf);
+    ctx.stroke();
   }
+  ctx.restore();
+
+  // ── Bounding box around data area ────────────────────────
+  ctx.strokeStyle = '#b8c2d8';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(xLeft + 0.5, RUG_PAD + 0.5, span - 1, H - RUG_PAD - BOX_PAD - 1);
+
+  // ── Band labels in the left margin ───────────────────────
+  ctx.save();
+  ctx.font = '500 9px "IBM Plex Mono", monospace';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  const labelX = xLeft - 5;
+  ctx.fillStyle = 'rgba(92,107,192,0.85)';
+  ctx.fillText('x:', labelX, rugMid);
+  ctx.fillStyle = 'rgba(26,140,134,0.85)';
+  ctx.fillText('\u0394x:', labelX, gapTop + gapH / 2);
+  ctx.restore();
+
+  // ── Store layout state for hover handler ─────────────────
+  stripState = { boundaries, sp, ranks, maxRank,
+                 xLeft, xRight, span, gapTop, gapH,
+                 GAP_SPLIT, RUG_PAD, BOX_PAD, H, W, dpr };
 }
 
 // ═══════════════════════════════════════════════════════
@@ -620,6 +779,14 @@ function drawSampleChart() {
   const pdfVals = Array.from({length: n}, (_, i) => betaPDF((i + 0.5)*bw, A, B));
   const labels  = Array.from({length: n}, (_, i) => ((i + 0.5)*bw).toFixed(2));
 
+  // Plugin: once the chart has laid out, align the strip to the data area
+  const stripAlignPlugin = {
+    id: 'stripAlign',
+    afterRender(chart) {
+      drawStrip(chart.chartArea, chart.canvas);
+    }
+  };
+
   if (cSample) { cSample.destroy(); cSample = null; }
   cSample = new Chart(document.getElementById('chart-sample'), {
     data: {
@@ -638,7 +805,8 @@ function drawSampleChart() {
         }
       ]
     },
-    options: mkOpts('Value  x', 'Density')
+    options: mkOpts('Value  x', 'Density'),
+    plugins: [stripAlignPlugin]
   });
 }
 
@@ -707,14 +875,12 @@ function drawSpacingChart() {
 function fullUpdate() {
   doSample();
   updateStats();
-  drawStrip();
-  drawSampleChart();
+  drawSampleChart();   // strip is drawn inside chart's afterRender plugin
   drawSpacingChart();
 }
 
 function redrawCharts() {
   updateStats();
-  drawStrip();
   drawSampleChart();
   drawSpacingChart();
 }
@@ -766,6 +932,79 @@ document.querySelectorAll('.preset').forEach(btn => {
 
 fillSlider(slA); fillSlider(slB); fillSlider(slN);
 window.addEventListener('load', fullUpdate);
+
+// ═══════════════════════════════════════════════════════
+//  Strip hover — highlight gap + tooltip
+// ═══════════════════════════════════════════════════════
+
+(function () {
+  const canvas  = document.getElementById('strip-canvas');
+  const tooltip = document.getElementById('strip-tooltip');
+
+  canvas.addEventListener('mousemove', function (e) {
+    if (!stripState) return;
+    const { boundaries, sp, ranks, maxRank,
+            xLeft, xRight, span, gapTop, gapH, H } = stripState;
+
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const cssH = rect.height;
+
+    // Only respond when cursor is in the Δx band
+    const gapTopFrac = gapTop / H;
+    const gapBotFrac = (gapTop + gapH) / H;
+    if (my / cssH < gapTopFrac || my / cssH > gapBotFrac + 0.05) {
+      redrawGapBand(-1);
+      tooltip.style.display = 'none';
+      return;
+    }
+
+    // Find which gap the x-position falls in
+    const xFrac = (mx - xLeft) / span;
+    let hitIdx = -1;
+    for (let i = 0; i < boundaries.length - 1; i++) {
+      if (xFrac >= boundaries[i] && xFrac <= boundaries[i+1]) {
+        hitIdx = i; break;
+      }
+    }
+    if (hitIdx < 0) {
+      redrawGapBand(-1);
+      tooltip.style.display = 'none';
+      return;
+    }
+
+    redrawGapBand(hitIdx);
+
+    // Tooltip content
+    const deltaX   = sp[hitIdx];
+    const pct      = Math.round(ranks[hitIdx] / maxRank * 100);
+    const gapLabel = hitIdx === 0 ? '0 → x₁' :
+                     hitIdx === sp.length - 1 ? `x${sp.length-1} → 1` :
+                     `x${hitIdx} → x${hitIdx+1}`;
+    tooltip.innerHTML =
+      `<span style="color:#7ee8e4">\u0394x</span> = ${deltaX.toFixed(5)}`
+      + `&nbsp;&nbsp;<span style="color:#a0b0c8">rank ${ranks[hitIdx]+1}/${sp.length}`
+      + ` &nbsp;(${pct}th pct)</span>`;
+
+    // Position relative to card (canvas parent is .card which is position:relative)
+    const cardRect = canvas.parentElement.getBoundingClientRect();
+    let tx = e.clientX - cardRect.left + 10;
+    let ty = e.clientY - cardRect.top  - 32;
+    // Keep inside card width
+    const ttW = 260;
+    if (tx + ttW > cardRect.width - 8) tx = cardRect.width - ttW - 8;
+    if (ty < 4) ty = 4;
+    tooltip.style.left    = tx + 'px';
+    tooltip.style.top     = ty + 'px';
+    tooltip.style.display = 'block';
+  });
+
+  canvas.addEventListener('mouseleave', function () {
+    redrawGapBand(-1);
+    tooltip.style.display = 'none';
+  });
+})();
 </script>
 <footer style="padding-top:0.75rem;padding-left:1rem;border-top:1px solid #e0e0e0;font-size:0.8rem;color:#888;">
   <a href="../" style="color:#2e7d32;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">&larr; All course visualizations</a>
