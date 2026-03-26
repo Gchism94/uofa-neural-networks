@@ -50,6 +50,7 @@ as iframes.
 | [`softmax/`](softmax/) | Interactive explorer for the softmax (Gibbs) distribution: how temperature interpolates between uniform exploration and greedy exploitation, connecting MaxEnt methods to SA and reinforcement learning |
 | [`maxent/`](maxent/) | Interactive explainer for the Maximum Entropy principle: how MaxEnt selects the least-assumptive distribution consistent with known constraints, deriving the Gibbs/softmax distribution |
 | [`boltzmann_maxent/`](boltzmann_maxent/) | Interactive simulation of N agents trading random amounts of a conserved quantity — any initial distribution relaxes to the Boltzmann (exponential) equilibrium |
+| [`boltzmann_maxent/beta_spacings.html`](boltzmann_maxent/beta_spacings.html) | Interactive Beta(α,β) distribution explorer: adjust α and β, draw N samples, and watch how order statistics and spacings connect uniform random variables to the Beta distribution |
 
 ### Neural Networks
 

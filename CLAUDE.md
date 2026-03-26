@@ -168,6 +168,7 @@ Add a row to the appropriate table under `## Contents`:
 - `softmax/softmax_temperature_explorer.html`
 - `maxent/maxent_demo.html`
 - `boltzmann_maxent/boltzmann_maxent_random_exchange.html`
+- `boltzmann_maxent/beta_spacings.html`
 
 ### Neural Networks
 
