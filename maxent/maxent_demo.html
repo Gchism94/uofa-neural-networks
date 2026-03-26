@@ -44,6 +44,7 @@
 .cell{aspect-ratio:1;border-radius:3px;cursor:pointer;border:2px solid transparent;position:relative;overflow:hidden;transition:border-color 0.1s}
 .cell.occ{border-color:var(--color-text-primary)}
 .cell.occ::after{content:'';position:absolute;top:25%;left:25%;width:50%;height:50%;border-radius:50%;background:var(--color-text-primary)}
+.cell:hover:not(.occ){border-color:var(--color-text-tertiary)}
 .cell .fstrip{position:absolute;bottom:0;left:0;right:0;height:22%;display:flex}
 .cell .fstrip span{flex:1}
 .bar-track{flex:1;background:var(--color-background-secondary);border-radius:2px;height:16px;overflow:hidden;border:0.5px solid var(--color-border-tertiary)}
@@ -58,6 +59,8 @@
 .clrbtn{padding:5px 12px;font-size:12px;cursor:pointer;background:none;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);color:var(--color-text-secondary);font-family:var(--font-sans);margin-top:10px}
 .match-row{margin-bottom:10px}
 .match-label{font-size:11px;color:var(--color-text-tertiary);margin-bottom:4px}
+.match-label-top{display:flex;align-items:baseline;gap:6px}
+.constraint-defn{font-size:10px;color:var(--color-text-tertiary);font-style:italic;margin-top:2px;margin-bottom:2px;padding-left:2px;border-left:2px solid #BA7517;padding-left:5px;opacity:0.85}
 .match-pair{display:flex;align-items:center;gap:6px;margin-bottom:3px}
 .match-tag{font-size:10px;width:52px;flex-shrink:0;text-align:right}
 .cswatch{display:inline-block;width:10px;height:10px;border-radius:2px;flex-shrink:0}
@@ -70,6 +73,8 @@
 .legend-row{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:11px;color:var(--color-text-tertiary)}
 .legend-grad{height:8px;flex:1;border-radius:2px}
 p,span,div,label,button{font-family:var(--font-sans)}
+/* Context framing box for NLP tab */
+.context-box{background:#faf8f2;border:0.5px solid var(--color-border-tertiary);border-left:3px solid var(--color-text-secondary);border-radius:0 var(--border-radius-md) var(--border-radius-md) 0;padding:8px 12px;margin-bottom:0.75rem;line-height:1.6}
 </style>
 
 <div class="outer">
@@ -83,7 +88,15 @@ p,span,div,label,button{font-family:var(--font-sans)}
   <span style="font-size:10px;color:var(--color-text-tertiary)">&copy; 2026 Theodore P. Pavlic &mdash; MIT License</span>
 </div>
 
-<div id="tab-sdm" style="display:flex;gap:1.5rem;flex-wrap:wrap;align-items:flex-start">
+<!-- ═══════════════ SDM TAB ═══════════════ -->
+<div id="tab-sdm">
+  <div class="context-box" style="margin-bottom:0.75rem">
+    <span style="font-size:12px;color:var(--color-text-secondary)">
+      Where does this species occur? &ensp;&middot;&ensp;
+      The model estimates <em>P(cell&nbsp;|&nbsp;environment)</em> using MaxEnt with feature constraints.
+    </span>
+  </div>
+  <div style="display:flex;gap:1.5rem;flex-wrap:wrap;align-items:flex-start">
   <div style="flex:1;min-width:280px;max-width:460px">
     <p style="font-size:13px;color:var(--color-text-secondary);margin-bottom:0.75rem;line-height:1.6">Click cells to record species observations. In all views, <strong style="font-weight:500">darker = higher value</strong>: darker green = higher probability; darker amber/red/blue in the strip = higher elevation/temperature/moisture. The strip colors match the single-layer views exactly. Cells whose feature strip best matches the averages observed in your clicks receive the highest (darkest green) probability.</p>
     <div class="grid-wrap">
@@ -94,10 +107,21 @@ p,span,div,label,button{font-family:var(--font-sans)}
         <span>high prob</span>
       </div>
     </div>
-    <div style="margin-top:10px;font-size:12px;color:var(--color-text-secondary)">Entropy: <strong id="entropy-val" style="color:var(--color-text-primary)">4.605</strong> <span id="entropy-pct" style="color:var(--color-text-tertiary)">(100.0% of max)</span></div>
+    <!-- Entropy display + optimization principle note -->
+    <div style="margin-top:10px;font-size:12px;color:var(--color-text-secondary)">
+      Entropy: <strong id="entropy-val" style="color:var(--color-text-primary)">4.605</strong>
+      <span id="entropy-pct" style="color:var(--color-text-tertiary)">(100.0% of max)</span>
+    </div>
+    <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:3px;font-style:italic;line-height:1.5">
+      This is the highest-entropy distribution that satisfies the constraints above.
+    </div>
+    <!-- Cell hover note -->
+    <div id="sdm-hover-note" style="min-height:1.7rem;margin-top:7px;font-size:12px;color:var(--color-text-secondary);line-height:1.5"></div>
     <button class="clrbtn" onclick="clearOcc()">Clear observations</button>
   </div>
+
   <div style="flex:0 0 220px">
+    <!-- View selector panel -->
     <div class="panel">
       <div class="sl">View</div>
       <label class="chk-row"><input type="radio" name="view" value="prob" checked onchange="setView('prob')"> <span class="cswatch" style="background:#3B6D11"></span> Probability (MaxEnt)</label>
@@ -106,43 +130,64 @@ p,span,div,label,button{font-family:var(--font-sans)}
       <label class="chk-row" style="margin:0"><input type="radio" name="view" value="moist" onchange="setView('moist')"> <span class="cswatch" style="background:#185FA5"></span> Moisture only</label>
       <p style="font-size:11px;color:var(--color-text-tertiary);margin-top:8px;line-height:1.5">In all views, darker = higher value.</p>
     </div>
+    <!-- Active features panel -->
     <div class="panel">
-      <div class="sl">Active features &amp; constraints</div>
+      <div class="sl">Active features</div>
       <label class="chk-row"><input type="checkbox" checked onchange="toggleSDMFeature(0)"> <span class="cswatch" style="background:#BA7517"></span> Elevation</label>
       <label class="chk-row"><input type="checkbox" checked onchange="toggleSDMFeature(1)"> <span class="cswatch" style="background:#A32D2D"></span> Temperature</label>
       <label class="chk-row" style="margin:0"><input type="checkbox" checked onchange="toggleSDMFeature(2)"> <span class="cswatch" style="background:#185FA5"></span> Moisture</label>
-      <p style="font-size:11px;color:var(--color-text-tertiary);margin-top:8px;line-height:1.5">Each checked feature becomes a constraint: the model must match its average value across your observations.</p>
+      <p style="font-size:11px;color:var(--color-text-tertiary);margin-top:8px;line-height:1.5">Each checked feature becomes a constraint: the model must match its mean value across your observations.</p>
     </div>
+    <!-- Constraints panel (definition + match, unified) -->
     <div class="panel" style="margin-bottom:0">
-      <div class="sl">Constraint match</div>
-      <p style="font-size:11px;color:var(--color-text-tertiary);margin-bottom:10px;line-height:1.5">For each active constraint, <span style="color:#BA7517;font-weight:500">amber</span> = average feature value across your observed clicks; <span style="font-weight:500">colored</span> = what the current model predicts. At convergence the two bars match — that is what satisfying the constraint means.</p>
+      <div class="sl">Constraints</div>
+      <p style="font-size:11px;color:var(--color-text-tertiary);margin-bottom:10px;line-height:1.5">
+        Each row: <em>italic</em> line = target from data; <span style="color:#BA7517;font-weight:500">amber</span> bar = that same target; <span style="font-weight:500">colored</span> bar = model prediction. At convergence the bars match.
+      </p>
       <div id="sdm-expectations"><div style="font-size:12px;color:var(--color-text-tertiary)">Add observations to see constraints.</div></div>
     </div>
   </div>
-</div>
+  </div><!-- end flex row -->
+</div><!-- end tab-sdm -->
 
+<!-- ═══════════════ NLP TAB ═══════════════ -->
 <div id="tab-nlp" style="display:none">
+  <!-- Context / framing box -->
+  <div class="context-box">
+    <span style="font-size:12px;color:var(--color-text-secondary)">
+      Predict the next word in: <em style="color:var(--color-text-primary)">"the ____"</em>
+      &ensp;&middot;&ensp;
+      The model estimates <em>P(word&nbsp;|&nbsp;context)</em> using MaxEnt with feature constraints.
+    </span>
+  </div>
   <p style="font-size:13px;color:var(--color-text-secondary);margin-bottom:0.75rem;line-height:1.6">Click words to add them to the corpus. Each word shows feature badges: <span style="background:#EAF3DE;color:#3B6D11;padding:1px 4px;border-radius:3px;font-size:11px;font-weight:500">N</span> nature word, <span style="background:#FAEEDA;color:#633806;padding:1px 4px;border-radius:3px;font-size:11px;font-weight:500">noun</span>, <span style="background:#E6F1FB;color:#0C447C;padding:1px 4px;border-radius:3px;font-size:11px;font-weight:500">long</span>. Hover a word to see which others share its features — those are outlined in blue and receive a probability boost from the same constraints.</p>
   <div id="word-btns" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:1rem;padding:4px"></div>
-  <div id="hover-note" style="font-size:12px;color:var(--color-text-secondary);margin-bottom:1rem;height:2.8rem;overflow:hidden;line-height:1.6"></div>
+  <!-- Hover note — allow two lines for feature value summary -->
+  <div id="hover-note" style="font-size:12px;color:var(--color-text-secondary);margin-bottom:1rem;min-height:3.4rem;overflow:hidden;line-height:1.6"></div>
   <div style="display:flex;gap:1.5rem;flex-wrap:wrap;align-items:flex-start">
     <div style="flex:1;min-width:340px;max-width:460px">
       <div class="sl" style="margin-bottom:12px">Word probability</div>
       <div id="nlp-bars" style="padding:4px"></div>
       <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:8px;line-height:1.5">Vertical line = uniform (12.5%, no data). <span style="color:#3B6D11">Green</span> = above uniform; <span style="color:#A32D2D">red</span> = below.</div>
+      <div style="margin-top:10px;font-size:12px;color:var(--color-text-secondary)">Entropy: <strong id="nlp-entropy-val" style="color:var(--color-text-primary)">2.079</strong> <span id="nlp-entropy-pct" style="color:var(--color-text-tertiary)">(100.0% of max)</span></div>
+      <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:3px;font-style:italic;line-height:1.5">This is the highest-entropy distribution that satisfies the constraints above.</div>
       <button class="clrbtn" onclick="clearCorpus()">Clear corpus</button>
     </div>
     <div style="flex:0 0 220px;min-width:220px">
+      <!-- Active features panel -->
       <div class="panel">
-        <div class="sl">Active features &amp; constraints</div>
+        <div class="sl">Active features</div>
         <label class="chk-row"><input type="checkbox" checked onchange="toggleNLPFeature(0)"> <span class="cswatch" style="background:#3B6D11"></span> Nature word</label>
         <label class="chk-row"><input type="checkbox" checked onchange="toggleNLPFeature(1)"> <span class="cswatch" style="background:#633806"></span> Noun</label>
         <label class="chk-row" style="margin:0"><input type="checkbox" checked onchange="toggleNLPFeature(2)"> <span class="cswatch" style="background:#0C447C"></span> Long word (&ge;6 chars)</label>
         <p style="font-size:11px;color:var(--color-text-tertiary);margin-top:8px;line-height:1.5">Each checked feature becomes a constraint: the model must match how often that feature appeared in your corpus.</p>
       </div>
+      <!-- Constraints panel (definition + match, unified) -->
       <div class="panel" style="margin-bottom:0">
-        <div class="sl">Constraint match</div>
-        <p style="font-size:11px;color:var(--color-text-tertiary);margin-bottom:10px;line-height:1.5">For each active constraint, <span style="color:#BA7517;font-weight:500">amber</span> = fraction of corpus words that have this feature; <span style="font-weight:500">colored</span> = fraction the model currently predicts. At convergence the two bars are equal.</p>
+        <div class="sl">Constraints</div>
+        <p style="font-size:11px;color:var(--color-text-tertiary);margin-bottom:10px;line-height:1.5">
+          Each row: <em>italic</em> line = target proportion from corpus; <span style="color:#BA7517;font-weight:500">amber</span> bar = that target; <span style="font-weight:500">colored</span> bar = model prediction. At convergence the bars match.
+        </p>
         <div id="nlp-expectations"><div style="font-size:12px;color:var(--color-text-tertiary)">Add corpus words to see constraints.</div></div>
       </div>
     </div>
@@ -151,6 +196,7 @@ p,span,div,label,button{font-family:var(--font-sans)}
 </div>
 
 <script>
+/* ─── constants ─── */
 const GRID=10,N=GRID*GRID;
 const FC_SDM=['#BA7517','#A32D2D','#185FA5'];
 const FC_NLP=['#3B6D11','#633806','#0C447C'];
@@ -169,6 +215,8 @@ const RAMPS={
   temp:[[252,235,235],[163,45,45]],
   moist:[[230,241,251],[24,95,165]]
 };
+
+/* ─── feature map ─── */
 function buildFeatures(){
   const e=[],t=[],m=[];
   for(let r=0;r<GRID;r++) for(let c=0;c<GRID;c++){
@@ -181,12 +229,12 @@ function buildFeatures(){
   return[{name:'Elevation',values:nr(e),ramp:'elev'},{name:'Temperature',values:nr(t),ramp:'temp'},{name:'Moisture',values:nr(m),ramp:'moist'}];
 }
 const FEATS=buildFeatures();
-let occs=[],sdmAF=[true,true,true],view='prob';
+
+/* ─── state ─── */
+let occs=[],sdmAF=[true,true,true],view='prob',hoveredCell=-1;
 let sdmR={probs:new Array(N).fill(1/N),empirical:[],model:[],names:[]};
-function fToColor(v,ramp){
-  const R=RAMPS[ramp];
-  return`rgb(${Math.round(R[0][0]+(R[1][0]-R[0][0])*v)},${Math.round(R[0][1]+(R[1][1]-R[0][1])*v)},${Math.round(R[0][2]+(R[1][2]-R[0][2])*v)})`;
-}
+
+/* ─── solvers ─── */
 function solveMaxEntSDM(ai,os){
   const af=ai.map(i=>FEATS[i]),nF=af.length;
   if(!os.length||!nF)return{probs:new Array(N).fill(1/N),empirical:[],model:[],names:[]};
@@ -207,6 +255,7 @@ function solveMaxEntSDM(ai,os){
   const model=af.map(f=>probs.reduce((s,pr,x)=>s+pr*f.values[x],0));
   return{probs,empirical:mu,model,names:af.map(f=>f.name)};
 }
+
 function entropy(p){return-p.reduce((s,v)=>s+(v>1e-10?v*Math.log(v):0),0);}
 function pToGreen(p,mx){
   const t=Math.min(p/(mx+1e-10),1);
@@ -215,6 +264,12 @@ function pToGreen(p,mx){
   const b=t<0.5?Math.round(222+(34-222)*(t*2)):Math.round(34+(4-34)*((t-0.5)*2));
   return`rgb(${r},${g},${b})`;
 }
+function fToColor(v,ramp){
+  const R=RAMPS[ramp];
+  return`rgb(${Math.round(R[0][0]+(R[1][0]-R[0][0])*v)},${Math.round(R[0][1]+(R[1][1]-R[0][1])*v)},${Math.round(R[0][2]+(R[1][2]-R[0][2])*v)})`;
+}
+
+/* ─── SDM update & render ─── */
 function updateSDM(){
   const ai=sdmAF.map((a,i)=>a?i:-1).filter(i=>i>=0);
   sdmR=solveMaxEntSDM(ai,occs);
@@ -222,7 +277,10 @@ function updateSDM(){
   const H=entropy(sdmR.probs),Hm=Math.log(N);
   document.getElementById('entropy-val').textContent=H.toFixed(3);
   document.getElementById('entropy-pct').textContent=`(${(H/Hm*100).toFixed(1)}% of max ${Hm.toFixed(3)})`;
+  // Refresh cell hover note in case obs changed (affects "included in averages")
+  updateSDMHover(hoveredCell);
 }
+
 function renderGrid(){
   const cells=document.querySelectorAll('.cell'),mx=Math.max(...sdmR.probs);
   cells.forEach((c,i)=>{
@@ -240,33 +298,75 @@ function renderGrid(){
     c.classList.toggle('occ',occs.includes(i));
   });
 }
+
 function renderSDMExp(){
   const el=document.getElementById('sdm-expectations');
-  if(!sdmR.names||!sdmR.names.length){el.innerHTML='<div style="font-size:12px;color:var(--color-text-tertiary)">Add observations to see constraints.</div>';return;}
+  if(!sdmR.names||!sdmR.names.length){
+    el.innerHTML='<div style="font-size:12px;color:var(--color-text-tertiary)">Add observations to see constraints.</div>';
+    return;
+  }
+  const nObs=occs.length;
   el.innerHTML=sdmR.names.map((nm,i)=>{
     const ai=FEATS.findIndex(f=>f.name===nm),col=FC_SDM[ai],emp=sdmR.empirical[i]||0,mod=sdmR.model[i]||0;
     const converged=Math.abs(emp-mod)<0.015;
-    return`<div class="match-row"><div class="match-label">${nm} <span style="font-size:10px;color:${converged?'#3B6D11':'#A32D2D'}">${converged?'&#10003; matched':'&#9679; converging'}</span></div>
-    <div class="match-pair"><span class="match-tag" style="color:#BA7517">observed</span><div class="bar-track"><div class="bar-fill" style="width:${(emp*100).toFixed(1)}%;background:#BA7517"></div></div><span style="font-size:10px;color:#BA7517;width:26px;text-align:right">${emp.toFixed(2)}</span></div>
-    <div class="match-pair"><span class="match-tag" style="color:${col}">model</span><div class="bar-track"><div class="bar-fill" style="width:${(mod*100).toFixed(1)}%;background:${col}"></div></div><span style="font-size:10px;color:${col};width:26px;text-align:right">${mod.toFixed(2)}</span></div></div>`;
+    // constraint definition: target as data-derived expectation
+    const defn=`avg. ${nm.toLowerCase()} across ${nObs} obs = ${emp.toFixed(2)}`;
+    return`<div class="match-row">
+      <div class="match-label">
+        <div class="match-label-top">${nm} <span style="font-size:10px;color:${converged?'#3B6D11':'#A32D2D'}">${converged?'&#10003;&nbsp;matched':'&#9679;&nbsp;converging'}</span></div>
+        <div class="constraint-defn">target: ${defn}</div>
+      </div>
+      <div class="match-pair"><span class="match-tag" style="color:#BA7517">observed</span><div class="bar-track"><div class="bar-fill" style="width:${(emp*100).toFixed(1)}%;background:#BA7517"></div></div><span style="font-size:10px;color:#BA7517;width:26px;text-align:right">${emp.toFixed(2)}</span></div>
+      <div class="match-pair"><span class="match-tag" style="color:${col}">model</span><div class="bar-track"><div class="bar-fill" style="width:${(mod*100).toFixed(1)}%;background:${col}"></div></div><span style="font-size:10px;color:${col};width:26px;text-align:right">${mod.toFixed(2)}</span></div>
+    </div>`;
   }).join('');
 }
+
+/* ─── SDM cell hover ─── */
+function updateSDMHover(idx){
+  hoveredCell=idx;
+  const note=document.getElementById('sdm-hover-note');
+  if(idx<0){note.innerHTML='';return;}
+  // Feature values for this cell (active features only)
+  const activeIdxs=sdmAF.map((a,i)=>a?i:-1).filter(i=>i>=0);
+  if(!activeIdxs.length){note.innerHTML='';return;}
+  const vals=activeIdxs.map(fi=>{
+    const f=FEATS[fi];
+    return`<span style="color:${FC_SDM[fi]};font-weight:500">${f.name.toLowerCase()}</span>&nbsp;${f.values[idx].toFixed(2)}`;
+  }).join(' &ensp; ');
+  const inObs=occs.includes(idx);
+  const obsNote=inObs
+    ?`<span style="color:#3B6D11;margin-left:8px">&middot; included in averages</span>`
+    :`<span style="color:var(--color-text-tertiary);margin-left:8px">&middot; not an observation</span>`;
+  note.innerHTML=vals+obsNote;
+}
+
+/* ─── SDM actions ─── */
 function toggleOccurrence(i){occs=occs.includes(i)?occs.filter(j=>j!==i):[...occs,i];updateSDM();}
 function clearOcc(){occs=[];updateSDM();}
 function setView(v){view=v;renderGrid();}
 function toggleSDMFeature(i){sdmAF[i]=!sdmAF[i];updateSDM();}
+
+/* ─── grid build ─── */
 function buildGrid(){
   const g=document.getElementById('sdm-grid');
   for(let i=0;i<N;i++){
     const c=document.createElement('div');c.className='cell';
     c.addEventListener('click',()=>toggleOccurrence(i));
+    c.addEventListener('mouseenter',()=>updateSDMHover(i));
+    c.addEventListener('mouseleave',()=>updateSDMHover(-1));
     const s=document.createElement('div');s.className='fstrip';
-    s.appendChild(document.createElement('span'));s.appendChild(document.createElement('span'));s.appendChild(document.createElement('span'));
+    s.appendChild(document.createElement('span'));
+    s.appendChild(document.createElement('span'));
+    s.appendChild(document.createElement('span'));
     c.appendChild(s);g.appendChild(c);
   }
 }
+
+/* ─── NLP state & solver ─── */
 let corpus=[],nlpAF=[true,true,true],hoveredWord=-1;
 let nlpR={probs:new Array(NLP_V.length).fill(1/NLP_V.length),empirical:[],model:[],names:[]};
+
 function solveMaxEntNLP(){
   const nW=NLP_V.length,ak=NLP_FK.filter((_,i)=>nlpAF[i]),afn=NLP_FN.filter((_,i)=>nlpAF[i]),nF=ak.length;
   if(!corpus.length||!nF)return{probs:new Array(nW).fill(1/nW),empirical:[],model:[],names:[]};
@@ -283,13 +383,19 @@ function solveMaxEntNLP(){
   const model=ak.map(k=>probs.reduce((s,pr,x)=>s+pr*NLP_V[x][k],0));
   return{probs,empirical:mu,model,names:afn};
 }
+
 function getSharedFeatures(wi,wj){
   return NLP_FK.filter((k,fi)=>nlpAF[fi]&&NLP_V[wi][k]===1&&NLP_V[wj][k]===1);
 }
+
 function updateNLP(){
   nlpR=solveMaxEntNLP();
   renderWordBtns();renderNLPBars();renderNLPExp();
+  const H=entropy(nlpR.probs),Hm=Math.log(NLP_V.length);
+  document.getElementById('nlp-entropy-val').textContent=H.toFixed(3);
+  document.getElementById('nlp-entropy-pct').textContent=`(${(H/Hm*100).toFixed(1)}% of max ${Hm.toFixed(3)})`;
 }
+
 function renderWordBtns(){
   const counts=NLP_V.map((_,i)=>corpus.filter(j=>j===i).length);
   const sharedSet=new Set(hoveredWord>=0?NLP_V.map((_,wj)=>wj!==hoveredWord&&getSharedFeatures(hoveredWord,wj).length>0?wj:-1).filter(j=>j>=0):[]);
@@ -304,11 +410,13 @@ function renderWordBtns(){
       container.appendChild(btn);
     }
     btn.className='wbtn'+(counts[i]>0?' inCorpus':'')+(sharedSet.has(i)?' shared':'');
-    const badges=NLP_FK.map((k,fi)=>nlpAF[fi]&&w[k]===1?`<span class="fbadge" style="background:${FC_NLP_BG[fi]};color:${FC_NLP[fi]}">${NLP_FSH[fi]}</span>`:''). join('');
+    const badges=NLP_FK.map((k,fi)=>nlpAF[fi]&&w[k]===1?`<span class="fbadge" style="background:${FC_NLP_BG[fi]};color:${FC_NLP[fi]}">${NLP_FSH[fi]}</span>`:'').join('');
     const countBadge=counts[i]>0?`<span style="font-size:10px;padding:1px 5px;background:rgba(59,109,17,0.15);color:#3B6D11;border-radius:8px;pointer-events:none">${counts[i]}</span>`:'';
     btn.innerHTML=`<span style="font-weight:${counts[i]>0?'500':'400'};pointer-events:none">${w.word}</span>${badges}${countBadge}`;
   });
 }
+
+/* ─── NLP hover (extended with feature value breakdown) ─── */
 function updateHover(){
   renderWordBtns();renderNLPBars();
   const note=document.getElementById('hover-note');
@@ -316,12 +424,20 @@ function updateHover(){
   const wi=hoveredWord,w=NLP_V[wi];
   const activeFeats=NLP_FK.map((k,fi)=>nlpAF[fi]&&w[k]===1?fi:-1).filter(f=>f>=0);
   const sharedWords=NLP_V.map((_,wj)=>wj!==wi&&getSharedFeatures(wi,wj).length>0?wj:-1).filter(j=>j>=0);
-  if(!activeFeats.length){note.innerHTML=`"${w.word}" has none of the currently active features — no other words are outlined.`;return;}
+
+  if(!activeFeats.length){
+    note.innerHTML=`"${w.word}" has none of the currently active features — no other words are outlined.`;
+    return;
+  }
   const fbadges=activeFeats.map(fi=>`<span style="background:${FC_NLP_BG[fi]};color:${FC_NLP[fi]};padding:1px 4px;border-radius:3px;font-size:11px;font-weight:500">${NLP_FN[fi]}</span>`).join(' ');
-  if(!sharedWords.length){note.innerHTML=`"${w.word}" has features ${fbadges} but no other word in the vocabulary shares any of them.`;return;}
+  if(!sharedWords.length){
+    note.innerHTML=`"${w.word}" has features ${fbadges} but no other word in the vocabulary shares any of them.`;
+    return;
+  }
   const wnames=sharedWords.map(wj=>`<strong>${NLP_V[wj].word}</strong>`).join(', ');
   note.innerHTML=`"${w.word}" has features ${fbadges} — so the model boosts ${wnames} (outlined in blue), since they share at least one of those features and help satisfy the same constraints.`;
 }
+
 function renderNLPBars(){
   const pU=1/NLP_V.length,mxP=Math.max(...nlpR.probs);
   const unifPct=(pU/mxP*100).toFixed(2);
@@ -330,7 +446,7 @@ function renderNLPBars(){
     const p=nlpR.probs[i],bw=(p/mxP*100).toFixed(2),col=p>pU?'#3B6D11':'#A32D2D';
     const hi=sharedSet.has(i),selfH=i===hoveredWord;
     const rowCls='bar-row'+(selfH?' selfhov':hi?' sharedhov':'');
-    const badges=NLP_FK.map((k,fi)=>nlpAF[fi]&&w[k]===1?`<span class="fbadge" style="background:${FC_NLP_BG[fi]};color:${FC_NLP[fi]}">${NLP_FSH[fi]}</span>`:''). join('');
+    const badges=NLP_FK.map((k,fi)=>nlpAF[fi]&&w[k]===1?`<span class="fbadge" style="background:${FC_NLP_BG[fi]};color:${FC_NLP[fi]}">${NLP_FSH[fi]}</span>`:'').join('');
     const badgesOrDash=badges||'<span style="font-size:10px;color:var(--color-text-tertiary)">—</span>';
     return`<div class="${rowCls}">
       <span style="width:54px;font-size:12px;color:var(--color-text-secondary);text-align:right;flex-shrink:0">${w.word}</span>
@@ -343,22 +459,41 @@ function renderNLPBars(){
     </div>`;
   }).join('');
 }
+
+/* ─── NLP constraint panel (definition + match, unified) ─── */
 function renderNLPExp(){
   const el=document.getElementById('nlp-expectations');
-  if(!nlpR.names||!nlpR.names.length){el.innerHTML='<div style="font-size:12px;color:var(--color-text-tertiary)">Add corpus words to see constraints.</div>';return;}
+  if(!nlpR.names||!nlpR.names.length){
+    el.innerHTML='<div style="font-size:12px;color:var(--color-text-tertiary)">Add corpus words to see constraints.</div>';
+    return;
+  }
+  const total=corpus.length;
   el.innerHTML=nlpR.names.map((nm,i)=>{
     const ai=NLP_FN.indexOf(nm),col=FC_NLP[ai],emp=nlpR.empirical[i]||0,mod=nlpR.model[i]||0;
     const converged=Math.abs(emp-mod)<0.015;
-    return`<div class="match-row"><div class="match-label">${nm} <span style="font-size:10px;color:${converged?'#3B6D11':'#A32D2D'}">${converged?'&#10003; matched':'&#9679; converging'}</span></div>
-    <div class="match-pair"><span class="match-tag" style="color:#BA7517">corpus</span><div class="bar-track"><div class="bar-fill" style="width:${(emp*100).toFixed(1)}%;background:#BA7517"></div></div><span style="font-size:10px;color:#BA7517;width:26px;text-align:right">${emp.toFixed(2)}</span></div>
-    <div class="match-pair"><span class="match-tag" style="color:${col}">model</span><div class="bar-track"><div class="bar-fill" style="width:${(mod*100).toFixed(1)}%;background:${col}"></div></div><span style="font-size:10px;color:${col};width:26px;text-align:right">${mod.toFixed(2)}</span></div></div>`;
+    // constraint definition: count-derived target
+    const key=NLP_FK[ai];
+    const count=corpus.filter(wi=>NLP_V[wi][key]===1).length;
+    const defn=`${count}/${total} corpus words = ${emp.toFixed(2)}`;
+    return`<div class="match-row">
+      <div class="match-label">
+        <div class="match-label-top">${nm} <span style="font-size:10px;color:${converged?'#3B6D11':'#A32D2D'}">${converged?'&#10003;&nbsp;matched':'&#9679;&nbsp;converging'}</span></div>
+        <div class="constraint-defn">target: ${defn}</div>
+      </div>
+      <div class="match-pair"><span class="match-tag" style="color:#BA7517">corpus</span><div class="bar-track"><div class="bar-fill" style="width:${(emp*100).toFixed(1)}%;background:#BA7517"></div></div><span style="font-size:10px;color:#BA7517;width:26px;text-align:right">${emp.toFixed(2)}</span></div>
+      <div class="match-pair"><span class="match-tag" style="color:${col}">model</span><div class="bar-track"><div class="bar-fill" style="width:${(mod*100).toFixed(1)}%;background:${col}"></div></div><span style="font-size:10px;color:${col};width:26px;text-align:right">${mod.toFixed(2)}</span></div>
+    </div>`;
   }).join('');
 }
+
+/* ─── NLP actions ─── */
 function clearCorpus(){corpus=[];hoveredWord=-1;updateNLP();}
 function toggleNLPFeature(i){nlpAF[i]=!nlpAF[i];updateNLP();}
 document.getElementById('word-btns').addEventListener('mouseleave',()=>{hoveredWord=-1;updateHover();});
+
+/* ─── tab switch ─── */
 function switchTab(tab){
-  document.getElementById('tab-sdm').style.display=tab==='sdm'?'flex':'none';
+  document.getElementById('tab-sdm').style.display=tab==='sdm'?'block':'none';
   document.getElementById('tab-nlp').style.display=tab==='nlp'?'block':'none';
   ['sdm','nlp'].forEach(t=>{
     const b=document.getElementById('btn-'+t),active=t===tab;
@@ -367,6 +502,7 @@ function switchTab(tab){
     b.style.fontWeight=active?'500':'400';
   });
 }
+
 buildGrid();updateSDM();updateNLP();
 </script>
 <div style="max-width:860px;margin:0 auto;padding:0 1.5rem 1.5rem">
