@@ -19,6 +19,9 @@ tags
 # Persistent undo
 [._]*.un~
 
+# Claude Code local settings (machine-specific, not shared)
+.claude/settings.local.json
+
 # General
 .DS_Store
 __MACOSX/
