@@ -1744,7 +1744,9 @@ canvas.addEventListener('touchmove', e=>{
   const xw=clampD(toWorldX(evPt(e).cx));
   if (dragging.type==='mob') { mob.x=xw; mob.dx=xw; mob.trail=[]; }
   else { fixedBac[dragging.i].x=xw; fixedBac[dragging.i].dx=xw; }
-  updateStatus();
+  tumbleStreak=0;
+  if(swimState==='converged') swimState='idle';
+  updateStatus(); needsRedraw=true;
 },{passive:false});
 canvas.addEventListener('touchend',()=>{ dragging=null; });
 
