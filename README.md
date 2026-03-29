@@ -56,7 +56,7 @@ as iframes.
 
 | Directory | Description |
 | --- | --- |
-| [`bacterial_foraging_optimization/bfo_explorer.html`](bacterial_foraging_optimization/bfo_comm_and_chemotaxis.html) | Interactive explorer for the chemotaxis and cell-to-cell communication components of BFO in isolation: bacteria swim/tumble toward nutrients while signaling neighbors via attractant/repellent molecules |
+| [`bacterial_foraging_optimization/bfo_explorer.html`](bacterial_foraging_optimization/bfo_explorer.html) | Interactive explorer for the complete BFO algorithm (Passino 2002): cell-to-cell signaling and tumble-swim chemotaxis in 1-D and 2-D, plus the full nested loop with reproduction and elimination-dispersal |
 
 ### Neural Networks
 
