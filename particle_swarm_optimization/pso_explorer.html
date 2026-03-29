@@ -60,6 +60,11 @@ html, body {
   font-size: 15px;
   line-height: 1.5;
 }
+.page-wrap {
+  max-width: 900px;
+  margin: 0 auto;
+  box-shadow: 0 0 0 1px var(--border);
+}
 
 /* HEADER */
 .hdr {
@@ -368,6 +373,7 @@ input[type=range] { width: 100%; accent-color: var(--green-dark); cursor: pointe
 </style>
 </head>
 <body>
+<div class="page-wrap">
 
 <header class="hdr">
   <span class="hdr-title">Particle Swarm Optimization (PSO) Explorer</span>
@@ -1558,6 +1564,7 @@ const PARTICLE_COLORS = [
   updateBadge();
 })();
 </script>
+</div><!-- page-wrap -->
 <footer style="margin-top:0;padding:0.75rem 20px;border-top:1px solid #e0e0e0;font-size:0.8rem;color:#888;">
   <a href="../" style="color:#2e7d32;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">&larr; All course visualizations</a>
 </footer>
