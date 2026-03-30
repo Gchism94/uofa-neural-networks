@@ -1,0 +1,1388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Boids Explorer</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:          #f0ede5;
+  --surface:     #ffffff;
+  --surface-alt: #f8f6f0;
+  --border:      #d4cfc4;
+  --border-dark: #b8b2a6;
+  --green-dark:  #1d3c28;
+  --green-mid:   #2d6a4f;
+  --green-light: #52b788;
+  --green-pale:  #d8edde;
+  --orange:      #c85018;
+  --orange-pale: #fce8d8;
+  --sep-col:     #c03020;
+  --align-col:   #b08010;
+  --cohes-col:   #2a7a4a;
+  --text:        #1a1a1a;
+  --text-muted:  #5a5a5a;
+  --text-small:  #888;
+  --font-body:   'Outfit', sans-serif;
+  --font-mono:   'IBM Plex Mono', monospace;
+  --r:           8px;
+  --pill:        999px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+sub, sup { font-size: 0.75em; vertical-align: sub; }
+sup { vertical-align: super; }
+html, body {
+  background: var(--bg); color: var(--text);
+  font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+}
+.page-wrap { max-width: 900px; margin: 0 auto; box-shadow: 0 0 0 1px var(--border); }
+
+/* HEADER */
+.hdr {
+  background: var(--green-dark); color: #fff;
+  display: flex; align-items: baseline; justify-content: space-between;
+  flex-wrap: wrap; gap: 8px; padding: 11px 20px;
+}
+.hdr-title { font-size: 1.05rem; font-weight: 600; letter-spacing: -0.01em; }
+.hdr-copy  { font-size: 0.72rem; opacity: 0.65; white-space: nowrap; }
+.hdr-copy a { color: inherit; }
+
+/* TABBAR */
+.tabbar {
+  background: var(--green-dark); display: flex; padding: 0 16px;
+  border-bottom: 2px solid var(--border);
+  overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none;
+}
+.tabbar::-webkit-scrollbar { display: none; }
+.tab-btn {
+  font-family: var(--font-body); font-size: 0.79rem; font-weight: 500;
+  padding: 8px 14px; border: none; background: transparent;
+  color: rgba(255,255,255,0.55); cursor: pointer;
+  border-bottom: 3px solid transparent; margin-bottom: -2px;
+  white-space: nowrap; transition: color 0.15s;
+}
+.tab-btn:hover:not(.active) { color: rgba(255,255,255,0.88); }
+.tab-btn.active {
+  color: var(--green-dark); background: var(--bg);
+  border-bottom-color: var(--orange); border-radius: var(--r) var(--r) 0 0;
+}
+.tab-select-wrap {
+  display: none; background: var(--green-dark);
+  padding: 6px 16px 8px; border-bottom: 2px solid var(--border);
+}
+.tab-select {
+  width: 100%; font-family: var(--font-body); font-size: 0.82rem;
+  font-weight: 500; padding: 6px 10px;
+  border: 1.5px solid rgba(255,255,255,0.25); border-radius: var(--r);
+  background: var(--green-dark); color: #fff; cursor: pointer; appearance: auto;
+}
+
+/* DESCRIPTION */
+.desc {
+  padding: 12px 20px; font-size: 0.875rem;
+  color: var(--text-muted); border-bottom: 1px solid var(--border); line-height: 1.65;
+}
+.desc strong { color: var(--text); font-weight: 600; }
+.desc-lede { color: var(--orange); font-weight: 500; }
+
+/* MAIN */
+.main { display: grid; grid-template-columns: 1fr 310px; border-bottom: 1px solid var(--border); }
+.canvas-panel {
+  padding: 14px 16px; border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 9px; min-width: 0;
+}
+.canvas-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.canvas-section-label {
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--text-muted);
+}
+.status-badge {
+  font-family: var(--font-mono); font-size: 0.69rem; font-weight: 500;
+  padding: 3px 11px; border-radius: var(--pill);
+  border: 1.5px solid var(--border); background: var(--surface-alt);
+  color: var(--text-muted); min-width: 90px; text-align: center;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.status-badge.state-running { background: var(--green-pale); color: var(--green-dark); border-color: var(--green-light); }
+.status-badge.state-paused  { background: var(--orange-pale); color: var(--orange); border-color: #e8a880; }
+.canvas-wrap {
+  position: relative; width: 100%; aspect-ratio: 1 / 1;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r); overflow: hidden;
+}
+canvas { display: block; width: 100%; height: 100%; cursor: default; }
+.canvas-hint {
+  position: absolute; bottom: 6px; right: 8px;
+  font-size: 0.64rem; color: rgba(255,255,255,0.7);
+  pointer-events: none; font-family: var(--font-mono);
+}
+
+/* CHART */
+.chart-wrap { width: 100%; height: 72px; border: 1px solid var(--border); border-radius: var(--r); background: var(--surface); overflow: hidden; }
+.chart-wrap canvas { display: block; width: 100%; height: 100%; }
+.chart-legend { display: flex; gap: 14px; font-size: 0.72rem; color: var(--text-muted); flex-wrap: wrap; }
+.chart-leg { display: flex; align-items: center; gap: 5px; }
+.chart-leg-line { width: 20px; height: 3px; border-radius: 2px; flex-shrink: 0; }
+
+/* SIDEBAR */
+.sidebar {
+  background: var(--surface-alt); padding: 14px 15px;
+  display: flex; flex-direction: column; gap: 14px; overflow-y: auto;
+}
+.sec { display: flex; flex-direction: column; gap: 7px; }
+.sec-label {
+  font-size: 0.67rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--text-muted); padding-bottom: 4px; border-bottom: 1px solid var(--border);
+}
+.sl-row { display: grid; grid-template-columns: 68px 1fr 48px; align-items: center; gap: 6px; }
+.sl-label { font-family: var(--font-mono); font-size: 0.74rem; color: var(--text); }
+.sl-val   { font-family: var(--font-mono); font-size: 0.78rem; font-weight: 500; color: var(--orange); text-align: right; }
+input[type=range] { width: 100%; accent-color: var(--green-dark); cursor: pointer; }
+.sl-label.sep   { color: var(--sep-col); }
+.sl-label.align { color: var(--align-col); }
+.sl-label.cohes { color: var(--cohes-col); }
+
+.tog-row { display: flex; align-items: center; justify-content: space-between; font-size: 0.82rem; gap: 6px; }
+.toggle { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.tog-track {
+  position: absolute; inset: 0; background: var(--border-dark);
+  border-radius: var(--pill); cursor: pointer; transition: background 0.18s;
+}
+.toggle input:checked + .tog-track { background: var(--green-dark); }
+.tog-track::after {
+  content: ''; position: absolute; left: 3px; top: 3px;
+  width: 14px; height: 14px; background: #fff; border-radius: 50%;
+  transition: transform 0.18s; box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+}
+.toggle input:checked + .tog-track::after { transform: translateX(16px); }
+
+.btn-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.btn {
+  font-family: var(--font-body); font-size: 0.82rem; font-weight: 600;
+  border: none; border-radius: var(--pill); padding: 7px 15px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 4px;
+  transition: filter 0.15s, opacity 0.15s;
+}
+.btn:hover:not(:disabled) { filter: brightness(1.1); }
+.btn:active:not(:disabled) { filter: brightness(0.9); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-primary   { background: var(--green-dark); color: #fff; }
+.btn-secondary { background: transparent; border: 1.5px solid var(--green-dark); color: var(--green-dark); }
+.btn-preset {
+  font-family: var(--font-body); font-size: 0.75rem; font-weight: 600;
+  border: 1.5px solid var(--border); border-radius: var(--r);
+  padding: 6px 10px; cursor: pointer; background: var(--surface);
+  color: var(--text-muted); transition: all 0.15s; flex: 1 1 calc(50% - 4px);
+  white-space: nowrap; text-align: center;
+}
+.btn-preset:hover { background: var(--green-pale); border-color: var(--green-light); color: var(--green-dark); }
+.btn-preset.active { border-width: 2px; font-weight: 700; }
+/* Phase colors */
+.btn-preset[data-preset="flock"]   { background:#f8f6d8; border-color:#c8c870; color:#707010; }
+.btn-preset[data-preset="swarm"]   { background:#fde8e4; border-color:#d09080; color:#a03020; }
+.btn-preset[data-preset="scatter"] { background:#fef4e0; border-color:#c8a860; color:#806010; }
+.btn-preset[data-preset="mill"]    { background:#dff0df; border-color:#80b880; color:#1d6030; }
+.btn-preset[data-preset="hipar"]   { background:#dce8fc; border-color:#80a8d8; color:#1a3a80; }
+.btn-preset[data-preset="compact"] { background:#dff0df; border-color:#80b880; color:#1d6030; }
+.btn-preset[data-preset="flock"].active   { border-color:#a0a020; background:#f0ec90; }
+.btn-preset[data-preset="swarm"].active   { border-color:#a04030; background:#fcc8c0; }
+.btn-preset[data-preset="scatter"].active { border-color:#a07820; background:#fce8a0; }
+.btn-preset[data-preset="mill"].active    { border-color:#1d6030; background:#b0ddb0; }
+.btn-preset[data-preset="hipar"].active   { border-color:#1a3a80; background:#a8c8f0; }
+.btn-preset[data-preset="compact"].active { border-color:#1d6030; background:#b0ddb0; }
+
+/* STATUS BAR */
+.status-bar { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--border); }
+.stat { padding: 8px 14px; border-right: 1px solid var(--border); }
+.stat:last-child { border-right: none; }
+.stat-lbl { font-size: 0.63rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-small); margin-bottom: 1px; }
+.stat-val { font-family: var(--font-mono); font-size: 0.92rem; font-weight: 500; color: var(--orange); }
+
+/* THEORY TAB */
+.theory-wrap { display: grid; grid-template-columns: 1fr 340px; gap: 0; border-bottom: 1px solid var(--border); }
+.theory-canvas-col { padding: 14px 16px; border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+.theory-info-col { background: var(--surface-alt); padding: 14px 15px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
+.canvas-wrap-theory { position: relative; width: 100%; aspect-ratio: 1/1; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; }
+
+.phase-badge {
+  font-family: var(--font-mono); font-size: 0.69rem; font-weight: 500;
+  padding: 3px 11px; border-radius: var(--pill);
+  border: 1.5px solid var(--border); background: var(--surface-alt);
+  color: var(--text-muted); min-width: 140px; text-align: center;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.phase-badge.state-sep   { background: #fde8e4; color: var(--sep-col);   border-color: #e09080; }
+.phase-badge.state-align { background: #fef8e0; color: var(--align-col); border-color: #d0c060; }
+.phase-badge.state-cohes { background: #e0f4ea; color: var(--cohes-col); border-color: #80c0a0; }
+.phase-badge.state-steer { background: var(--green-pale); color: var(--green-dark); border-color: var(--green-light); }
+.phase-badge.state-move  { background: #f8f8e0; color: #707010; border-color: #c8c870; }
+
+/* FORCE CARDS */
+.eq-cards { display: flex; flex-direction: column; gap: 8px; }
+.eq-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--r); padding: 11px 13px; }
+.eq-card-title { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
+.eq-card.ec-sep   .eq-card-title { color: var(--sep-col); }
+.eq-card.ec-align .eq-card-title { color: var(--align-col); }
+.eq-card.ec-cohes .eq-card-title { color: var(--cohes-col); }
+.eq-card.ec-result .eq-card-title { color: var(--green-dark); }
+.eq-card-eq { font-family: var(--font-mono); font-size: 0.74rem; line-height: 1.7; color: var(--text); }
+.eq-card-eq .sep   { color: var(--sep-col);   font-weight: 500; }
+.eq-card-eq .aln   { color: var(--align-col); font-weight: 500; }
+.eq-card-eq .coh   { color: var(--cohes-col); font-weight: 500; }
+.eq-card-eq .kw    { color: var(--green-dark); font-weight: 500; }
+.eq-card-desc { font-size: 0.75rem; color: var(--text-muted); margin-top: 5px; line-height: 1.55; }
+
+.algo-block { background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--r); padding: 12px 14px; }
+.algo-block-title { font-size: 0.67rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 9px; }
+.algo-code { font-family: var(--font-mono); font-size: 0.695rem; line-height: 1.80; color: var(--text); white-space: pre; overflow-x: auto; }
+.kw  { color: var(--green-dark); font-weight: 500; }
+.sep { color: var(--sep-col);    font-weight: 500; }
+.aln { color: var(--align-col);  font-weight: 500; }
+.coh { color: var(--cohes-col);  font-weight: 500; }
+.cm  { color: var(--text-small); font-style: italic; }
+
+/* FOOTER */
+.footer { padding: 11px 20px; text-align: right; font-size: 0.72rem; color: var(--text-small); }
+.footer a { color: inherit; }
+
+/* RESPONSIVE */
+@media (max-width: 700px) {
+  .main { grid-template-columns: 1fr; }
+  .canvas-panel { border-right: none; border-bottom: 1px solid var(--border); }
+  .status-bar { grid-template-columns: 1fr 1fr; }
+  .stat:nth-child(2) { border-right: none; }
+  .theory-wrap { grid-template-columns: 1fr; }
+  .theory-canvas-col { border-right: none; border-bottom: 1px solid var(--border); }
+  .hdr, .desc, .footer { padding-left: 14px; padding-right: 14px; }
+}
+@media (max-width: 520px) {
+  .tabbar { display: none; }
+  .tab-select-wrap { display: block; }
+}
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+<header class="hdr">
+  <span class="hdr-title">Boids Explorer</span>
+  <span class="hdr-copy">
+    &copy; 2026 Theodore P. Pavlic &middot;
+    <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a>
+  </span>
+</header>
+
+<nav class="tabbar">
+  <button class="tab-btn active" id="tabBtnTheory">&#9312; How It Works</button>
+  <button class="tab-btn"        id="tabBtnSim">&#9313; Simulation</button>
+</nav>
+<div class="tab-select-wrap">
+  <select class="tab-select" id="tabSelect">
+    <option value="theory">&#9312; How It Works</option>
+    <option value="sim">&#9313; Simulation</option>
+  </select>
+</div>
+
+<!-- ═══════════════════════ TAB 1 ═══════════════════════ -->
+<div id="tab-theory">
+<p class="desc">
+  <span class="desc-lede">Reynolds' Boids (<a href="https://www.red3d.com/cwr/boids/" target="_blank" rel="noopener">1987</a>) produces lifelike flocking from three purely local rules applied to every agent at each step: <strong>separation</strong> (avoid crowding), <strong>alignment</strong> (match neighbors' headings), and <strong>cohesion</strong> (steer toward the local center of mass). The name "Boid" is a portmanteau of <em>bird-oid</em> — bird-like.</span>
+  Each rule acts within its own spatial radius — separation closest, cohesion farthest — and the emergent collective motion depends sensitively on the balance of their weights.
+  Unlike other classic collective motion models such as the Vicsek model (<a href="https://doi.org/10.1103/PhysRevLett.75.1226" target="_blank" rel="noopener">Vicsek et al., 1995</a>), Boids has no explicit noise term; behavioral richness arises from the nonlinear interplay of three competing forces.
+  <span style="color:var(--green-mid);font-weight:600">For an interactive simulation, see <em>Tab ② Simulation</em>.</span>
+</p>
+
+<div class="theory-wrap">
+  <div class="theory-canvas-col">
+    <div class="canvas-row">
+      <span class="canvas-section-label">Force decomposition</span>
+      <span class="phase-badge" id="phaseBadge">Current state</span>
+    </div>
+    <div class="canvas-wrap-theory">
+      <canvas id="theoryCanvas"></canvas>
+    </div>
+    <div style="font-size:0.73rem;color:var(--text-muted);display:flex;gap:14px;flex-wrap:wrap">
+      <span style="color:var(--green-dark)">&#9654; Focus boid</span>
+      <span style="color:var(--sep-col)">&#9654; Separation zone</span>
+      <span style="color:var(--align-col)">&#9654; Alignment zone</span>
+      <span style="color:var(--cohes-col)">&#9654; Cohesion zone</span>
+      <span style="color:#aaa">&#9654; Non-neighbor</span>
+    </div>
+  </div>
+
+  <div class="theory-info-col">
+    <div class="sec">
+      <div class="sec-label">The Three Rules</div>
+      <div class="eq-cards">
+
+        <div class="eq-card ec-sep">
+          <div class="eq-card-title">&#9312; Separation &mdash; avoid crowding</div>
+          <div class="eq-card-eq"><span class="sep">f<sub>sep</sub> = &minus;&Sigma;<sub>j: d&lt;r<sub>s</sub></sub> (x<sub>j</sub>&minus;x<sub>i</sub>) / |x<sub>j</sub>&minus;x<sub>i</sub>|</span></div>
+          <div class="eq-card-desc">Repulsion from boids inside the separation radius r<sub>s</sub>. Normalized so near and far neighbors contribute equally.</div>
+        </div>
+
+        <div class="eq-card ec-align">
+          <div class="eq-card-title">&#9313; Alignment &mdash; match headings</div>
+          <div class="eq-card-eq"><span class="aln">f<sub>align</sub> = normalize(&Sigma;<sub>j: d&lt;r<sub>a</sub></sub> v&#x302;<sub>j</sub>) &minus; v&#x302;<sub>i</sub></span></div>
+          <div class="eq-card-desc">Steer toward the average heading of neighbors within r<sub>a</sub>. Drives directional coherence; the primary flocking force.</div>
+        </div>
+
+        <div class="eq-card ec-cohes">
+          <div class="eq-card-title">&#9314; Cohesion &mdash; stay together</div>
+          <div class="eq-card-eq"><span class="coh">f<sub>coh</sub> = normalize(CoM<sub>j: d&lt;r<sub>c</sub></sub> &minus; x<sub>i</sub>)</span></div>
+          <div class="eq-card-desc">Steer toward the center of mass of neighbors within r<sub>c</sub>. Keeps the flock from dispersing; r<sub>c</sub> is typically the largest radius.</div>
+        </div>
+
+        <div class="eq-card ec-result">
+          <div class="eq-card-title">&#10145; New Heading</div>
+          <div class="eq-card-eq">v(t+1) = normalize(v(t) + <span class="sep">w<sub>s</sub>f<sub>sep</sub></span> + <span class="aln">w<sub>a</sub>f<sub>align</sub></span> + <span class="coh">w<sub>c</sub>f<sub>coh</sub></span>) &middot; v<sub>max</sub></div>
+          <div class="eq-card-desc">Weighted sum steers the current velocity; direction is normalized and speed is reset to v<sub>max</sub>. Ordering r<sub>s</sub> &lt; r<sub>a</sub> &le; r<sub>c</sub> is typical.</div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-label">System Properties</div>
+      <div class="eq-cards">
+        <div class="eq-card" style="border-left:3px solid var(--green-dark)">
+          <div class="eq-card-title" style="color:var(--green-dark)">Order Parameter &phi;</div>
+          <div class="eq-card-eq">&phi; = <span class="kw">(1/N)|&Sigma;<sub>j</sub> e<sup>i&theta;<sub>j</sub></sup>|</span>
+= <span class="kw">(1/N)&radic;((Σcos&theta;)<sup>2</sup>+(Σsin&theta;)<sup>2</sup>)</span></div>
+          <div class="eq-card-desc">&phi; = 0: all headings random. &phi; = 1: perfect alignment. A global statistic of collective coherence — not part of the per-boid dynamics.
+            <div style="display:flex;gap:10px;margin-top:10px;align-items:flex-end">
+              <div style="text-align:center">
+                <canvas id="bHistEx0" style="width:52px;height:52px;display:block"></canvas>
+                <div style="font-size:0.63rem;font-family:var(--font-mono);color:var(--text-muted);margin-top:3px">&phi; &asymp; 0</div>
+              </div>
+              <div style="text-align:center">
+                <canvas id="bHistEx05" style="width:52px;height:52px;display:block"></canvas>
+                <div style="font-size:0.63rem;font-family:var(--font-mono);color:var(--text-muted);margin-top:3px">&phi; &asymp; 0.5</div>
+              </div>
+              <div style="text-align:center">
+                <canvas id="bHistEx1" style="width:52px;height:52px;display:block"></canvas>
+                <div style="font-size:0.63rem;font-family:var(--font-mono);color:var(--text-muted);margin-top:3px">&phi; &asymp; 1</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-label">Algorithm Sketch</div>
+      <div class="algo-block">
+        <div class="algo-code"><span class="kw">initialize</span> N boids in [0,L]&sup2;:
+  x<sub>i</sub> &sim; U([0,L]&sup2;); &theta;<sub>i</sub> &sim; U(&minus;&pi;,&pi;)
+  v<sub>i</sub> = v<sub>max</sub>(cos&theta;<sub>i</sub>, sin&theta;<sub>i</sub>)
+
+<span class="kw">repeat</span> each timestep:
+  <span class="kw">for each</span> boid i:
+    <span class="sep">f<sub>sep</sub></span>  = steer away from {j: d &lt; r<sub>s</sub>}
+    <span class="aln">f<sub>align</sub></span> = match heading of {j: d &lt; r<sub>a</sub>}
+    <span class="coh">f<sub>coh</sub></span>  = toward CoM of  {j: d &lt; r<sub>c</sub>}
+    v<sub>i</sub> &larr; normalize(v<sub>i</sub> + <span class="sep">w<sub>s</sub>f<sub>sep</sub></span>
+              + <span class="aln">w<sub>a</sub>f<sub>align</sub></span> + <span class="coh">w<sub>c</sub>f<sub>coh</sub></span>) &middot; v<sub>max</sub>
+    x<sub>i</sub> &larr; x<sub>i</sub> + v<sub>i</sub>
+  apply boundary conditions</div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-label">Key Differences from Vicsek</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.65">
+        Vicsek uses a single averaging rule with additive noise; Boids uses three competing forces without noise. The three radii create spatial structure absent in Vicsek — a boid simultaneously repels its nearest neighbors, aligns with a wider group, and coheres with an even wider group. Tuning their weights and radii produces qualitatively distinct collective states: directed flocking, compact swarming, milling vortices, and dispersed wandering — a richer behavioral landscape than Vicsek's ordered-vs-disordered binary.
+      </div>
+    </div>
+
+  </div>
+</div>
+</div><!-- tab-theory -->
+
+<!-- ═══════════════════════ TAB 2 ═══════════════════════ -->
+<div id="tab-sim" style="display:none">
+<p class="desc">
+  <span class="desc-lede">Agents are colored by heading angle. Tune the three force weights and their spatial radii to explore the different collective behaviors.</span>
+  The three radii are shown as concentric colored rings when toggled on: <span style="color:var(--sep-col)">red</span> = separation, <span style="color:var(--align-col)">amber</span> = alignment, <span style="color:var(--cohes-col)">green</span> = cohesion.
+  Use the presets to jump to qualitatively different regimes, then explore the parameter space around them.
+</p>
+
+<div class="main">
+  <div class="canvas-panel">
+
+    <div class="canvas-row">
+      <span class="canvas-section-label">Boid swarm</span>
+      <span class="status-badge" id="simBadge">ready</span>
+    </div>
+
+    <div class="canvas-wrap">
+      <canvas id="simCanvas"></canvas>
+      <div class="canvas-hint" id="simHint">Press Run to start</div>
+    </div>
+
+    <div style="border-top:1px solid var(--border);padding-top:9px;display:flex;flex-direction:column;gap:8px">
+      <span class="canvas-section-label">Heading distribution &amp; order parameter</span>
+      <div style="display:flex;align-items:center;gap:14px">
+        <canvas id="histCanvas" style="width:90px;height:90px;flex-shrink:0;border-radius:50%"></canvas>
+        <span id="phiLabel" style="font-family:var(--font-mono);font-size:0.88rem;color:var(--green-dark);font-weight:600">&phi;&nbsp;(order&nbsp;param.)&nbsp;=&nbsp;&mdash;</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <div class="chart-legend">
+          <span class="chart-leg"><span class="chart-leg-line" style="background:#52b788"></span><span style="color:#52b788">&phi; (order param.)</span></span>
+        </div>
+        <div class="chart-wrap"><canvas id="chartCanvas"></canvas></div>
+      </div>
+    </div>
+
+  </div><!-- canvas-panel -->
+
+  <div class="sidebar">
+
+    <!-- Presets -->
+    <div class="sec">
+      <div class="sec-label">Presets <span style="font-size:0.60rem;font-weight:400;text-transform:none;letter-spacing:0">(colored by phase)</span></div>
+      <div class="btn-row" style="flex-wrap:wrap">
+        <button class="btn-preset" data-preset="flock">Classic flock</button>
+        <button class="btn-preset" data-preset="swarm">Swarm</button>
+        <button class="btn-preset" data-preset="scatter">Dispersed</button>
+        <button class="btn-preset" data-preset="mill">Milling</button>
+        <button class="btn-preset" data-preset="hipar">Highly parallel</button>
+        <button class="btn-preset" data-preset="compact">Compact</button>
+      </div>
+      <div id="presetDesc" style="font-size:0.72rem;color:var(--text-muted);line-height:1.55;height:4.4em;overflow:hidden">&nbsp;</div>
+    </div>
+
+    <!-- Controls -->
+    <div class="sec">
+      <div class="sec-label">Controls</div>
+      <div class="btn-row">
+        <button class="btn btn-primary"   id="btnRun">&#9654; Run</button>
+        <button class="btn btn-secondary" id="btnStep">&#x23E9; Step</button>
+        <button class="btn btn-secondary" id="btnReset">&#x21BA; Reset</button>
+      </div>
+      <div class="sl-row" style="margin-top:4px">
+        <span class="sl-label" style="font-size:0.70rem">speed</span>
+        <input type="range" id="sl_speed" min="0" max="4" step="1" value="2">
+        <span class="sl-val" id="vl_speed">1×</span>
+      </div>
+    </div>
+
+    <!-- Weights -->
+    <div class="sec">
+      <div class="sec-label">Force weights</div>
+      <div class="sl-row">
+        <span class="sl-label sep">w<sub>sep</sub></span>
+        <input type="range" id="sl_wsep"   min="0" max="4.0" step="0.1" value="1.8">
+        <span class="sl-val" id="vl_wsep">1.8</span>
+      </div>
+      <div class="sl-row">
+        <span class="sl-label align">w<sub>align</sub></span>
+        <input type="range" id="sl_walign" min="0" max="4.0" step="0.1" value="1.0">
+        <span class="sl-val" id="vl_walign">1.0</span>
+      </div>
+      <div class="sl-row">
+        <span class="sl-label cohes">w<sub>coh</sub></span>
+        <input type="range" id="sl_wcohes" min="0" max="4.0" step="0.1" value="0.8">
+        <span class="sl-val" id="vl_wcohes">0.8</span>
+      </div>
+    </div>
+
+    <!-- Radii -->
+    <div class="sec">
+      <div class="sec-label">Interaction radii <span style="font-size:0.60rem;font-weight:400;text-transform:none;letter-spacing:0">(r<sub>s</sub> &lt; r<sub>a</sub> &le; r<sub>c</sub> typical)</span></div>
+      <div class="sl-row">
+        <span class="sl-label sep">r<sub>sep</sub></span>
+        <input type="range" id="sl_rsep"   min="0.2" max="2.0" step="0.1" value="0.8">
+        <span class="sl-val" id="vl_rsep">0.8</span>
+      </div>
+      <div class="sl-row">
+        <span class="sl-label align">r<sub>align</sub></span>
+        <input type="range" id="sl_ralign" min="0.5" max="4.0" step="0.1" value="2.0">
+        <span class="sl-val" id="vl_ralign">2.0</span>
+      </div>
+      <div class="sl-row">
+        <span class="sl-label cohes">r<sub>coh</sub></span>
+        <input type="range" id="sl_rcohes" min="0.5" max="6.0" step="0.1" value="3.5">
+        <span class="sl-val" id="vl_rcohes">3.5</span>
+      </div>
+    </div>
+
+    <!-- Speed & Count -->
+    <div class="sec">
+      <div class="sec-label">Speed &amp; count</div>
+      <div class="sl-row">
+        <span class="sl-label">v<sub>max</sub></span>
+        <input type="range" id="sl_vmax" min="0.02" max="0.20" step="0.01" value="0.08">
+        <span class="sl-val" id="vl_vmax">0.08</span>
+      </div>
+      <div class="sl-row">
+        <span class="sl-label">N</span>
+        <input type="range" id="sl_N" min="10" max="200" step="5" value="80">
+        <span class="sl-val" id="vl_N">80</span>
+      </div>
+    </div>
+
+    <!-- Phase diagram -->
+    <div class="sec">
+      <div class="sec-label">Phase diagram <span style="font-size:0.60rem;font-weight:400;text-transform:none;letter-spacing:0">(approx., Couzin et al. 2002)</span></div>
+      <div style="font-size:0.68rem;color:var(--text-muted);line-height:1.5;margin-bottom:5px">
+        Four collective regimes from Couzin et al. (2002), plotted as ratios of separation and alignment radii to the cohesion radius. The dot shows current parameters, adjusted for force weights. Note: Couzin's original model uses non-overlapping zones with equal weights — with weighted overlapping zones as used here, force weights shift the effective boundaries.
+      </div>
+      <canvas id="phaseDiag" style="width:100%;display:block"></canvas>
+    </div>
+
+    <!-- Display -->
+    <div class="sec">
+      <div class="sec-label">Display</div>
+      <div class="tog-row">
+        <span id="radiiLabel">Show zone radii</span>
+        <label class="toggle"><input type="checkbox" id="tog_radii"><span class="tog-track"></span></label>
+      </div>
+    </div>
+
+    <!-- Boundaries -->
+    <div class="sec">
+      <div class="sec-label">Boundaries</div>
+      <div class="tog-row">
+        <span id="boundaryLabel">Periodic (toroidal)</span>
+        <label class="toggle"><input type="checkbox" id="tog_boundary"><span class="tog-track"></span></label>
+      </div>
+    </div>
+
+  </div><!-- sidebar -->
+</div><!-- main -->
+
+<div class="status-bar">
+  <div class="stat"><div class="stat-lbl">Iteration</div><div class="stat-val" id="st_iter">&mdash;</div></div>
+  <div class="stat"><div class="stat-lbl">&phi; (order)</div><div class="stat-val" id="st_phi">&mdash;</div></div>
+  <div class="stat"><div class="stat-lbl">Avg align nbrs</div><div class="stat-val" id="st_anb">&mdash;</div></div>
+  <div class="stat"><div class="stat-lbl">Avg cohes nbrs</div><div class="stat-val" id="st_cnb">&mdash;</div></div>
+</div>
+
+</div><!-- tab-sim -->
+
+<footer class="footer">
+  &copy; 2026 Theodore P. Pavlic &middot;
+  <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a>
+</footer>
+
+</div><!-- page-wrap -->
+<script>
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   UTILITIES
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+function lerp(a,b,t){ return a+(b-a)*t; }
+function clamp(v,lo,hi){ return v<lo?lo:v>hi?hi:v; }
+function wrapAngle(a){ return ((a+Math.PI)%(2*Math.PI))-Math.PI; }
+function headingColor(theta){
+  const hue=((theta/(2*Math.PI)*360)+360)%360;
+  return `hsl(${hue.toFixed(1)},78%,48%)`;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   TAB SWITCHING
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+let activeTab='theory';
+const tabs={ theory:document.getElementById('tab-theory'), sim:document.getElementById('tab-sim') };
+const tabBtns={ theory:document.getElementById('tabBtnTheory'), sim:document.getElementById('tabBtnSim') };
+
+function switchTab(id){
+  activeTab=id;
+  for(const k in tabs){ tabs[k].style.display=(k===id)?'':'none'; tabBtns[k].classList.toggle('active',k===id); }
+  document.getElementById('tabSelect').value=id;
+  if(id==='theory') requestAnimationFrame(theoryLoop);
+  if(id==='sim') setTimeout(()=>{ if(typeof simInitGlobal==='function') simInitGlobal(); requestAnimationFrame(simLoop); },0);
+}
+document.getElementById('tabBtnTheory').addEventListener('click',()=>switchTab('theory'));
+document.getElementById('tabBtnSim').addEventListener('click',()=>switchTab('sim'));
+document.getElementById('tabSelect').addEventListener('change',e=>switchTab(e.target.value));
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   DRAWING HELPERS
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+function drawArrow(ctx,x1,y1,x2,y2,col,lw=2,head=9){
+  const dx=x2-x1,dy=y2-y1;
+  if(Math.sqrt(dx*dx+dy*dy)<2) return;
+  const ang=Math.atan2(dy,dx);
+  ctx.save(); ctx.strokeStyle=col; ctx.fillStyle=col; ctx.lineWidth=lw;
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x2,y2);
+  ctx.lineTo(x2-head*Math.cos(ang-0.38),y2-head*Math.sin(ang-0.38));
+  ctx.lineTo(x2-head*Math.cos(ang+0.38),y2-head*Math.sin(ang+0.38));
+  ctx.closePath(); ctx.fill(); ctx.restore();
+}
+function drawTriangle(ctx,cx,cy,theta,size,fillColor,alpha=1){
+  ctx.save(); ctx.globalAlpha=alpha; ctx.translate(cx,cy); ctx.rotate(theta);
+  ctx.fillStyle=fillColor;
+  ctx.beginPath(); ctx.moveTo(size*1.6,0); ctx.lineTo(-size,size*0.85); ctx.lineTo(-size,-size*0.85); ctx.closePath();
+  ctx.fill(); ctx.restore();
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   LIVE HEADING HISTOGRAM
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+function drawHeadingHistogram(particles){
+  const hc=document.getElementById('histCanvas'); if(!hc) return;
+  const hdpr=window.devicePixelRatio||1, CSS=90;
+  hc.width=Math.round(CSS*hdpr); hc.height=Math.round(CSS*hdpr);
+  const hctx=hc.getContext('2d');
+  hctx.clearRect(0,0,hc.width,hc.height);
+  const cx=hc.width/2,cy=hc.height/2,ro=cx*0.92,ri=cx*0.38;
+  const BINS=36, counts=new Float32Array(BINS); let maxC=0;
+  for(const p of particles){ const b=Math.floor(((p.theta+Math.PI)/(2*Math.PI))*BINS+BINS)%BINS; counts[b]++; }
+  for(let b=0;b<BINS;b++) if(counts[b]>maxC) maxC=counts[b];
+  maxC=maxC||1;
+  for(let b=0;b<BINS;b++){
+    const a1=-Math.PI+(b/BINS)*2*Math.PI, a2=-Math.PI+((b+1)/BINS)*2*Math.PI;
+    const midAngle=a1+(a2-a1)/2;
+    const hue=((midAngle/(2*Math.PI)*360)+360)%360;
+    const frac=counts[b]/maxC, outerR=ri+(ro-ri)*Math.max(frac,0.04);
+    hctx.save(); hctx.globalAlpha=0.35+0.65*frac;
+    hctx.fillStyle=`hsl(${hue},78%,52%)`;
+    hctx.beginPath(); hctx.moveTo(cx+ri*Math.cos(a1),cy+ri*Math.sin(a1));
+    hctx.arc(cx,cy,outerR,a1,a2); hctx.arc(cx,cy,ri,a2,a1,true);
+    hctx.closePath(); hctx.fill(); hctx.restore();
+  }
+  hctx.fillStyle='rgba(20,20,40,0.78)';
+  hctx.beginPath(); hctx.arc(cx,cy,ri*0.9,0,Math.PI*2); hctx.fill();
+  const phiVal=(()=>{ let sx=0,sy=0; for(const p of particles){sx+=Math.cos(p.theta);sy+=Math.sin(p.theta);} return particles.length>0?Math.sqrt(sx*sx+sy*sy)/particles.length:0; })();
+  const lbl=document.getElementById('phiLabel');
+  if(lbl) lbl.textContent='\u03C6\u00A0(order\u00A0param.)\u00A0=\u00A0'+phiVal.toFixed(3);
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   STATIC EXAMPLE HISTOGRAMS (Tab 1)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+function drawStaticHistogram(canvasId, kappa, mu=0){
+  const hc=document.getElementById(canvasId); if(!hc) return;
+  const hdpr=window.devicePixelRatio||1, CSS=52;
+  hc.width=Math.round(CSS*hdpr); hc.height=Math.round(CSS*hdpr);
+  const hctx=hc.getContext('2d');
+  hctx.clearRect(0,0,hc.width,hc.height);
+  const cx=hc.width/2, cy=hc.height/2, ro=cx*0.92, ri=cx*0.38;
+  const BINS=36, counts=new Float32Array(BINS); let maxC=0;
+  for(let b=0;b<BINS;b++){
+    const theta=-Math.PI+(b+0.5)/BINS*2*Math.PI;
+    counts[b]=Math.exp(kappa*Math.cos(theta-mu));
+    if(counts[b]>maxC) maxC=counts[b];
+  }
+  for(let b=0;b<BINS;b++){
+    const a1=-Math.PI+(b/BINS)*2*Math.PI, a2=-Math.PI+((b+1)/BINS)*2*Math.PI;
+    const midAngle=a1+(a2-a1)/2;
+    const hue=((midAngle/(2*Math.PI)*360)+360)%360;
+    const frac=counts[b]/maxC, outerR=ri+(ro-ri)*Math.max(frac,0.04);
+    hctx.save(); hctx.globalAlpha=0.35+0.65*frac;
+    hctx.fillStyle=`hsl(${hue},78%,52%)`;
+    hctx.beginPath(); hctx.moveTo(cx+ri*Math.cos(a1),cy+ri*Math.sin(a1));
+    hctx.arc(cx,cy,outerR,a1,a2); hctx.arc(cx,cy,ri,a2,a1,true);
+    hctx.closePath(); hctx.fill(); hctx.restore();
+  }
+  hctx.fillStyle='rgba(20,20,40,0.75)';
+  hctx.beginPath(); hctx.arc(cx,cy,ri*0.9,0,Math.PI*2); hctx.fill();
+}
+drawStaticHistogram('bHistEx0',  0,        0);
+drawStaticHistogram('bHistEx05', 1.2, Math.PI*0.75);
+drawStaticHistogram('bHistEx1',  15,       0);
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   TAB 1 — THEORY ANIMATION
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+(function(){
+  const canvas=document.getElementById('theoryCanvas');
+  const ctx=canvas.getContext('2d');
+  let W,H,dpr;
+
+  /* Fixed scenario — domain [0,10]×[0,10] */
+  const TDIM=10;
+  const FOCUS={ x:5.0, y:5.0, theta:0.404 }; // ~23°
+
+  /* Boids by zone (canvas y increases downward, so angles match) */
+  const SEP_B=[
+    { x:6.0, y:5.5, theta: 1.047 },  // 60°
+    { x:5.5, y:4.2, theta:-0.524 },  // -30°
+  ];
+  const ALN_B=[
+    { x:7.2, y:5.8, theta: 1.047 },  // 60°
+    { x:4.8, y:3.0, theta: 1.396 },  // 80°
+    { x:3.0, y:4.5, theta: 0.873 },  // 50°
+  ];
+  const COH_B=[
+    { x:8.5, y:6.0, theta: 0.349 },
+    { x:5.5, y:1.5, theta:-1.047 },
+    { x:1.8, y:4.0, theta: 2.792 },
+    { x:7.0, y:8.5, theta: 1.745 },
+    { x:3.5, y:8.0, theta: 2.094 },
+  ];
+  const NON_B=[
+    { x:9.2, y:2.5, theta: 0.785 },
+    { x:1.0, y:8.5, theta:-2.094 },
+  ];
+
+  /* Pre-computed force vectors (in domain units) */
+  const F_SEP   =[-0.850, 0.527];  // away from two close boids
+  const F_ALIGN  =[-0.472, 0.502]; // toward avg heading of alignment boids
+  const F_COHES  =[ 0.942, 0.083]; // toward center of mass of all cohesion boids
+  const W_S=1.8, W_A=1.0, W_C=0.8;
+  const v0=[Math.cos(0.404), Math.sin(0.404)]; // unit current velocity
+  const STEER=[
+    v0[0]+W_S*F_SEP[0]+W_A*F_ALIGN[0]+W_C*F_COHES[0],
+    v0[1]+W_S*F_SEP[1]+W_A*F_ALIGN[1]+W_C*F_COHES[1]
+  ];
+  const STEER_LEN=Math.sqrt(STEER[0]*STEER[0]+STEER[1]*STEER[1]);
+  const NEW_THETA=Math.atan2(STEER[1],STEER[0]);
+
+  const R_SEP=1.5, R_ALN=2.8, R_COH=4.2;
+
+  const PHASES=[
+    { name:'Current state', cls:'' },
+    { name:'① Separation',  cls:'state-sep' },
+    { name:'② Alignment',   cls:'state-align' },
+    { name:'③ Cohesion',    cls:'state-cohes' },
+    { name:'④ Steering sum',cls:'state-steer' },
+    { name:'⑤ New heading', cls:'state-steer' },
+    { name:'⑥ Move',        cls:'state-move' },
+  ];
+  const PHASE_DUR=1800;
+  let startTime=null;
+
+  function resize(){
+    dpr=window.devicePixelRatio||1;
+    const rect=canvas.parentElement.getBoundingClientRect();
+    W=rect.width; H=rect.height;
+    canvas.width=Math.round(W*dpr); canvas.height=Math.round(H*dpr);
+  }
+  new ResizeObserver(()=>resize()).observe(canvas.parentElement);
+  resize();
+
+  function d2c(wx,wy){ return [wx/TDIM*W, wy/TDIM*H]; }
+  function sc(l){ return l/TDIM*Math.min(W,H); }
+  const FS=()=>Math.round(Math.min(W,H)/38);
+  function lbl(text,x,y,col,alpha=1){
+    ctx.save(); ctx.globalAlpha=alpha;
+    ctx.font=`500 ${FS()}px 'IBM Plex Mono',monospace`;
+    ctx.fillStyle=col; ctx.fillText(text,x,y); ctx.restore();
+  }
+  // Draw label with proper subscript: e.g. lblSub('f','sep',x,y,col,alpha)
+  function lblSub(main,sub,x,y,col,alpha=1){
+    ctx.save(); ctx.globalAlpha=alpha; ctx.fillStyle=col;
+    const fs=FS(), ss=Math.round(fs*0.72);
+    ctx.font=`500 ${fs}px 'IBM Plex Mono',monospace`;
+    const mw=ctx.measureText(main).width;
+    ctx.fillText(main,x,y);
+    ctx.font=`500 ${ss}px 'IBM Plex Mono',monospace`;
+    ctx.fillText(sub,x+mw,y+Math.round(fs*0.32));
+    ctx.restore();
+  }
+
+  function drawBoid(b, col, size, alpha=1){
+    const [cx,cy]=d2c(b.x,b.y);
+    drawTriangle(ctx,cx,cy,b.theta,size,col,alpha);
+  }
+
+  function draw(ts){
+    if(!startTime) startTime=ts;
+    const phase=Math.floor((ts-startTime)/PHASE_DUR)%PHASES.length;
+    const t=((ts-startTime)%PHASE_DUR)/PHASE_DUR;
+    const fi=v=>clamp(v*2.5,0,1);
+
+    const badge=document.getElementById('phaseBadge');
+    badge.textContent=PHASES[phase].name;
+    badge.className='phase-badge '+(PHASES[phase].cls||'');
+
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle='#fafaf6'; ctx.fillRect(0,0,W,H);
+
+    // Faint grid
+    ctx.save(); ctx.strokeStyle='rgba(0,0,0,0.05)'; ctx.lineWidth=1;
+    for(let g=0;g<=10;g++){
+      const [gx]=d2c(g,0); const [,gy]=d2c(0,g);
+      ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,H); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(W,gy); ctx.stroke();
+    }
+    ctx.restore();
+
+    const [fcx,fcy]=d2c(FOCUS.x,FOCUS.y);
+    const triSz=Math.max(5,Math.min(W,H)/30);
+    const arrowScale=sc(2.5);
+
+    // ── Zone rings
+    const ringConfigs=[
+      { r:R_SEP,  col:'rgba(180,50,30,{a})',  phase_show:1 },
+      { r:R_ALN,  col:'rgba(170,140,10,{a})', phase_show:2 },
+      { r:R_COH,  col:'rgba(40,120,60,{a})',  phase_show:3 },
+    ];
+    ringConfigs.forEach(({r,col,phase_show})=>{
+      const a0=0.10, a1=0.55;
+      const alpha = phase===0 ? a0
+                  : phase===phase_show ? (a0+fi(t)*(a1-a0))
+                  : phase>phase_show ? a1 : a0;
+      const lw = phase>=phase_show ? 2 : 1;
+      ctx.save();
+      ctx.strokeStyle=col.replace('{a}',alpha);
+      ctx.lineWidth=lw; ctx.setLineDash([4,3]);
+      ctx.beginPath(); ctx.arc(fcx,fcy,sc(r),0,Math.PI*2); ctx.stroke();
+      ctx.setLineDash([]); ctx.restore();
+    });
+
+    // ── Non-neighbors (always faint)
+    NON_B.forEach(b=>drawBoid(b,'#bbb',triSz,0.5));
+
+    // ── Cohesion boids
+    const cohA = phase===3?fi(t):phase>3?1:0.4;
+    COH_B.forEach(b=>drawBoid(b, phase>=3?'#3a9a60':'#aaa', triSz, phase>=3?cohA:0.4));
+
+    // ── Alignment boids
+    const alnA = phase===2?fi(t):phase>2?1:0.4;
+    ALN_B.forEach(b=>drawBoid(b, phase>=2?'#c09010':'#aaa', triSz, phase>=2?alnA:0.4));
+
+    // ── Separation boids
+    const sepA = phase===1?fi(t):phase>1?1:0.4;
+    SEP_B.forEach(b=>drawBoid(b, phase>=1?'#c04030':'#aaa', triSz, phase>=1?sepA:0.4));
+
+    // ── PHASE 1: Separation vectors
+    if(phase===1 || (phase>=2 && phase<=3)){
+      const a=phase===1?fi(t):0.3;
+      ctx.globalAlpha=a;
+      SEP_B.forEach(b=>{
+        const [bx,by]=d2c(b.x,b.y);
+        const dx=fcx-bx, dy=fcy-by, len=Math.sqrt(dx*dx+dy*dy)||1;
+        drawArrow(ctx,fcx,fcy,fcx+dx/len*arrowScale*0.5,fcy+dy/len*arrowScale*0.5,'#c04030',2,8);
+      });
+      ctx.globalAlpha=1;
+      if(phase===1) lblSub('f','sep',fcx+arrowScale*0.5+5,fcy-arrowScale*0.2,'#c04030',fi(t));
+    }
+
+    // ── PHASE 2: Alignment — avg heading arrow
+    if(phase===2 || phase===3){
+      const a=phase===2?fi(t):0.3;
+      let ax=0,ay=0;
+      ALN_B.forEach(b=>{ax+=Math.cos(b.theta);ay+=Math.sin(b.theta);});
+      const al=Math.sqrt(ax*ax+ay*ay)||1;
+      ctx.globalAlpha=a;
+      drawArrow(ctx,fcx,fcy,fcx+ax/al*arrowScale*0.6,fcy+ay/al*arrowScale*0.6,'#b08010',2.5,9);
+      ctx.globalAlpha=1;
+      if(phase===2) lblSub('f','align',fcx+ax/al*arrowScale*0.6+5,fcy+ay/al*arrowScale*0.6-5,'#b08010',fi(t));
+    }
+
+    // ── PHASE 3: Cohesion — center of mass
+    if(phase===3){
+      let cmx=0,cmy=0;
+      [...SEP_B,...ALN_B,...COH_B].forEach(b=>{cmx+=b.x;cmy+=b.y;});
+      cmx/=(SEP_B.length+ALN_B.length+COH_B.length);
+      cmy/=(SEP_B.length+ALN_B.length+COH_B.length);
+      const [comCx,comCy]=d2c(cmx,cmy);
+      const a=fi(t);
+      // CoM dot
+      ctx.save(); ctx.globalAlpha=a;
+      ctx.fillStyle='rgba(40,120,60,0.7)'; ctx.strokeStyle='#2a7a4a'; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.arc(comCx,comCy,5,0,Math.PI*2); ctx.fill(); ctx.stroke();
+      // CoM arrow from focus
+      const ddx=comCx-fcx, ddy=comCy-fcy, ddl=Math.sqrt(ddx*ddx+ddy*ddy)||1;
+      drawArrow(ctx,fcx,fcy,fcx+ddx/ddl*arrowScale*0.7,fcy+ddy/ddl*arrowScale*0.7,'#2a7a4a',2.5,9);
+      ctx.restore();
+      lblSub('f','coh',fcx+ddx/ddl*arrowScale*0.7+5,fcy+ddy/ddl*arrowScale*0.7+5,'#2a7a4a',fi(t));
+    }
+
+    // ── PHASE 4: Steering sum (all three, faded, plus combined)
+    if(phase===4){
+      const a=fi(t);
+      // ghost components at 20%
+      ctx.globalAlpha=0.2;
+      drawArrow(ctx,fcx,fcy,fcx+F_SEP[0]*arrowScale*0.5,fcy+F_SEP[1]*arrowScale*0.5,'#c04030',1.5,6);
+      drawArrow(ctx,fcx,fcy,fcx+F_ALIGN[0]*arrowScale*0.5,fcy+F_ALIGN[1]*arrowScale*0.5,'#b08010',1.5,6);
+      drawArrow(ctx,fcx,fcy,fcx+F_COHES[0]*arrowScale*0.5,fcy+F_COHES[1]*arrowScale*0.5,'#2a7a4a',1.5,6);
+      ctx.globalAlpha=1;
+      // Combined steering
+      const steerLen=Math.sqrt(STEER[0]*STEER[0]+STEER[1]*STEER[1]);
+      const sU=[STEER[0]/steerLen,STEER[1]/steerLen];
+      ctx.globalAlpha=a;
+      drawArrow(ctx,fcx,fcy,fcx+sU[0]*arrowScale*0.8,fcy+sU[1]*arrowScale*0.8,'#1d3c28',3,11);
+      lbl('steering',fcx+sU[0]*arrowScale*0.8+6,fcy+sU[1]*arrowScale*0.8-6,'#1d3c28',a);
+      ctx.globalAlpha=1;
+    }
+
+    // ── PHASE 5: New heading arrow
+    if(phase===5){
+      const a=0.12+0.88*fi(t);
+      ctx.globalAlpha=a;
+      drawArrow(ctx,fcx,fcy,fcx+Math.cos(NEW_THETA)*arrowScale*0.85,fcy+Math.sin(NEW_THETA)*arrowScale*0.85,'#1d3c28',3,12);
+      ctx.globalAlpha=1;
+      lbl('v(t+1)',fcx+Math.cos(NEW_THETA)*arrowScale*0.85+6,fcy+Math.sin(NEW_THETA)*arrowScale*0.85-6,'#1d3c28',fi(t));
+    }
+
+    // ── Focus boid — moves on phase 6
+    const movT=phase===6?Math.min(t*2.5,1):0;
+    const fpX=lerp(fcx,fcx+Math.cos(NEW_THETA)*sc(0.8),movT);
+    const fpY=lerp(fcy,fcy+Math.sin(NEW_THETA)*sc(0.8),movT);
+    const fpTheta=phase>=5?NEW_THETA:FOCUS.theta;
+    // ghost on move
+    if(phase===6 && movT>0.1) drawTriangle(ctx,fcx,fcy,FOCUS.theta,triSz*1.35,'rgba(29,60,40,0.15)');
+    ctx.save();
+    ctx.shadowColor='rgba(29,60,40,0.4)'; ctx.shadowBlur=8;
+    drawTriangle(ctx,fpX,fpY,fpTheta,triSz*1.35,'#1d3c28');
+    ctx.restore();
+  }
+
+  function theoryLoopInner(ts){
+    if(activeTab!=='theory') return;
+    draw(ts);
+    requestAnimationFrame(theoryLoopInner);
+  }
+  window.theoryLoop=function(ts){ theoryLoopInner(ts); };
+  requestAnimationFrame(theoryLoopInner);
+})();
+
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   TAB 2 — SIMULATION
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+(function(){
+  const canvas   =document.getElementById('simCanvas');
+  const chartCvs =document.getElementById('chartCanvas');
+  const ctx      =canvas.getContext('2d');
+  const chartCtx =chartCvs.getContext('2d');
+
+  const L=10;
+  let wSep=1.8, wAlign=1.0, wCohes=0.8;
+  let rSep=0.8, rAlign=2.0, rCohes=3.5;
+  let vMax=0.08, N=80;
+  let periodicBoundary=true, showRadii=false;
+
+  let state='ready', particles=[], iter=0;
+  let phi=0, avgAlignNbrs=0, avgCohesNbrs=0;
+  let histPhi=[], stepsPerFrame=0, slowEvery=3, slowFrame=0, lastStepTime=0, needsRedraw=true;
+  let W,H,dpr,cW2,cH2;
+
+  function resize(){
+    dpr=window.devicePixelRatio||1;
+    const rect=canvas.parentElement.getBoundingClientRect();
+    W=rect.width; H=rect.height;
+    canvas.width=Math.round(W*dpr); canvas.height=Math.round(H*dpr);
+    const cr=chartCvs.parentElement.getBoundingClientRect();
+    cW2=cr.width; cH2=cr.height;
+    chartCvs.width=Math.round(cW2*dpr); chartCvs.height=Math.round(cH2*dpr);
+    needsRedraw=true;
+  }
+  new ResizeObserver(()=>resize()).observe(canvas.parentElement);
+  new ResizeObserver(()=>resize()).observe(chartCvs.parentElement);
+  resize();
+
+  const sc=()=>W/L;
+
+  function initParticles(){
+    particles=[];
+    for(let i=0;i<N;i++){
+      const theta=(Math.random()*2-1)*Math.PI;
+      particles.push({ x:Math.random()*L, y:Math.random()*L, theta,
+                        vx:Math.cos(theta)*vMax, vy:Math.sin(theta)*vMax });
+    }
+    iter=0; histPhi=[]; phi=0; avgAlignNbrs=0; avgCohesNbrs=0; needsRedraw=true;
+  }
+
+  function step(){
+    iter++;
+    const newB=[];
+    let totAlignNbrs=0, totCohesNbrs=0;
+    const MAX_TURN=0.22; // max heading change per step (rad) — prevents oscillation
+
+    for(let i=0;i<N;i++){
+      const p=particles[i];
+      let sx=0,sy=0,sepCnt=0;
+      let ax=0,ay=0,alnCnt=0;
+      let cx=0,cy=0,cohCnt=0;
+
+      for(let j=0;j<N;j++){
+        if(i===j) continue;
+        let dx=particles[j].x-p.x, dy=particles[j].y-p.y;
+        if(periodicBoundary){
+          if(dx> L/2) dx-=L; else if(dx<-L/2) dx+=L;
+          if(dy> L/2) dy-=L; else if(dy<-L/2) dy+=L;
+        }
+        const d=Math.sqrt(dx*dx+dy*dy);
+        if(d<rSep && d>0){ sx-=dx/d; sy-=dy/d; sepCnt++; }
+        if(d<rAlign && d>0){ ax+=Math.cos(particles[j].theta); ay+=Math.sin(particles[j].theta); alnCnt++; }
+        if(d<rCohes && d>0){ cx+=dx; cy+=dy; cohCnt++; }
+      }
+
+      totAlignNbrs+=alnCnt; totCohesNbrs+=cohCnt;
+
+      // Build desired direction in unit-vector space
+      // Start from current unit direction; each force adds weighted unit steering vector
+      let dux=Math.cos(p.theta), duy=Math.sin(p.theta);
+
+      if(sepCnt>0){
+        const sl=Math.sqrt(sx*sx+sy*sy)||1;
+        dux+=wSep*(sx/sl); duy+=wSep*(sy/sl);
+      }
+      if(alnCnt>0){
+        const al=Math.sqrt(ax*ax+ay*ay)||1;
+        dux+=wAlign*(ax/al); duy+=wAlign*(ay/al);
+      }
+      if(cohCnt>0){
+        const avgX=cx/cohCnt, avgY=cy/cohCnt;
+        const cl=Math.sqrt(avgX*avgX+avgY*avgY)||1;
+        dux+=wCohes*(avgX/cl); duy+=wCohes*(avgY/cl);
+      }
+
+      // Desired heading from combined steering
+      const desiredTheta=Math.atan2(duy,dux);
+
+      // Limit turn rate — prevents oscillation from over-correction
+      let dtheta=wrapAngle(desiredTheta-p.theta);
+      dtheta=clamp(dtheta,-MAX_TURN,MAX_TURN);
+      const newTheta=p.theta+dtheta;
+
+      newB.push({ vx:Math.cos(newTheta)*vMax, vy:Math.sin(newTheta)*vMax, theta:newTheta });
+    }
+
+    for(let i=0;i<N;i++){
+      particles[i].vx=newB[i].vx; particles[i].vy=newB[i].vy; particles[i].theta=newB[i].theta;
+      particles[i].x+=particles[i].vx; particles[i].y+=particles[i].vy;
+      if(periodicBoundary){
+        particles[i].x=((particles[i].x%L)+L)%L;
+        particles[i].y=((particles[i].y%L)+L)%L;
+      } else {
+        if(particles[i].x<0){ particles[i].x=-particles[i].x; particles[i].vx=-particles[i].vx; }
+        else if(particles[i].x>L){ particles[i].x=2*L-particles[i].x; particles[i].vx=-particles[i].vx; }
+        if(particles[i].y<0){ particles[i].y=-particles[i].y; particles[i].vy=-particles[i].vy; }
+        else if(particles[i].y>L){ particles[i].y=2*L-particles[i].y; particles[i].vy=-particles[i].vy; }
+        particles[i].x=clamp(particles[i].x,0,L); particles[i].y=clamp(particles[i].y,0,L);
+        particles[i].theta=Math.atan2(particles[i].vy,particles[i].vx);
+      }
+    }
+
+    let csx=0,csy=0;
+    for(const p of particles){ csx+=Math.cos(p.theta); csy+=Math.sin(p.theta); }
+    phi=Math.sqrt(csx*csx+csy*csy)/N;
+    avgAlignNbrs=totAlignNbrs/N;
+    avgCohesNbrs=totCohesNbrs/N;
+    histPhi.push(phi); if(histPhi.length>400) histPhi.shift();
+    updateStats(); needsRedraw=true;
+  }
+
+
+  function render(){
+    if(!needsRedraw) return;
+    if(W<1||H<1){ resize(); if(W<1||H<1) return; }
+    needsRedraw=false;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle='#1a1a2e'; ctx.fillRect(0,0,W,H);
+    if(!periodicBoundary){
+      ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.lineWidth=2; ctx.strokeRect(1,1,W-2,H-2);
+    }
+    const s=sc(), triSz=Math.max(3,Math.min(W/60,7));
+    if(showRadii){
+      [[rSep,'rgba(200,50,30,0.07)'],[rAlign,'rgba(180,150,10,0.07)'],[rCohes,'rgba(40,150,60,0.07)']].forEach(([r,col])=>{
+        ctx.strokeStyle=col.replace('0.07','0.12'); ctx.lineWidth=1;
+        for(const p of particles){ ctx.beginPath(); ctx.arc(p.x*s,p.y*s,r*s,0,Math.PI*2); ctx.stroke(); }
+      });
+    }
+    for(const p of particles){ drawTriangle(ctx,p.x*s,p.y*s,p.theta,triSz,headingColor(p.theta)); }
+    document.getElementById('simHint').textContent=state==='ready'?'Press Run to start':'';
+    drawHeadingHistogram(particles);
+    renderPhaseDiagram();
+    renderChart();
+  }
+
+  function renderChart(){
+    chartCtx.setTransform(dpr,0,0,dpr,0,0);
+    chartCtx.clearRect(0,0,cW2,cH2);
+    if(histPhi.length<2) return;
+    const PAD_T=12,PAD=4,pw=cW2-PAD*2,ph=cH2-PAD_T-PAD,n=histPhi.length;
+    function fx(i){ return PAD+i/(n-1||1)*pw; }
+    function fy(v){ return PAD_T+ph*(1-v); }
+    chartCtx.save(); chartCtx.strokeStyle='rgba(200,200,200,0.15)'; chartCtx.lineWidth=1;
+    [0,0.5,1].forEach(v=>{ chartCtx.beginPath(); chartCtx.moveTo(PAD,fy(v)); chartCtx.lineTo(PAD+pw,fy(v)); chartCtx.stroke(); });
+    chartCtx.restore();
+    chartCtx.save(); chartCtx.strokeStyle='#52b788'; chartCtx.lineWidth=2;
+    chartCtx.beginPath();
+    for(let i=0;i<n;i++) i===0?chartCtx.moveTo(fx(i),fy(histPhi[i])):chartCtx.lineTo(fx(i),fy(histPhi[i]));
+    chartCtx.stroke();
+    chartCtx.font=`500 9px 'IBM Plex Mono',monospace`;
+    chartCtx.fillStyle='#52b788'; chartCtx.textAlign='left';
+    chartCtx.fillText(phi.toFixed(3),PAD+2,PAD_T-2);
+    chartCtx.fillStyle='rgba(200,200,200,0.5)'; chartCtx.textAlign='right';
+    chartCtx.fillText('1.0',PAD+pw-1,PAD_T+5); chartCtx.fillText('0.0',PAD+pw-1,PAD_T+ph);
+    chartCtx.restore();
+  }
+
+  function updateStats(){
+    document.getElementById('st_iter').textContent=iter;
+    document.getElementById('st_phi').textContent=phi.toFixed(3);
+    document.getElementById('st_anb').textContent=avgAlignNbrs.toFixed(1);
+    document.getElementById('st_cnb').textContent=avgCohesNbrs.toFixed(1);
+  }
+  function updateBadge(){
+    const b=document.getElementById('simBadge'); b.className='status-badge';
+    if(state==='running') b.classList.add('state-running');
+    else if(state==='paused') b.classList.add('state-paused');
+    b.textContent=state;
+    const btn=document.getElementById('btnRun');
+    btn.textContent=state==='running'?'⏸ Pause':state==='paused'?'▶ Resume':'▶ Run';
+  }
+
+  /* Presets */
+  const PRESETS={
+    flock:  { wSep:1.5, wAlign:2.5, wCohes:0.8, rSep:0.8, rAlign:2.5, rCohes:4.0, vMax:0.09, N:80  },
+    swarm:  { wSep:0.8, wAlign:0.1, wCohes:1.2, rSep:0.6, rAlign:1.0, rCohes:6.0, vMax:0.04, N:100 },
+    scatter:{ wSep:3.5, wAlign:0.4, wCohes:0.1, rSep:1.8, rAlign:2.0, rCohes:2.5, vMax:0.10, N:60  },
+    mill:   { wSep:2.5, wAlign:0.1, wCohes:3.5, rSep:0.8, rAlign:1.0, rCohes:3.5, vMax:0.07, N:70  },
+    hipar:  { wSep:1.0, wAlign:4.0, wCohes:1.5, rSep:0.5, rAlign:4.0, rCohes:5.0, vMax:0.09, N:80  },
+    compact:{ wSep:0.5, wAlign:0.2, wCohes:4.0, rSep:0.4, rAlign:0.8, rCohes:2.5, vMax:0.04, N:100 },
+  };
+  const PRESET_DESC={
+    flock:  'Strong alignment drives directional travel — agents spontaneously form moving groups with a shared heading.',
+    swarm:  'Weak alignment, large cohesion radius — agents drift together loosely without a preferred direction.',
+    scatter:'Separation dominates — agents push each other apart and spread across the domain with little cohesion.',
+    mill:   'Milling (torus): strong cohesion and separation with minimal alignment — agents orbit a common center, producing a rotating ring or vortex (Couzin et al., 2002).',
+    hipar:  'Highly parallel (hi-par.): very strong alignment with moderate cohesion — agents move in near-perfect unison with minimal spread. The tightest directional regime.',
+    compact:'Very strong cohesion at short range, minimal separation — agents collapse into a dense, slow-moving cluster with little directional order.',
+  };
+
+  function applyPreset(key){
+    const p=PRESETS[key];
+    wSep=p.wSep; wAlign=p.wAlign; wCohes=p.wCohes;
+    rSep=p.rSep; rAlign=p.rAlign; rCohes=p.rCohes;
+    vMax=p.vMax; N=p.N;
+    [['sl_wsep','vl_wsep',p.wSep],['sl_walign','vl_walign',p.wAlign],['sl_wcohes','vl_wcohes',p.wCohes],
+     ['sl_rsep','vl_rsep',p.rSep],['sl_ralign','vl_ralign',p.rAlign],['sl_rcohes','vl_rcohes',p.rCohes],
+     ['sl_vmax','vl_vmax',p.vMax],['sl_N','vl_N',p.N]].forEach(([sl,vl,v])=>{
+      document.getElementById(sl).value=v;
+      document.getElementById(vl).textContent=typeof v==='number'&&v<10?v.toFixed(v>=1?1:2):v;
+    });
+    document.getElementById('vl_N').textContent=p.N;
+    document.querySelectorAll('.btn-preset').forEach(b=>b.classList.toggle('active',b.dataset.preset===key));
+    const descEl=document.getElementById('presetDesc');
+    if(descEl) descEl.textContent=PRESET_DESC[key]||'';
+    initParticles(); state='ready'; updateBadge(); needsRedraw=true;
+  }
+  document.querySelectorAll('.btn-preset').forEach(b=>b.addEventListener('click',()=>applyPreset(b.dataset.preset)));
+
+  /* Controls */
+  document.getElementById('btnRun').addEventListener('click',()=>{
+    if(state==='ready'||state==='paused') state='running';
+    else if(state==='running') state='paused';
+    updateBadge(); needsRedraw=true;
+  });
+  document.getElementById('btnStep').addEventListener('click',()=>{
+    if(state==='running') state='paused';
+    step(); state='paused'; updateBadge();
+  });
+  document.getElementById('btnReset').addEventListener('click',()=>{
+    initParticles(); state='ready';
+    document.querySelectorAll('.btn-preset').forEach(b=>b.classList.remove('active'));
+    updateBadge(); needsRedraw=true;
+  });
+
+  function clearPreset(){
+    document.querySelectorAll('.btn-preset').forEach(b=>b.classList.remove('active'));
+    const descEl=document.getElementById('presetDesc');
+    if(descEl) descEl.innerHTML='&nbsp;'; // blank but preserve height
+  }
+
+  /* Sliders */
+  function bindSlider(id,vId,setter,fmt=v=>v.toFixed(2)){
+    document.getElementById(id).addEventListener('input',function(){
+      const v=parseFloat(this.value); setter(v); document.getElementById(vId).textContent=fmt(v);
+      clearPreset(); needsRedraw=true;
+    });
+  }
+  bindSlider('sl_wsep',  'vl_wsep',  v=>{wSep=v;},  v=>v.toFixed(1));
+  bindSlider('sl_walign','vl_walign',v=>{wAlign=v;}, v=>v.toFixed(1));
+  bindSlider('sl_wcohes','vl_wcohes',v=>{wCohes=v;}, v=>v.toFixed(1));
+  bindSlider('sl_rsep',  'vl_rsep',  v=>{rSep=v;},  v=>v.toFixed(1));
+  bindSlider('sl_ralign','vl_ralign',v=>{rAlign=v;}, v=>v.toFixed(1));
+  bindSlider('sl_rcohes','vl_rcohes',v=>{rCohes=v;}, v=>v.toFixed(1));
+  bindSlider('sl_vmax',  'vl_vmax',  v=>{vMax=v;},  v=>v.toFixed(2));
+  bindSlider('sl_N','vl_N',v=>{
+    N=Math.round(v); initParticles(); if(state==='running') state='ready'; updateBadge();
+  },v=>Math.round(v).toString());
+
+  const SPEED_STOPS=[{spf:0,every:15,label:'0.2×'},{spf:0,every:6,label:'0.5×'},{spf:0,every:3,label:'1×'},{spf:2,label:'2×'},{spf:6,label:'4×'}];
+  document.getElementById('sl_speed').addEventListener('input',function(){
+    const s=SPEED_STOPS[parseInt(this.value)];
+    stepsPerFrame=s.spf; slowEvery=s.every||1; document.getElementById('vl_speed').textContent=s.label;
+  });
+
+  /* Toggles */
+  document.getElementById('tog_radii').addEventListener('change',e=>{
+    showRadii=e.target.checked;
+    document.getElementById('radiiLabel').textContent=showRadii?'Hide zone radii':'Show zone radii';
+    needsRedraw=true;
+  });
+  document.getElementById('tog_boundary').addEventListener('change',e=>{
+    periodicBoundary=!e.target.checked;
+    document.getElementById('boundaryLabel').textContent=periodicBoundary?'Periodic (toroidal)':'Reflective walls';
+    needsRedraw=true;
+  });
+
+  /* ── Phase diagram (Couzin et al. 2002 inspired) ── */
+  function renderPhaseDiagram(){
+    const pd=document.getElementById('phaseDiag');
+    if(!pd) return;
+    const pddpr=window.devicePixelRatio||1;
+    const PW=pd.parentElement.clientWidth||260;
+    const PH=Math.round(PW*1.02);
+    pd.width=Math.round(PW*pddpr); pd.height=Math.round(PH*pddpr);
+    pd.style.height=PH+'px';
+    const pc=pd.getContext('2d');
+    pc.setTransform(pddpr,0,0,pddpr,0,0);
+    pc.clearRect(0,0,PW,PH);
+
+    const PL=44, PR=12, PT=14, PB=54;
+    const pw=PW-PL-PR, ph=PH-PT-PB;
+
+    function ex(v){ return PL+v*pw; }
+    function ey(v){ return PT+ph*(1-v); }
+
+    // Background: phase regions
+    const iw=Math.round(pw*pddpr), ih=Math.round(ph*pddpr);
+    const img=pc.createImageData(iw,ih);
+    const d=img.data;
+    for(let py=0;py<ih;py++){
+      for(let px=0;px<iw;px++){
+        const xs=px/iw, ya=(1-py/ih);
+        const inSwarm = ya<0.25;
+        const inTorus = !inSwarm && xs<0.30 && ya<0.65;
+        const inHiPar = !inSwarm && xs<0.20 && ya>=0.65;
+        let r,g,b;
+        if(inSwarm)       { r=255;g=228;b=218; }
+        else if(inTorus)  { r=212;g=240;b=212; }
+        else if(inHiPar)  { r=212;g=228;b=252; }
+        else              { r=252;g=246;b=212; }
+        const bw=0.04;
+        const nearSwarm=Math.max(0,1-Math.abs(ya-0.25)/bw);
+        const nearTorus=!inSwarm?Math.max(0,1-Math.abs(xs-0.30)/bw):0;
+        const blend=Math.max(nearSwarm,nearTorus)*0.45;
+        if(blend>0){ r=Math.round(r*(1-blend)+240*blend); g=Math.round(g*(1-blend)+237*blend); b=Math.round(b*(1-blend)+228*blend); }
+        const idx=(py*iw+px)*4;
+        d[idx]=r; d[idx+1]=g; d[idx+2]=b; d[idx+3]=255;
+      }
+    }
+    pc.putImageData(img,Math.round(PL*pddpr),Math.round(PT*pddpr));
+
+    // Border
+    pc.save(); pc.strokeStyle='rgba(0,0,0,0.12)'; pc.lineWidth=1;
+    pc.strokeRect(PL,PT,pw,ph); pc.restore();
+
+    // Region labels — Hi-par. only (no subtitle; button says "Highly parallel")
+    // Torus gets (milling + compact) since both presets land there
+    const regFnt=`600 ${Math.round(PW/26)}px 'Outfit',sans-serif`;
+    const subFnt=`400 ${Math.round(PW/34)}px 'Outfit',sans-serif`;
+    const lineH=Math.round(PW/26)*1.3;
+    pc.textAlign='center';
+    pc.fillStyle='rgba(160,40,20,0.70)'; pc.font=regFnt; pc.fillText('Swarm',   PL+pw*0.58, PT+ph*0.88);
+    pc.fillStyle='rgba(20,110,40,0.75)'; pc.font=regFnt; pc.fillText('Torus',   PL+pw*0.14, PT+ph*0.42);
+    pc.font=subFnt; pc.fillText('(milling,', PL+pw*0.14, PT+ph*0.42+lineH);
+    pc.fillText('compact)', PL+pw*0.14, PT+ph*0.42+lineH*2);
+    pc.fillStyle='rgba(110,120,20,0.80)'; pc.font=regFnt; pc.fillText('Flock',  PL+pw*0.62, PT+ph*0.32);
+    pc.fillStyle='rgba(20,50,180,0.70)'; pc.font=regFnt; pc.fillText('Hi-par.', PL+pw*0.09, PT+ph*0.10);
+    pc.fillStyle='rgba(80,50,20,0.45)'; pc.font=subFnt; pc.textAlign='right';
+    pc.fillText('\u2192 dispersed', PL+pw-4, PT+ph*0.55);
+
+    // Axes lines
+    pc.save(); pc.strokeStyle='rgba(0,0,0,0.28)'; pc.lineWidth=1;
+    pc.beginPath(); pc.moveTo(PL,PT+ph); pc.lineTo(PL+pw,PT+ph); pc.stroke();
+    pc.beginPath(); pc.moveTo(PL,PT);    pc.lineTo(PL,PT+ph);    pc.stroke();
+    pc.restore();
+
+    // X ticks + label — exact Vicsek approach with textAlign='left'
+    const tickFnt=`400 ${Math.round(PW/30)}px 'IBM Plex Mono',monospace`;
+    pc.font=tickFnt; pc.fillStyle='rgba(0,0,0,0.5)';
+    [0.0,0.2,0.4,0.6,0.8,1.0].forEach(v=>{
+      const x=ex(v); if(x>PL+pw+2) return;
+      pc.save(); pc.strokeStyle='rgba(0,0,0,0.2)'; pc.lineWidth=1;
+      pc.beginPath(); pc.moveTo(x,PT+ph); pc.lineTo(x,PT+ph+4); pc.stroke(); pc.restore();
+      pc.textAlign='center'; pc.textBaseline='top'; pc.fillText(v.toFixed(1),x,PT+ph+5);
+    });
+
+    // X label: r_sep / r_coh  — copy Vicsek ρ_eff approach, textAlign='left' critical
+    {
+      const fSz=Math.round(PW/22), subSz=Math.round(fSz*0.70);
+      pc.fillStyle='rgba(0,0,0,0.55)';
+      pc.font=`500 ${fSz}px 'IBM Plex Mono',monospace`;
+      const rW=pc.measureText('r').width, slashW=pc.measureText('/').width;
+      pc.font=`500 ${subSz}px 'IBM Plex Mono',monospace`;
+      const sepW=pc.measureText('sep').width, cohXW=pc.measureText('coh').width;
+      const totalW=rW+sepW+slashW+rW+cohXW;
+      let cx=PL+pw/2-totalW/2;
+      pc.textBaseline='alphabetic'; pc.textAlign='left';
+      pc.font=`500 ${fSz}px 'IBM Plex Mono',monospace`;
+      pc.fillText('r',cx,PH-12); cx+=rW;
+      pc.font=`500 ${subSz}px 'IBM Plex Mono',monospace`;
+      pc.fillText('sep',cx,PH-12+Math.round(fSz*0.32)); cx+=sepW;
+      pc.font=`500 ${fSz}px 'IBM Plex Mono',monospace`;
+      pc.fillText('/',cx,PH-12); cx+=slashW;
+      pc.fillText('r',cx,PH-12); cx+=rW;
+      pc.font=`500 ${subSz}px 'IBM Plex Mono',monospace`;
+      pc.fillText('coh',cx,PH-12+Math.round(fSz*0.32));
+    }
+
+    // Y ticks
+    pc.font=tickFnt; pc.fillStyle='rgba(0,0,0,0.5)';
+    [0.0,0.2,0.4,0.6,0.8,1.0].forEach(v=>{
+      const y=ey(v); if(y<PT-2) return;
+      pc.save(); pc.strokeStyle='rgba(0,0,0,0.2)'; pc.lineWidth=1;
+      pc.beginPath(); pc.moveTo(PL-4,y); pc.lineTo(PL,y); pc.stroke(); pc.restore();
+      pc.textAlign='right'; pc.textBaseline='middle'; pc.fillText(v.toFixed(1),PL-6,y);
+    });
+
+    // Y label: r_align / r_coh rotated — same textAlign='left' approach
+    pc.save();
+    pc.translate(10, PT+ph/2); pc.rotate(-Math.PI/2);
+    pc.fillStyle='rgba(0,0,0,0.55)';
+    {
+      const fSz=Math.round(PW/22), subSz=Math.round(fSz*0.70);
+      pc.font=`500 ${fSz}px 'IBM Plex Mono',monospace`;
+      const rW=pc.measureText('r').width, slashW=pc.measureText('/').width;
+      pc.font=`500 ${subSz}px 'IBM Plex Mono',monospace`;
+      const alnW=pc.measureText('align').width, cohYW=pc.measureText('coh').width;
+      const totalW=rW+alnW+slashW+rW+cohYW;
+      let cx=-totalW/2;
+      pc.textBaseline='alphabetic'; pc.textAlign='left';
+      pc.font=`500 ${fSz}px 'IBM Plex Mono',monospace`;
+      pc.fillText('r',cx,0); cx+=rW;
+      pc.font=`500 ${subSz}px 'IBM Plex Mono',monospace`;
+      pc.fillText('align',cx,Math.round(fSz*0.32)); cx+=alnW;
+      pc.font=`500 ${fSz}px 'IBM Plex Mono',monospace`;
+      pc.fillText('/',cx,0); cx+=slashW;
+      pc.fillText('r',cx,0); cx+=rW;
+      pc.font=`500 ${subSz}px 'IBM Plex Mono',monospace`;
+      pc.fillText('coh',cx,Math.round(fSz*0.32));
+    }
+    pc.restore();
+
+    // Dot: weight-adjusted
+    const xsBase=clamp(rSep/rCohes,0,1);
+    const yaBase=clamp(rAlign/rCohes,0,1);
+    const wTot=wSep+wAlign+wCohes||1;
+    const xsAdj=clamp(xsBase+0.25*(wSep/wTot-wCohes/wTot),0,1);
+    const yaAdj=clamp(yaBase+0.20*(wAlign/wTot),0,1);
+    const dotX=ex(xsAdj), dotY=ey(yaAdj);
+    pc.save();
+    pc.fillStyle='rgba(29,60,40,0.2)'; pc.beginPath(); pc.arc(dotX,dotY,9,0,Math.PI*2); pc.fill();
+    pc.fillStyle='#1d3c28';            pc.beginPath(); pc.arc(dotX,dotY,5,0,Math.PI*2); pc.fill();
+    pc.fillStyle='#fff';               pc.beginPath(); pc.arc(dotX,dotY,2,0,Math.PI*2); pc.fill();
+    pc.restore();
+  }
+
+  /* ── Main loop ── */
+  function simLoopInner(ts){
+    if(activeTab!=='sim') return;
+    if(W<1||H<1){ resize(); if(W>=1&&H>=1) needsRedraw=true; }
+    if(state==='running'){ if(stepsPerFrame===0){ if(++slowFrame>=slowEvery){ slowFrame=0; step(); } } else { for(let s=0;s<stepsPerFrame;s++) step(); } }
+    render();
+    requestAnimationFrame(simLoopInner);
+  }
+  window.simLoop=function(ts){ simLoopInner(ts); };
+  window.simInitGlobal=function(){ initParticles(); state='ready'; updateBadge(); needsRedraw=true; };
+  initParticles(); updateBadge();
+})();
+</script>
+</body>
+</html>
