@@ -173,10 +173,10 @@ Add a row to the appropriate table under `## Contents`:
 
 ### Swarm Intelligence
 
-- `bacterial_foraging_optimization/bfo_explorer.html` *(full BFO: 1-D and 2-D chemotaxis with cell-to-cell signaling, plus reproduction and elimination-dispersal)*
-- `particle_swarm_optimization/pso_explorer.html`
-- `collective_motion/vicsek_explorer.html`
 - `collective_motion/boids_explorer.html`
+- `collective_motion/vicsek_explorer.html`
+- `particle_swarm_optimization/pso_explorer.html`
+- `bacterial_foraging_optimization/bfo_explorer.html` *(full BFO: 1-D and 2-D chemotaxis with cell-to-cell signaling, plus reproduction and elimination-dispersal)*
 
 ### Neural Networks
 
