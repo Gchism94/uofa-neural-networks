@@ -140,8 +140,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
           <div class="grow"><span class="gk">m</span><span class="gv">ants per iteration (colony size)</span></div>
           <div class="grow"><span class="gk">α</span><span class="gv">pheromone exponent in τ<sup>α</sup>·η<sup>β</sup></span></div>
           <div class="grow"><span class="gk">β</span><span class="gv">heuristic exponent in τ<sup>α</sup>·η<sup>β</sup></span></div>
-          <div class="grow"><span class="gk">ρ</span><span class="gv">evaporation rate: τ ← (1−ρ)τ each iteration</span></div>
-          <div class="grow"><span class="gk">Q</span><span class="gv">deposit scale (Δτ = Q·obj layered; Q/L TSP)</span></div>
+          <div class="grow"><span class="gk">ρ</span><span class="gv">evaporation rate: τ ← (1−ρ)τ, floored at τ_min = τ_init. At ρ=1.0 all paths reset to the uniform baseline each iteration (near-random with low Q). Range 0–1.</span></div>
+          <div class="grow"><span class="gk">Q</span><span class="gv">deposit scale — one ant on the optimal path deposits Q per node per iteration. Vary Q to control how quickly pheromone differentiates; vary ρ to control how long it persists.</span></div>
           <div class="grow"><span class="gk">τ</span><span class="gv"><strong>Pheromone</strong> — learned trail strength. Higher τ means more ants chose that path historically. Decays via evaporation; built up by deposit. Click in τ view to inject.</span></div>
           <div class="grow"><span class="gk">η</span><span class="gv"><strong>Prior</strong> — fixed heuristic attractiveness, independent of pheromone. All presets start uniform (η=1); use the η prior view to add bias. Click to boost, right-click to decrease.</span></div>
           <div style="grid-column:1/-1;border-top:1px solid rgba(200,196,188,.35);margin-top:5px;padding-top:6px">
@@ -168,7 +168,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
     </div>
     <div class="rcol">
       <div class="card" id="rc-app">
-        <div class="sec" id="appheading">Application</div>
+        <div class="sec" id="appheading">Application — TSP is the original ACO formulation</div>
         <div class="pills" id="prebtns">
           <button class="pill on" data-p="knapsack">Knapsack</button>
           <button class="pill" data-p="routing">Routing</button>
@@ -234,7 +234,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
         <div class="sec">Pheromone memory</div>
         <div class="trow">
           <span class="tlbl">Node trails &nbsp;↔&nbsp; Edge trails</span>
-          <label class="tog"><input type="checkbox" id="taumode"><div class="ttrack"></div><div class="tthumb"></div></label>
+          <label class="tog"><input type="checkbox" id="taumode" checked><div class="ttrack"></div><div class="tthumb"></div></label>
         </div>
         <div class="tdesc" id="tmdesc"></div>
       </div>
@@ -243,7 +243,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
         <div class="srow"><span class="plbl">m</span><input type="range" id="sm" min="1" max="20" step="1" value="8"><span class="pval" id="vm">8</span></div>
         <div class="srow"><span class="plbl">α</span><input type="range" id="sa" min="0" max="4" step="0.1" value="1.0"><span class="pval" id="va">1.0</span></div>
         <div class="srow"><span class="plbl">β</span><input type="range" id="sb" min="0" max="6" step="0.1" value="2.0"><span class="pval" id="vb">2.0</span></div>
-        <div class="srow"><span class="plbl">ρ</span><input type="range" id="sr" min="0.01" max="0.9" step="0.01" value="0.1"><span class="pval" id="vr">0.10</span></div>
+        <div class="srow"><span class="plbl">ρ</span><input type="range" id="sr" min="0.01" max="1.0" step="0.01" value="0.1"><span class="pval" id="vr">0.10</span></div>
         <div class="srow"><span class="plbl">Q</span><input type="range" id="sq" min="0.1" max="5" step="0.1" value="1.0"><span class="pval" id="vq">1.0</span></div>
       </div>
       </div>
@@ -253,7 +253,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
 </div>
 <script>
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
-const TAU_MIN=0.001,TAU_INIT=0.1,TAU_MAX=10.0,FLASH_DUR=700;
+// TAU_MIN = TAU_INIT: bad paths decay to the uniform baseline (not to near-zero).
+// This ensures ρ and Q have observable effects — without it, τ_good/τ_bad
+// reaches 9000:1 via floor effects, making selection appear deterministic.
+const TAU_MIN=0.1,TAU_INIT=0.1,TAU_MAX=100.0,FLASH_DUR=700;
 
 // ── PALETTE ───────────────────────────────────────────────────────────────────
 const K={
@@ -418,7 +421,7 @@ const PRESETS={
 let S={
   preset:'knapsack',
   nodePos:[],nestPos:{x:0,y:0},feederPos:{x:0,y:0},
-  tauMode:'node',tau:null,
+  tauMode:'edge',tau:null,
   tspTau:null,tspCityPos:[],tspEtaBoost:[],
   params:{m:8,alpha:1.0,beta:2.0,rho:.1,Q:1.0},
   ants:[],
@@ -475,8 +478,8 @@ function initTau(){
 }
 function getTauVal(li,from,to){return S.tauMode==='node'?S.tau[li][to]:S.tau[li][from][to]}
 function addTauVal(li,from,to,d){
-  if(S.tauMode==='node')S.tau[li][to]=Math.max(TAU_MIN,S.tau[li][to]+d);
-  else S.tau[li][from][to]=Math.max(TAU_MIN,S.tau[li][from][to]+d);
+  if(S.tauMode==='node')S.tau[li][to]=Math.min(TAU_MAX,Math.max(TAU_MIN,S.tau[li][to]+d));
+  else S.tau[li][from][to]=Math.min(TAU_MAX,Math.max(TAU_MIN,S.tau[li][from][to]+d));
 }
 function tauRange(){
   let mn=1e9,mx=-1e9;
@@ -550,14 +553,27 @@ function evaporate(){
 
 function deposit(){
   const{Q}=S.params;
+  const pst=PRESETS[S.preset];
   if(isTSP()){
+    // Normalize by known optimum so deposit ∈ (0, Q] per ant per edge
+    // (optimal tour deposits Q; longer tours deposit less)
+    const optTSP=pst.optima&&pst.optima<1e9?pst.optima:(S.bestObj<1e9?S.bestObj:null);
     const n=PRESETS.tsp.cities.length;
-    S.ants.forEach(a=>{if(a.obj<=0)return;const d=Q/a.obj;for(let s=0;s<n;s++){const i=a.path[s],j=a.path[(s+1)%n];S.tspTau[i][j]=Math.min(TAU_MAX,Math.max(TAU_MIN,S.tspTau[i][j]+d));S.tspTau[j][i]=Math.min(TAU_MAX,Math.max(TAU_MIN,S.tspTau[j][i]+d))}});
+    S.ants.forEach(a=>{
+      if(a.obj<=0)return;
+      const d=optTSP?Q*(optTSP/a.obj):Q/a.obj;
+      for(let s=0;s<n;s++){const i=a.path[s],j=a.path[(s+1)%n];
+        S.tspTau[i][j]=Math.min(TAU_MAX,Math.max(TAU_MIN,S.tspTau[i][j]+d));
+        S.tspTau[j][i]=Math.min(TAU_MAX,Math.max(TAU_MIN,S.tspTau[j][i]+d));}
+    });
     return;
   }
-  const p=PRESETS[S.preset],nL=p.layers.length;
+  // Layered: normalize by known optimum so deposit ∈ (0, Q] per ant per node
+  // Prevents immediate TAU_MAX saturation with large-scale objectives (e.g. knapsack obj≈17)
+  const optL=pst.optima&&pst.optima<1e9?pst.optima:(S.bestObj>0&&S.bestObj<1e9?S.bestObj:1);
+  const nL=pst.layers.length;
   S.ants.forEach(a=>{
-    const d=Q*Math.max(0,a.obj);if(d<=0)return;
+    const d=Q*Math.max(0,a.obj)/optL;if(d<=0)return;
     if(S.tauMode==='node'){for(let l=0;l<nL;l++)addTauVal(l,0,a.path[l],d);}
     else{addTauVal(0,0,a.path[0],d);for(let l=0;l<nL-1;l++)addTauVal(l+1,a.path[l],a.path[l+1],d);addTauVal(nL,a.path[nL-1],0,d);}
   });
@@ -1308,8 +1324,8 @@ function updateRunBtn(){
 }
 function updateTmDesc(){
   document.getElementById('tmdesc').innerHTML=S.tauMode==='node'
-    ?'<strong>Node trails:</strong> τ[layer][node] — independent marginals. Assumes variable choices are weakly coupled across layers.'
-    :'<strong>Edge trails:</strong> τ[layer][from→to] — adjacent-pair conditionals. Captures first-order coupling; sensitive to layer order.';
+    ?'<strong>Node trails:</strong> τ[layer][node] — independent marginals. Identifies best value per layer but converges to a specific full path more slowly. Useful for viewing per-node τ values.'
+    :'<strong>Edge trails (canonical):</strong> τ[layer][from→to] — transition-specific. Matches Dorigo\'s original formulation; converges to a specific full path more readily. Q and ρ dynamics are most visible here.<br><br>Note: edge trails make the <em>order of variables in the DAG matter</em> — analogous to the effect of chromosome ordering in a GA with crossover. Reordering the layers can change which solutions the colony finds easily.';
 }
 function setPF(s){const m=parseFloat(s.min),mx=parseFloat(s.max),v=parseFloat(s.value);s.style.setProperty('--pct',((v-m)/(mx-m)*100)+'%')}
 
@@ -1391,39 +1407,43 @@ const CARDS=[
 <span class="kw">FOR</span> each ant k = 1..m:
   L_k ← <span class="kw">eval</span>(path_k)       <span class="cm">// objective value</span>
   Δτ_k ← <span class="kw">f</span>(L_k)            <span class="cm">// quality reward</span>
-  <span class="cm">//  Layered (maximize): f(L) = Q × L</span>
-  <span class="cm">//  TSP    (minimize):  f(L) = Q / L</span>
-  <span class="cm">//  In both cases: better path → more Δτ</span>
+  <span class="cm">//  Layered (maximize): f(L) = Q × L / L★</span>
+  <span class="cm">//  TSP    (minimize):  f(L) = Q × L★ / L</span>
+  <span class="cm">//  L★ = known optimum or best-so-far</span>
+  <span class="cm">//  → Δτ ≤ Q per ant per node/edge</span>
+  <span class="cm">//  → Q &amp; ρ work at the same scale</span>
+  <span class="cm">//     regardless of objective magnitude</span>
   <span class="kw">FOR</span> each node/edge e ∈ path_k:
     τ[e] ← τ[e] + Δτ_k
+    τ[e] ← <span class="kw">min</span>(τ[e], τ_max)   <span class="cm">// ceiling (τ_max = 100)</span>
 
-<span class="cm">// TSP initial conditions: each ant starts</span>
-<span class="cm">// at a different city (staggered across all</span>
-<span class="cm">// n cities). Deposit Q/L reinforces all</span>
-<span class="cm">// edges of the completed tour equally —</span>
-<span class="cm">// not proportional to individual distances.</span>`,
-   cap:'Better solutions deposit more pheromone. For TSP the m ants start at staggered cities (ant k starts at city k mod n). Pheromone is deposited uniformly on every edge of the completed tour — it is the tour length as a whole that determines Δτ, not the individual edge distances.'},
+<span class="cm">// TSP: each ant starts at a different city</span>
+<span class="cm">// (staggered). Deposit reinforces all edges</span>
+<span class="cm">// of the completed tour equally — tour</span>
+<span class="cm">// length as a whole determines Δτ.</span>`,
+   cap:'Deposit is normalized by the known optimum (or best-so-far) so one ant on the optimal path deposits exactly Q per node per iteration. This keeps deposit in a scale-independent range regardless of objective magnitude — a knapsack value of 17 and a tour length of 2.5 both behave the same way. Increasing Q makes pheromone differentiate faster; increasing ρ shortens the effective memory. Both effects are now clearly visible in the τ view and objective history.'},
   {html:`<span class="cm">// Applied at START of each iteration:</span>
 <span class="kw">FOR</span> each node/edge e:
   τ[e] ← (1 − ρ) × τ[e]     <span class="cm">// decay</span>
   τ[e] ← <span class="kw">max</span>(τ[e], τ_min)   <span class="cm">// floor</span>
 
-<span class="cm">// τ_init = 0.1 (uniform start):</span>
-<span class="cm">//   equal probability before learning;</span>
-<span class="cm">//   τ=0 → Σweight=0 (undefined)</span>
-<span class="cm">// high ρ → fast forgetting → explore</span>
-<span class="cm">// low  ρ → long memory    → exploit</span>
+<span class="cm">// τ_init = τ_min = 0.1 (uniform start):</span>
+<span class="cm">//   bad paths decay back to the "no</span>
+<span class="cm">//   information" baseline, not to zero.</span>
+<span class="cm">//   Prevents τ_good/τ_bad from reaching</span>
+<span class="cm">//   absurd ratios (e.g. 9000:1) through</span>
+<span class="cm">//   floor effects alone.</span>
+<span class="cm">// ρ = 1.0 → all paths reset to τ_init</span>
+<span class="cm">//   each iteration → near-random (with</span>
+<span class="cm">//   low Q). True "no memory" baseline.</span>
+<span class="cm">// high ρ → short memory → explore</span>
+<span class="cm">// low  ρ → long memory  → exploit</span>
 
 <span class="cm">// Manual τ injections (left-click in</span>
 <span class="cm">// τ pheromone view) also decay — they</span>
 <span class="cm">// are a transient nudge to the colony,</span>
-<span class="cm">// not a permanent structural change.</span>
-<span class="cm">// Right-click halves τ symmetrically.</span>
-
-<span class="cm">// Standard notation: τ (tau) = pheromone</span>
-<span class="cm">// concentration. "C" (concentration) is</span>
-<span class="cm">// an equivalent and intuitive alias.</span>`,
-   cap:'Evaporation is active forgetting. Without it, the first good path locks in permanently. The τ_init = 0.1 is uniform — all paths start equally likely. Try ρ = 0.05 vs 0.5 and watch the convergence speed and diversity change dramatically.'},
+<span class="cm">// not a permanent structural change.</span>`,
+   cap:'Evaporation is active forgetting. Without it, the first good path locks in permanently. τ_min = τ_init = 0.1: bad paths decay to the uniform baseline, not to zero — this keeps selection probabilistic. At ρ=1.0 all paths reset to 0.1 each iteration; paired with low Q this demonstrates near-random (memoryless) search.'},
   {html:`τ ← τ_init                   <span class="cm">// uniform 0.1</span>
 <span class="kw">REPEAT</span>:
   <span class="kw">FOR</span> k = 1..m: path_k ← <span class="kw">choose</span>()
@@ -1494,11 +1514,11 @@ function uniformizeEta(){
       return s/(n-1);
     });
     const target=avgIncoming.reduce((a,b)=>a+b,0)/n;
-    for(let j=0;j<n;j++)S.tspEtaBoost[j]=Math.min(10,Math.max(0.1,target/Math.max(1e-10,avgIncoming[j])));
+    for(let j=0;j<n;j++)S.tspEtaBoost[j]=Math.min(20,Math.max(0.1,target/Math.max(1e-10,avgIncoming[j])));
   } else {
     PRESETS[S.preset].layers.forEach((layer,l)=>{
       layer.nodes.forEach((nd,j)=>{
-        etaBoost[l][j]=nd.eta>0?Math.min(10,1.0/nd.eta):1.0;
+        etaBoost[l][j]=nd.eta>0?Math.min(20,1.0/nd.eta):1.0;
       });
     });
   }
@@ -1542,8 +1562,6 @@ function initSim(preset){
   // TSP UI adjustments
   document.getElementById('tmcard').style.display=tsp?'none':'';
   document.getElementById('blayer').textContent=tsp?'↝ City':'↝ Layer';
-  document.getElementById('appheading').textContent=tsp
-    ?'Application — TSP is the original ACO formulation':'Application';
   updateRunBtn();updateTmDesc();updateViewDesc();updateHint();
   document.getElementById('pdesc').textContent=PRESETS[preset].desc;
   renderObjFormula(preset);
@@ -1619,8 +1637,10 @@ window.addEventListener('load',()=>{
     });
   });
   document.getElementById('taumode').addEventListener('change',e=>{
-    S.tauMode=e.target.checked?'edge':'node';S.running=false;S.paused=false;S.phase='idle';
-    initTau();buildPaths();updateTmDesc();updateRunBtn();drawMain();
+    stopLoop();
+    S.tauMode=e.target.checked?'edge':'node';
+    initSim(S.preset);
+    startLoop();setTimeout(stopLoop,200);
   });
   [{id:'sm',key:'m',valId:'vm',fmt:v=>Math.round(v)},
    {id:'sa',key:'alpha',valId:'va',fmt:v=>v.toFixed(1)},
@@ -1685,8 +1705,8 @@ window.addEventListener('load',()=>{
         const he=findHoverEdge(cx,cy);
         if(he&&he.isTsp){
           const mult=e.button===2||e.ctrlKey?1/1.6:1.6;
-          S.tspEtaBoost[he.i]=Math.max(0.1,Math.min(10,(S.tspEtaBoost[he.i]||1)*mult));
-          S.tspEtaBoost[he.j]=Math.max(0.1,Math.min(10,(S.tspEtaBoost[he.j]||1)*mult));
+          S.tspEtaBoost[he.i]=Math.max(0.1,Math.min(20,(S.tspEtaBoost[he.i]||1)*mult));
+          S.tspEtaBoost[he.j]=Math.max(0.1,Math.min(20,(S.tspEtaBoost[he.j]||1)*mult));
           S.hoverEdge=findHoverEdge(cx,cy);
           e.preventDefault();drawMain();return;
         }
@@ -1721,7 +1741,7 @@ window.addEventListener('load',()=>{
               }
             } else { // eta
               if(e.button===2||e.ctrlKey)etaBoost[l][j]=Math.max(0.1,(etaBoost[l][j]||1)/1.6);
-              else etaBoost[l][j]=Math.min((etaBoost[l][j]||1)*1.6,10);
+              else etaBoost[l][j]=Math.min((etaBoost[l][j]||1)*1.6,20);
               if(S.phase==='idle')buildPaths();
             }
             S.hoverEdge=findHoverEdge(cx,cy);
@@ -1747,7 +1767,7 @@ window.addEventListener('load',()=>{
         if(he&&!he.isTsp&&he.destLayer!==undefined){
           const dl=he.destLayer,dn=he.destNode;
           if(e.button===2||e.ctrlKey)etaBoost[dl][dn]=Math.max(0.1,(etaBoost[dl][dn]||1)/1.6);
-          else etaBoost[dl][dn]=Math.min((etaBoost[dl][dn]||1)*1.6,10);
+          else etaBoost[dl][dn]=Math.min((etaBoost[dl][dn]||1)*1.6,20);
           if(S.phase==='idle')buildPaths();
           S.hoverEdge=findHoverEdge(cx,cy);
           e.preventDefault();drawMain();return;
