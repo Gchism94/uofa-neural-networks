@@ -78,13 +78,16 @@ Inside `<head>`, include all of the following, filling in the actual values:
 At the very bottom of `<body>`, before `</body>`, add:
 
 ```html
-<footer style="margin-top:1.5rem;padding-top:0.75rem;border-top:1px solid #e0e0e0;font-size:0.8rem;color:#888;">
+<footer id="course-nav-footer" style="margin-top:1.5rem;padding-top:0.75rem;border-top:1px solid #e0e0e0;font-size:0.8rem;color:#888;">
   <a href="../" style="color:#2e7d32;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">&larr; All course visualizations</a>
 </footer>
-<script>if (window.self !== window.top) { var f = document.querySelector('footer'); if (f) f.style.display = 'none'; }</script>
+<script>if (window.self !== window.top) { var f = document.getElementById('course-nav-footer'); if (f) f.style.display = 'none'; }</script>
 ```
 
-The `<script>` hides the footer when the page is embedded in a Canvas LMS iframe.
+The `<script>` hides the footer when the page is embedded in a Canvas LMS iframe. Use
+`getElementById('course-nav-footer')` rather than `querySelector('footer')` — some demos
+have their own internal `<footer>` elements, and `querySelector` would match the first one
+it finds instead of the back-link footer.
 
 **Watch for body padding:** if the demo's `body` CSS has no `padding-bottom`, the footer will
 sit flush against the viewport edge. Add `padding-bottom` to the body or `margin-bottom` to
