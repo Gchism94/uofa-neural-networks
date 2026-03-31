@@ -442,18 +442,20 @@ footer a { color: var(--green-mid); text-decoration: none; }
 .tab2-grid {
   display: grid;
   grid-template-columns: 1fr 280px;
+  grid-template-rows: auto auto 1fr;
   grid-template-areas: "top side" "mid side" "fml side";
 }
 .t2-top     { grid-area: top; border-right: 1px solid var(--border); min-width: 0; }
 .t2-mid     { grid-area: mid; border-right: 1px solid var(--border); border-top: 1px solid var(--border); min-width: 0; }
-.t2-formula { grid-area: fml; border-right: 1px solid var(--border); border-top: 1px solid var(--border); padding: 0 14px 14px; min-width: 0; }
+.t2-formula { grid-area: fml; border-right: 1px solid var(--border); border-top: 1px solid var(--border); padding: 14px; min-width: 0;
+              display: flex; align-items: center; justify-content: center; }
 .tab2-grid > .t2-sidebar { grid-area: side; }
 
 @media (max-width: 720px) {
   .tab2-grid { display: flex; flex-direction: column; }
   .t2-top     { order: 1; border-right: none; }
   .t2-mid     { order: 4; border-right: none; }
-  .t2-formula { order: 7; border-right: none; padding: 12px 14px; }
+  .t2-formula { order: 8; border-right: none; padding: 12px 14px; }
   /* Sidebar: display:contents makes its children direct flex children of tab2-grid */
   .t2-sidebar { display: contents; }
   .t2-sidebar > .section {
@@ -465,8 +467,9 @@ footer a { color: var(--green-mid); text-decoration: none; }
   .t2-s-regime { order: 3; }
   .t2-s-feeder { order: 5; }
   .t2-s-k      { order: 6; }
+  .t2-s-rcurve { order: 7; }
 }
-#mc2, #bc2 { display: block; width: 100%; max-width: 620px; height: auto; }
+#mc2, #bc2 { display: block; width: 100%; height: auto; }
 .phase-chip {
   display: inline-block; padding: 2px 10px; border-radius: 999px;
   font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em;
@@ -878,7 +881,7 @@ footer a { color: var(--green-mid); text-decoration: none; }
       <span class="sec-lbl">Forager Allocation — 5 Feeders</span>
       <span class="phase-chip" id="phase2-chip">proportional</span>
     </div>
-    <canvas id="mc2" style="display:block;width:100%;max-width:620px"></canvas>
+    <canvas id="mc2" style="display:block;width:100%"></canvas>
   </div>
 
   <!-- LEFT COL 2: bar chart + phase description -->
@@ -886,10 +889,7 @@ footer a { color: var(--green-mid); text-decoration: none; }
     <div style="padding:4px 14px 2px;border-bottom:1px solid var(--border)">
       <span class="sec-lbl" style="font-size:0.65rem;color:var(--muted)">Allocation share &nbsp;—&nbsp; solid = actual &nbsp;·&nbsp; dashed outline = proportional reference (<span style="text-transform:none">α</span>=1)</span>
     </div>
-    <canvas id="bc2" style="display:block;width:100%;max-width:620px"></canvas>
-    <div style="padding:6px 14px 8px;border-top:1px solid var(--border);font-size:0.72rem;color:var(--muted);line-height:1.5" id="phase2-desc">
-      Adjust α to explore how nonlinearity shapes collective allocation.
-    </div>
+    <canvas id="bc2" style="display:block;width:100%"></canvas>
   </div>
 
   <!-- LEFT COL 3: formula card -->
@@ -962,6 +962,19 @@ footer a { color: var(--green-mid); text-decoration: none; }
       <div class="sdesc-sl">Added to each quality before raising to α. At k=0 the formula is a pure power law q<sub>i</sub><sup>α</sup>. Higher k compresses quality differences toward equal allocation.</div>
     </div>
 
+    <div class="sdiv"></div>
+
+    <!-- Recruitment curve — P_i vs q_i -->
+    <div class="section t2-s-rcurve">
+      <div class="sec-lbl" style="margin-bottom:6px">The Graph — <span style="text-transform:none">p<sub>i</sub> vs q<sub>i</sub></span></div>
+      <canvas id="rc2" style="display:block"></canvas>
+      <div class="sdesc-sl" style="margin-top:4px">
+        Two-option experiment: p<sub>i</sub> = (k+q<sub>i</sub>)<sup><span style="text-transform:none">α</span></sup> / [(k+q<sub>i</sub>)<sup><span style="text-transform:none">α</span></sup> + (k+q<sub>B</sub>)<sup><span style="text-transform:none">α</span></sup>], q<sub>B</sub>=2.5 fixed.
+        Solid = current <span style="text-transform:none">α</span>. Dashed = <span style="text-transform:none">α</span> ∈ {−2, 0, 1, 2, 5, 10}. All curves cross P=0.5 at q<sub>i</sub>=q<sub>B</sub> (vertical dashed line).
+        Changing k shifts the whole family; changing <span style="text-transform:none">α</span> moves only the solid curve.
+      </div>
+    </div>
+
   </div><!-- t2-sidebar -->
 </div><!-- tab2-grid -->
 
@@ -996,8 +1009,8 @@ footer a { color: var(--green-mid); text-decoration: none; }
         </svg>
       </div>
       <div class="exp-step" style="margin-top:2px">Waggle Dance</div>
-      <div style="margin-bottom:3px"><span class="phase-chip" style="background:#2d7a50;font-size:0.62rem;padding:1px 8px">Linear</span></div>
-      <div class="exp-desc">A scout performs a figure-8 dance; the waggle run encodes food direction and distance. Each dance bout recruits roughly the same number of followers — no feedback between the number already foraging and the recruitment rate.</div>
+      <div style="margin-bottom:3px"><span class="phase-chip" style="background:#2d7a50;font-size:0.62rem;padding:1px 8px">Proportional</span></div>
+      <div class="exp-desc">A scout performs a figure-8 dance; the waggle run encodes food direction and distance. Each dance bout recruits roughly the same number of followers — no feedback between the number already foraging and the recruitment rate (<strong>linear recruitment</strong>).</div>
     </div>
 
     <!-- Tandem Running -->
@@ -1032,8 +1045,8 @@ footer a { color: var(--green-mid); text-decoration: none; }
         </svg>
       </div>
       <div class="exp-step" style="margin-top:2px">Tandem Running</div>
-      <div style="margin-bottom:3px"><span class="phase-chip" style="background:#2d7a50;font-size:0.62rem;padding:1px 8px">Linear</span></div>
-      <div class="exp-desc">An informed ant leads a single naive follower who maintains antennal contact from behind. Strictly 1-to-1: one leader can only guide one follower per run. Recruitment scales directly with the number of leaders — no amplification.</div>
+      <div style="margin-bottom:3px"><span class="phase-chip" style="background:#2d7a50;font-size:0.62rem;padding:1px 8px">Proportional</span></div>
+      <div class="exp-desc">An informed ant leads a single naive follower who maintains antennal contact from behind. Strictly 1-to-1: one leader can only guide one follower per run. Recruitment scales directly with the number of leaders — no amplification (<strong>linear recruitment</strong>).</div>
     </div>
 
     <!-- Trail Laying -->
@@ -1063,10 +1076,13 @@ footer a { color: var(--green-mid); text-decoration: none; }
             <ellipse cx="1" cy="0" rx="2.5" ry="2" fill="#1d3c28"/>
             <circle cx="5.5" cy="0" r="2.3" fill="#1d3c28"/>
           </g>
-          <!-- Feedback arrow: more ants → stronger trail → more ants -->
-          <path d="M76,38 C84,30 84,52 76,58" fill="none" stroke="#c85018" stroke-width="1.5" stroke-linecap="round"/>
-          <polygon points="76,58 72,51 79,52" fill="#c85018"/>
-          <text x="83" y="48" font-family="IBM Plex Mono,monospace" font-size="6.5" fill="#c85018" text-anchor="middle">+</text>
+          <!-- Positive feedback loop: ~270° circular arc, center (68,50), r=9 -->
+          <!-- Arc from top (68,41) clockwise to left (59,50); CW tangent at end = downward -->
+          <path d="M 68,41 A 9,9 0 1,1 59,50" fill="none" stroke="#c85018" stroke-width="1.8" stroke-linecap="round"/>
+          <!-- Arrowhead at (59,50) pointing upward (clockwise tangent direction at left of arc) -->
+          <polygon points="59,45 55.5,50 62.5,50" fill="#c85018"/>
+          <!-- + inside the loop at arc center -->
+          <text x="68" y="50" font-family="IBM Plex Mono,monospace" font-size="10" fill="#c85018" text-anchor="middle" dominant-baseline="middle" font-weight="700">+</text>
         </svg>
       </div>
       <div class="exp-step" style="margin-top:2px">Trail Laying</div>
@@ -1849,17 +1865,17 @@ let t2K     = 1.0;
 let t2Ants  = [];    // {fi, t} objects
 
 // Canvas logical dimensions
-const T2_MW = 620, T2_MH = 330;
-const T2_BW = 620, T2_BH = 155;
+const T2_MW = 680, T2_MH = 330;
+const T2_BW = 680, T2_BH = 155;
 
-// Geometry
-const T2_NEST = {x:310, y:295};
+// Geometry — feeder x positions scaled for 680px width (centre = 340)
+const T2_NEST = {x:340, y:295};
 const T2_FPT  = [
-  {x:72,  y:92},
-  {x:195, y:59},
-  {x:310, y:51},
-  {x:425, y:59},
-  {x:548, y:92}
+  {x:80,  y:92},
+  {x:215, y:59},
+  {x:340, y:51},
+  {x:465, y:59},
+  {x:600, y:92}
 ];
 
 function t2Alloc(alpha, k) {
@@ -2038,12 +2054,12 @@ function t2UpdatePhase() {
     desc  = 'Quality differences are underweighted — allocation is more even than quality alone would predict.';
   } else if (a < 1.25) {
     chip = 'proportional (α≈1)'; chipBg = '#2d7a50';
-    label = 'Proportional allocation — linear recruitment';
+    label = 'Proportional alloc. — linear recruitment';
     desc  = 'Ants are distributed in proportion to feeder quality. Allocation exactly tracks the quality vector.';
   } else if (a < 3.2) {
     chip = 'super-proportional'; chipBg = '#9a6010';
     label = 'Super-proportional allocation';
-    desc  = 'Quality differences are amplified — better feeders attract disproportionately more ants than their quality alone warrants.';
+    desc  = 'Amplified quality differences — better feeders attract disproportionately more ants than quality implies.';
   } else {
     chip = 'winner-take-all'; chipBg = '#c85018';
     label = 'Near winner-take-all';
@@ -2053,7 +2069,123 @@ function t2UpdatePhase() {
   chipEl.textContent = chip; chipEl.style.background = chipBg;
   el('phase2-label').textContent = label;
   el('phase2-sb').textContent    = desc;
-  el('phase2-desc').textContent  = desc;
+}
+
+// ── RECRUITMENT CURVE (P_A vs q_A) ───────────────────────────────────
+const T2_RC_W  = 250, T2_RC_H = 182;
+const T2_RC_QB = 2.5;  // fixed reference quality for the "other" option
+const T2_RC_FAMILY = [-2, 0, 1, 2, 5, 10]; // dashed reference α values
+
+function t2DrawRecruitCurve() {
+  const cv = el('rc2'); if (!cv) return;
+  const ctx = cv.getContext('2d');
+  const DPR2 = window.devicePixelRatio || 1;
+  ctx.setTransform(DPR2, 0, 0, DPR2, 0, 0);
+  ctx.clearRect(0, 0, T2_RC_W, T2_RC_H);
+  ctx.fillStyle = '#faf8f3'; ctx.fillRect(0, 0, T2_RC_W, T2_RC_H);
+
+  const PL = 42, PR = 30, PT = 10, PB = 34;
+  const pw = T2_RC_W - PL - PR, ph = T2_RC_H - PT - PB;
+  const xMax = 5.0;
+  const toX = q => PL + (q / xMax) * pw;
+  const toY = p => PT + ph * (1 - p);
+
+  // P_i for a given α and q_i
+  const pA = (alpha, qa) => {
+    const wa = Math.pow(Math.max(1e-9, t2K + qa), alpha);
+    const wb = Math.pow(Math.max(1e-9, t2K + T2_RC_QB), alpha);
+    return wa / (wa + wb + 1e-15);
+  };
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(0,0,0,0.07)'; ctx.lineWidth = 1;
+  [0.25, 0.5, 0.75].forEach(p => {
+    const y = toY(p);
+    ctx.beginPath(); ctx.moveTo(PL, y); ctx.lineTo(PL+pw, y); ctx.stroke();
+  });
+
+  // Reference line at q_i = q_B (all curves cross P=0.5 here)
+  const xRef = toX(T2_RC_QB);
+  ctx.strokeStyle = 'rgba(0,0,0,0.15)'; ctx.lineWidth = 1; ctx.setLineDash([3,3]);
+  ctx.beginPath(); ctx.moveTo(xRef, PT); ctx.lineTo(xRef, PT+ph); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Draw a curve given alpha, solid or dashed, color, linewidth
+  const drawCurve = (alpha, solid, color, lw) => {
+    ctx.beginPath();
+    for (let i = 0; i <= 300; i++) {
+      const qa = (i / 300) * xMax;
+      const x = toX(qa), y = toY(pA(alpha, qa));
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = color; ctx.lineWidth = lw;
+    ctx.setLineDash(solid ? [] : [3, 2.5]);
+    ctx.stroke(); ctx.setLineDash([]);
+  };
+
+  // Dashed family (skip if close to current α)
+  T2_RC_FAMILY.forEach(a => {
+    if (Math.abs(a - t2Alpha) < 0.15) return;
+    drawCurve(a, false, 'rgba(29,60,40,0.22)', 1.2);
+    // α label at right edge
+    const yEnd = toY(pA(a, xMax));
+    if (yEnd > PT + 4 && yEnd < PT + ph - 4) {
+      ctx.fillStyle = 'rgba(29,60,40,0.38)';
+      ctx.font = `9px 'IBM Plex Mono',monospace`;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText(a, PL + pw + 3, yEnd);
+    }
+  });
+
+  // Solid current α
+  drawCurve(t2Alpha, true, '#1d3c28', 2.2);
+  // Label solid curve
+  const yEnd = toY(pA(t2Alpha, xMax));
+  const clamp = v => Math.max(PT + 6, Math.min(PT + ph - 6, v));
+  ctx.fillStyle = '#1d3c28';
+  ctx.font = `bold 9px 'IBM Plex Mono',monospace`;
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.fillText(t2Alpha.toFixed(1), PL + pw + 3, clamp(yEnd));
+
+  // Axes
+  ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(PL, PT); ctx.lineTo(PL, PT+ph); ctx.lineTo(PL+pw, PT+ph); ctx.stroke();
+
+  // Y-axis tick labels
+  ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.font = `8.5px 'IBM Plex Mono',monospace`;
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  [0, 0.25, 0.5, 0.75, 1].forEach(p => {
+    ctx.fillText(p === 0 ? '0' : p === 1 ? '1' : p.toFixed(2), PL - 3, toY(p));
+  });
+
+  // X-axis tick labels
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  [0, 1, 2, 3, 4, 5].forEach(q => {
+    ctx.fillText(q, toX(q), PT + ph + 3);
+  });
+
+  // Axis titles — manual subscript: draw main char then smaller 'i' offset down
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  const subScript = (mainTxt, sub, x, y, align) => {
+    ctx.font = `8.5px 'IBM Plex Mono',monospace`;
+    ctx.textAlign = align; ctx.textBaseline = 'middle';
+    ctx.fillText(mainTxt, x, y);
+    const mainW = ctx.measureText(mainTxt).width;
+    const offX = align === 'center' ? mainW / 2 : align === 'right' ? 0 : mainW;
+    ctx.font = `6.5px 'IBM Plex Mono',monospace`;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(sub, x + offX, y + 3);
+  };
+
+  // x-axis title: q_i centred below axis
+  subScript('q', 'i', PL + pw/2 - 3, PT + ph + 18, 'center');
+
+  // y-axis title: p_i rotated
+  ctx.save();
+  ctx.translate(8, PT + ph/2);
+  ctx.rotate(-Math.PI/2);
+  subScript('p', 'i', -3, 0, 'center');
+  ctx.restore();
 }
 
 function t2SetupCanvases() {
@@ -2062,6 +2194,12 @@ function t2SetupCanvases() {
   mc2.width  = T2_MW * DPR2; mc2.height = T2_MH * DPR2;
   const bc2 = el('bc2');
   bc2.width  = T2_BW * DPR2; bc2.height = T2_BH * DPR2;
+  // Recruitment curve canvas — sized to sidebar width
+  const rc2 = el('rc2');
+  if (rc2) {
+    rc2.width  = T2_RC_W * DPR2; rc2.height = T2_RC_H * DPR2;
+    rc2.style.width  = T2_RC_W + 'px'; rc2.style.height = T2_RC_H + 'px';
+  }
 }
 
 function t2SetupQSliders() {
@@ -2133,6 +2271,7 @@ function t2RenderFrame() {
   t2SyncAnts();
   t2DrawNetwork();
   t2DrawBars();
+  t2DrawRecruitCurve();
 }
 
 let t2Ready = false;
