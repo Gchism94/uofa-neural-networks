@@ -1,0 +1,2273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ant Foraging Dynamics Explorer</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:          #f0ede5;
+  --surface:     #faf8f3;
+  --surface-alt: #f4f1e8;
+  --border:      #d4cfc4;
+  --green-dark:  #1d3c28;
+  --green-mid:   #2d6a4f;
+  --green-light: #52b788;
+  --green-pale:  #d8edde;
+  --orange:      #c85018;
+  --orange-pale: #fce8d8;
+  --text:        #1a1a1a;
+  --muted:       #5a5750;
+  --tiny:        #8a8680;
+  --font:        'Outfit', sans-serif;
+  --mono:        'IBM Plex Mono', monospace;
+  --r:           8px;
+  --pill:        999px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+sub, sup { font-size: 0.75em; }
+sup { vertical-align: super; }
+html, body {
+  background: var(--bg); color: var(--text);
+  font-family: var(--font); font-size: 15px; line-height: 1.5;
+}
+.page { max-width: 960px; margin: 0 auto; box-shadow: 0 0 0 1px var(--border); }
+
+/* ── HEADER ── */
+.hdr {
+  background: var(--green-dark); color: #fff;
+  padding: 11px 20px; display: flex;
+  align-items: flex-start; justify-content: space-between;
+  flex-wrap: wrap; gap: 6px 16px;
+}
+.hdr-left { flex: 1; min-width: 0; }
+.hdr-title { font-size: 1.05rem; font-weight: 700; letter-spacing: -0.02em; }
+.hdr-sub   { font-size: 0.76rem; opacity: 0.65; margin-top: 2px; }
+.hdr-copy  { font-size: 0.7rem; opacity: 0.55; white-space: nowrap; padding-top: 3px; }
+.hdr-copy a { color: inherit; }
+
+/* ── TABS ── */
+.tabbar {
+  background: var(--green-dark); display: flex;
+  padding: 0 16px; border-bottom: 2px solid var(--border);
+  overflow-x: auto; scrollbar-width: none;
+}
+.tabbar::-webkit-scrollbar { display: none; }
+.tab-btn {
+  font-family: var(--font); font-size: 0.79rem; font-weight: 500;
+  padding: 8px 14px; border: none; background: transparent;
+  color: rgba(255,255,255,0.50); cursor: pointer;
+  border-bottom: 3px solid transparent; margin-bottom: -2px;
+  white-space: nowrap; transition: color 0.15s;
+}
+.tab-btn:hover:not(.active) { color: rgba(255,255,255,0.85); }
+.tab-btn.active {
+  color: var(--green-dark); background: var(--bg);
+  border-bottom-color: var(--orange);
+  border-radius: var(--r) var(--r) 0 0;
+}
+
+/* Collapsed tab dropdown — shown on narrow screens instead of tabbar */
+.tab-select-wrap {
+  display: none;
+  background: var(--green-dark);
+  padding: 7px 16px 9px;
+  border-bottom: 2px solid var(--border);
+}
+.tab-select {
+  width: 100%; font-family: var(--font); font-size: 0.83rem; font-weight: 500;
+  padding: 6px 10px; cursor: pointer;
+  border: 1.5px solid rgba(255,255,255,0.28); border-radius: var(--r);
+  background: var(--green-dark); color: #fff; appearance: auto;
+}
+/* Swap at the width where the two tab buttons start to feel cramped */
+@media (max-width: 520px) {
+  .tabbar           { display: none; }
+  .tab-select-wrap  { display: block; }
+}
+
+/* ── NARRATIVE ── */
+.narrative {
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 11px 20px; font-size: 0.855rem;
+  color: var(--muted); line-height: 1.68;
+}
+.narrative strong { color: var(--text); }
+.narrative .lede { color: var(--orange); font-weight: 600; }
+
+/* ── MAIN GRID ── */
+.ymaze-grid {
+  display: grid;
+  grid-template-columns: 1fr 294px;
+  grid-template-rows: auto auto;
+  grid-template-areas: "top side" "bot side";
+  border-bottom: 1px solid var(--border);
+}
+.cv-top {
+  grid-area: top;
+  padding: 13px 15px 6px; border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.cv-bot {
+  grid-area: bot;
+  padding: 10px 15px 14px; border-right: 1px solid var(--border);
+  border-top: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.ymaze-grid > .sidebar { grid-area: side; }
+
+/* ── CANVAS PANEL (shared, used by tab2) ── */
+.cv-panel {
+  padding: 13px 15px; border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.row-hd {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.sec-lbl {
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.11em;
+  text-transform: uppercase; color: var(--tiny);
+}
+.badge {
+  font-family: var(--mono); font-size: 0.68rem; font-weight: 500;
+  padding: 2px 10px; border-radius: var(--pill);
+  border: 1.5px solid var(--border); background: var(--surface-alt);
+  color: var(--tiny); transition: all 0.2s;
+}
+.badge.running { background: var(--green-pale); color: var(--green-dark); border-color: var(--green-light); }
+.badge.paused  { background: var(--orange-pale); color: var(--orange); border-color: #e8a880; }
+.cv-wrap {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r); overflow: hidden; width: 100%;
+}
+canvas { display: block; width: 100%; }
+.legend {
+  display: flex; gap: 14px; flex-wrap: wrap;
+  font-size: 0.70rem; color: var(--muted);
+}
+.leg { display: flex; align-items: center; gap: 5px; }
+.leg-sw  { width: 18px; height: 3px; border-radius: 2px; flex-shrink: 0; }
+.leg-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; border: 2.5px solid; background: transparent !important; transition: border-color 0.3s; }
+
+/* ── SIDEBAR ── */
+.sidebar {
+  background: var(--surface-alt); padding: 13px 14px;
+  display: flex; flex-direction: column; gap: 13px; overflow-y: auto;
+}
+.section { }
+.sdesc {
+  font-size: 0.70rem; color: var(--tiny); line-height: 1.5;
+  margin-top: 5px;
+}
+
+/* PILLS */
+.pills { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 1px; }
+.pill {
+  padding: 3px 11px; border-radius: var(--pill);
+  border: 1.5px solid var(--border); background: transparent;
+  font-family: var(--font); font-size: 0.73rem; font-weight: 500;
+  color: var(--muted); cursor: pointer; transition: all 0.13s;
+}
+.pill:hover { border-color: var(--green-mid); color: var(--green-dark); }
+.pill.on { background: var(--green-dark); border-color: var(--green-dark); color: #fff; }
+
+/* SLIDERS */
+.srow {
+  display: grid; grid-template-columns: 20px 1fr 50px;
+  align-items: center; gap: 5px; margin-bottom: 5px;
+}
+.srow:last-of-type { margin-bottom: 0; }
+.slbl { font-size: 0.73rem; font-family: var(--mono); color: var(--muted); }
+.sval { font-size: 0.73rem; font-family: var(--mono); color: var(--orange); font-weight: 500; text-align: right; }
+input[type=range] {
+  -webkit-appearance: none; width: 100%; height: 4px;
+  background: linear-gradient(to right,
+    var(--green-dark) 0%, var(--green-dark) var(--pct,40%),
+    var(--border) var(--pct,40%));
+  border-radius: 2px; outline: none;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 13px; height: 13px;
+  border-radius: 50%; background: var(--green-dark); cursor: pointer;
+  border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.22);
+}
+
+/* BUTTONS */
+.btn-row { display: flex; gap: 5px; flex-wrap: wrap; }
+.btn {
+  padding: 5px 11px; border-radius: var(--pill);
+  border: 1.5px solid var(--green-dark); background: var(--green-dark);
+  font-family: var(--font); font-size: 0.74rem; font-weight: 600;
+  color: #fff; cursor: pointer; transition: all 0.13s; white-space: nowrap;
+}
+.btn:hover { background: var(--green-mid); border-color: var(--green-mid); }
+.btn.sec  { background: transparent; color: var(--green-dark); }
+.btn.sec:hover { background: var(--green-pale); }
+.btn.dng  { background: transparent; color: var(--orange); border-color: var(--orange); }
+.btn.dng:hover { background: var(--orange-pale); }
+.btn.full { width: 100%; text-align: center; margin-top: 5px; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* STATS */
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.stat-box {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 5px 8px;
+}
+.stat-name { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--tiny); }
+.stat-val  { font-size: 1.0rem; font-family: var(--mono); color: var(--green-dark); font-weight: 500; margin-top: 1px; }
+.stat-val.og { color: var(--orange); }
+
+/* CONSENSUS BAR */
+.cbar-wrap { margin-top: 3px; }
+.cbar-track { height: 7px; border-radius: 4px; background: var(--border); overflow: hidden; margin-top: 4px; }
+.cbar-fill  { height: 100%; border-radius: 4px; background: var(--green-dark); transition: width 0.4s; }
+.cbar-labels {
+  display: flex; justify-content: space-between;
+  font-size: 0.60rem; color: var(--tiny); margin-top: 3px; font-family: var(--mono);
+}
+
+/* DIVIDER */
+.sdiv { border-top: 1px solid var(--border); }
+
+/* PHASE TAG */
+.phase-tag {
+  font-size: 0.68rem; color: var(--muted); line-height: 1.5;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 5px 8px; margin-top: 4px;
+}
+.phase-tag em { color: var(--orange); font-style: normal; font-weight: 600; }
+
+/* ── TAB 2 STUB ── */
+.stub {
+  padding: 44px 32px; text-align: center;
+  color: var(--muted); font-size: 0.88rem; line-height: 1.72;
+}
+.stub h3 { font-size: 1.1rem; color: var(--text); margin-bottom: 10px; }
+.stub p { max-width: 500px; margin: 0 auto 14px; }
+.stub .preview-grid {
+  display: flex; gap: 14px; justify-content: center;
+  flex-wrap: wrap; margin-top: 18px;
+}
+.stub .pcard {
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: var(--r); padding: 14px 16px; width: 200px;
+  text-align: left; font-size: 0.78rem;
+}
+.stub .pcard strong { color: var(--green-dark); font-size: 0.82rem; display: block; margin-bottom: 4px; }
+.stub .pcard .tag {
+  display: inline-block; font-size: 0.62rem; padding: 2px 7px;
+  background: var(--green-pale); color: var(--green-dark);
+  border-radius: var(--pill); margin-bottom: 6px; font-weight: 600;
+}
+
+/* ── SPEC-NARROW (species preset clone for single-column layout) ── */
+.spec-narrow {
+  display: none; /* hidden in wide; media query below re-enables it */
+  padding: 10px 14px 12px; background: var(--surface-alt);
+  border-bottom: 1px solid var(--border);
+}
+
+/* RESPONSIVE — single-column layout */
+@media (max-width: 720px) {
+  /* Switch to flex column so DOM order drives the stack */
+  .ymaze-grid  { display: flex; flex-direction: column; }
+  .cv-top      { border-right: none; }
+  .cv-bot      { border-right: none; border-top: 1px solid var(--border); order: 999; }
+  .cv-panel    { border-right: none; border-bottom: 1px solid var(--border); }
+  .sidebar     { max-height: none; }
+
+  /* Species preset: show narrow clone, hide sidebar copy + its divider */
+  .spec-narrow { display: block; }
+  .spec-wide   { display: none; }
+  .spec-sdiv   { display: none; }
+
+  /* Sidebar ordering: Simulation → Feeder Quality → Parameters → Statistics
+     Children (spec-wide/spec-sdiv hidden, still counted by nth-child):
+       1 = spec-wide  (hidden)    5 = Feeder Quality
+       2 = spec-sdiv  (hidden)    6 = sdiv (feeder↔sim)
+       3 = Parameters             7 = Simulation
+       4 = sdiv (params↔feeder)   8 = sdiv (sim↔stats)
+                                  9 = Statistics               */
+  #tab1 .sidebar > :nth-child(3) { order: 30; }
+  #tab1 .sidebar > :nth-child(4) { order: 21; }
+  #tab1 .sidebar > :nth-child(5) { order: 20; }
+  #tab1 .sidebar > :nth-child(6) { order: 11; }
+  #tab1 .sidebar > :nth-child(7) { order: 10; }
+  #tab1 .sidebar > :nth-child(8) { order: 35; }
+  #tab1 .sidebar > :nth-child(9) { order: 40; }
+}
+.explainer {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 10px 13px;
+}
+.exp-panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: 8px; margin-top: 8px;
+}
+.exp-panel {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  border: 1px solid var(--border); border-radius: var(--r);
+  padding: 8px 6px; background: var(--surface-alt);
+}
+.exp-icon { width: 80px; height: 68px; flex-shrink: 0; }
+.exp-icon svg { width: 100%; height: 100%; }
+.exp-formula-box {
+  height: 68px; display: flex; align-items: center;
+  justify-content: center; background: var(--surface-alt);
+  border-radius: calc(var(--r) - 2px);
+}
+.exp-step {
+  font-size: 0.70rem; font-weight: 700; color: var(--green-dark);
+  letter-spacing: 0.04em; text-align: center;
+}
+.exp-desc {
+  font-size: 0.67rem; color: var(--muted); text-align: center; line-height: 1.45;
+}
+.exp-formula {
+  font-family: var(--mono); font-size: 12px; line-height: 1.9;
+  text-align: center; color: var(--text); white-space: nowrap;
+}
+.exp-frac {
+  display: inline-flex; flex-direction: column; align-items: center;
+  vertical-align: middle; line-height: 1.3;
+}
+.exp-frac .en { border-bottom: 1px solid var(--text); padding-bottom: 1px; font-size: 11px; }
+.exp-frac .ed { padding-top: 1px; font-size: 10.5px; }
+
+/* ── SDE MODEL CARD ── */
+.sde-card {
+  background: var(--green-dark); border-radius: var(--r);
+  padding: 12px 15px; color: #e0ece2;
+}
+.sde-card .sec-lbl {
+  color: #6aaa7a; margin-bottom: 8px; padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255,255,255,0.10);
+}
+.sde-eq {
+  font-family: var(--mono); font-size: 11.5px; line-height: 1.8;
+  color: #e8f2ea; margin-bottom: 3px;
+}
+.sde-pi {
+  font-family: var(--mono); font-size: 1em; line-height: 1.8;
+  color: #d0e8d4; margin-top: 4px; margin-bottom: 3px;
+}
+.sde-eq .kw { color: #f0a060; font-weight: 600; }
+.sde-pi .kw  { color: #f0a060; font-weight: 600; }
+.sde-eq .dim { color: #80c8a0; }
+.sde-eq .note { font-family: var(--font); font-size: 10px; color: #8abf9a; margin-left: 4px; }
+.sde-div { border-top: 1px solid rgba(255,255,255,0.10); margin: 7px 0; }
+.sde-glos { display: flex; flex-direction: column; gap: 2px; }
+.sde-row { display: grid; grid-template-columns: 50px 1fr; gap: 4px; align-items: baseline; }
+.sde-sym { font-family: var(--mono); font-size: 11px; color: #f0a060; font-weight: 500; }
+.sde-def { font-family: var(--font); font-size: 10.5px; color: #8abf9a; line-height: 1.4; }
+
+/* Chart legends — HTML so subscripts just work */
+.cleg-row {
+  display: flex; gap: 18px; flex-wrap: wrap; align-items: center;
+  padding: 3px 1px 5px; font-size: 0.70rem; color: var(--muted);
+}
+.cleg { display: flex; align-items: center; gap: 6px; }
+.cleg-line { width: 20px; height: 2.5px; flex-shrink: 0; border-radius: 2px; }
+.cleg-line.dashed { height: 0; background: none !important;
+  border-top: 2px dashed currentColor; }
+
+/* SDE card full-width below grid */
+.sde-card-wrap {
+  background: var(--green-dark); padding: 14px 20px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+.sde-eqs { display: flex; flex-wrap: wrap; gap: 6px 28px; align-items: baseline; margin-bottom: 2px; }
+.sde-glos {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 2px 28px; margin-top: 4px;
+}
+@media (max-width: 600px) { .sde-glos { grid-template-columns: 1fr; } }
+
+footer {
+  padding: 10px 20px; border-top: 1px solid var(--border);
+  font-size: 0.78rem; color: var(--tiny);
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+}
+footer a { color: var(--green-mid); text-decoration: none; }
+
+/* Header copyright: float on wide, inline below subtitle on narrow */
+.hdr-copy-float  { font-size: 0.7rem; opacity: 0.55; white-space: nowrap; padding-top: 3px; }
+.hdr-copy-float a { color: inherit; }
+.hdr-copy-inline { display: none; font-size: 0.68rem; opacity: 0.55; margin-top: 3px; }
+.hdr-copy-inline a { color: inherit; }
+@media (max-width: 560px) {
+  .hdr-copy-float  { display: none; }
+  .hdr-copy-inline { display: block; }
+}
+
+/* Per-slider description */
+.sdesc-sl {
+  font-size: 0.66rem; color: var(--tiny); line-height: 1.4;
+  margin: -2px 0 7px 0; padding-left: 1px;
+}
+.sdesc-sl:last-child { margin-bottom: 0; }
+
+/* Toggle (for continuous cycling) */
+.tog-row { display: flex; align-items: center; justify-content: space-between; margin-top: 7px; }
+.tog-lbl { font-size: 0.72rem; color: var(--muted); }
+.tog { position: relative; width: 34px; height: 19px; cursor: pointer; flex-shrink: 0; }
+.tog input { display: none; }
+.tog-track { position: absolute; inset: 0; background: var(--border); border-radius: 999px; transition: background .2s; }
+.tog input:checked + .tog-track { background: var(--green-dark); }
+.tog-thumb { position: absolute; top: 2.5px; left: 2.5px; width: 14px; height: 14px;
+  background: #fff; border-radius: 50%; transition: left .2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,.22); pointer-events: none; }
+.tog input:checked ~ .tog-thumb { left: 17.5px; }
+
+/* ── TAB 2: RECRUITMENT LINEARITY ── */
+.tab2-grid {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  grid-template-areas: "top side" "mid side" "fml side";
+}
+.t2-top     { grid-area: top; border-right: 1px solid var(--border); min-width: 0; }
+.t2-mid     { grid-area: mid; border-right: 1px solid var(--border); border-top: 1px solid var(--border); min-width: 0; }
+.t2-formula { grid-area: fml; border-right: 1px solid var(--border); border-top: 1px solid var(--border); padding: 0 14px 14px; min-width: 0; }
+.tab2-grid > .t2-sidebar { grid-area: side; }
+
+@media (max-width: 720px) {
+  .tab2-grid { display: flex; flex-direction: column; }
+  .t2-top     { order: 1; border-right: none; }
+  .t2-mid     { order: 4; border-right: none; }
+  .t2-formula { order: 7; border-right: none; padding: 12px 14px; }
+  /* Sidebar: display:contents makes its children direct flex children of tab2-grid */
+  .t2-sidebar { display: contents; }
+  .t2-sidebar > .section {
+    background: var(--surface-alt); padding: 13px 14px;
+    border-top: 1px solid var(--border);
+  }
+  .t2-sidebar > .sdiv { display: none; }
+  .t2-s-alpha  { order: 2; }
+  .t2-s-regime { order: 3; }
+  .t2-s-feeder { order: 5; }
+  .t2-s-k      { order: 6; }
+}
+#mc2, #bc2 { display: block; width: 100%; max-width: 620px; height: auto; }
+.phase-chip {
+  display: inline-block; padding: 2px 10px; border-radius: 999px;
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em;
+  color: #fff; background: var(--green-dark); transition: background 0.4s;
+}
+.q-srows { display: flex; flex-direction: column; gap: 3px; }
+.q-srow  { display: grid; grid-template-columns: 28px 1fr 36px; align-items: center; gap: 4px; }
+.q-lbl   { font-family: var(--mono); font-size: 0.70rem; font-weight: 600; text-align: right; }
+.q-val   { font-family: var(--mono); font-size: 0.68rem; color: var(--muted); text-align: right; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- HEADER -->
+<header class="hdr">
+  <div class="hdr-left">
+    <div class="hdr-title">Ant Foraging Dynamics Explorer</div>
+    <div class="hdr-sub">Trail noise &amp; recruitment linearity — two mechanisms for collective decision-making flexibility</div>
+    <div class="hdr-copy-inline">© 2026 Theodore P. Pavlic &nbsp;·&nbsp; <a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a></div>
+  </div>
+  <div class="hdr-copy-float">© 2026 Theodore P. Pavlic &nbsp;·&nbsp; <a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a></div>
+</header>
+
+<!-- TABBAR -->
+<nav class="tabbar">
+  <button class="tab-btn active" id="btn-t1">① Trail Noise &amp; Y-Maze</button>
+  <button class="tab-btn"        id="btn-t2">② Recruitment Linearity</button>
+</nav>
+<div class="tab-select-wrap">
+  <select class="tab-select" id="tab-select">
+    <option value="t1">① Trail Noise &amp; Y-Maze</option>
+    <option value="t2">② Recruitment Linearity</option>
+  </select>
+</div>
+
+<!-- SHARED NARRATIVE -->
+<div class="narrative">
+  <span class="lede">Real ant colonies must balance commitment with adaptability.</span>
+  Both tabs explore the same question from different angles: how do colonies tune between <strong>decisive winner-take-all allocation</strong>
+  and <strong>flexible proportional tracking</strong> of a changing environment?
+  In <strong>Tab ①</strong>, individual noise in trail-following acts like a stochastic temperature — too little and the colony locks in;
+  just right and it can escape a bad attractor; too much and it wanders randomly.
+  In <strong>Tab ②</strong>, the <em>shape</em> of the recruitment function (linear vs. nonlinear) determines
+  whether strong attractors exist at all — analogous to adjusting the softmax inverse-temperature β.
+  Both mechanisms can be understood as collective Boltzmann thermostats.
+</div>
+
+<!-- ═══════════════════════════════ TAB 1 ═══════════════════════════════ -->
+<div id="tab1">
+<div class="ymaze-grid">
+
+  <!-- LEFT: canvases -->
+  <!-- Species preset — narrow-only clone, sits above canvas in single-column layout -->
+  <div class="spec-narrow">
+    <div class="sec-lbl" style="margin-bottom:6px">Species Preset</div>
+    <div class="pills">
+      <button class="pill" id="pr-ph-n"><em>Pheidole</em> (noisy)</button>
+      <button class="pill" id="pr-ln-n"><em>Lasius</em> (deterministic)</button>
+    </div>
+    <div class="sdesc" style="margin-top:5px">Both <em>Pheidole megacephala</em> and <em>Lasius niger</em> establish coherent trails to food sources, but they differ in persistence and the ability to track changes in food availability. Use these presets to explore differences in trailing mechanisms and performance.</div>
+  </div>
+
+  <div class="cv-top">
+    <div class="row-hd">
+      <span class="sec-lbl">Y-Maze — ant colony</span>
+      <span class="badge paused" id="sim-badge">PAUSED</span>
+    </div>
+    <div class="cv-wrap">
+      <canvas id="mc" width="620" height="380"></canvas>
+    </div>
+    <div class="legend">
+      <div class="leg"><div class="leg-sw" style="background:var(--green-dark)"></div>Branch B — short (superior)</div>
+      <div class="leg"><div class="leg-sw" style="background:var(--orange)"></div>Branch A — long (inferior)</div>
+      <div class="leg"><div class="leg-sw" style="background:#b0a898;border:1px dashed #c82828"></div>Blocked</div>
+      <div class="leg"><div class="leg-dot" id="leg-maj-dot"></div><span id="leg-maj-txt">…</span></div>
+    </div>
+    <div class="row-hd" style="margin-top:3px">
+      <span class="sec-lbl">Allocation history</span>
+      <span style="font-size:0.67rem;color:var(--tiny);font-family:var(--mono)" id="time-lbl">t = 0 min</span>
+    </div>
+    <div class="cv-wrap">
+      <canvas id="tc" width="620" height="170"></canvas>
+    </div>
+    <div class="cleg-row">
+      <div class="cleg"><div class="cleg-line" style="background:#1d3c28"></div>B (short) — actual</div>
+      <div class="cleg"><div class="cleg-line dashed" style="color:rgba(29,60,40,0.5)"></div>target (ideal)</div>
+    </div>
+    <div class="row-hd" style="margin-top:3px">
+      <span class="sec-lbl">Pheromone concentrations (τ)</span>
+      <span style="font-size:0.67rem;color:var(--tiny);font-family:var(--mono)">τ<sub>A</sub> &amp; τ<sub>B</sub> — raw SDE state</span>
+    </div>
+    <div class="cv-wrap">
+      <canvas id="cc" width="620" height="130"></canvas>
+    </div>
+    <div class="cleg-row">
+      <div class="cleg"><div class="cleg-line" style="background:#c85018"></div><span>&tau;<sub>A</sub> (long)</span></div>
+      <div class="cleg"><div class="cleg-line" style="background:#1d3c28"></div><span>&tau;<sub>B</sub> (short)</span></div>
+    </div>
+  </div><!-- cv-top -->
+
+  <!-- cv-bot: explainer + SDE card — floated to bottom in narrow layout -->
+  <div class="cv-bot">
+    <div class="explainer">
+      <div class="sec-lbl">Individual Ant Decision Rule</div>
+      <div class="exp-panels">
+
+        <!-- Panel 1: Sense -->
+        <div class="exp-panel">
+          <div class="exp-icon">
+            <svg viewBox="0 0 80 68" xmlns="http://www.w3.org/2000/svg">
+              <!-- stem -->
+              <line x1="40" y1="66" x2="40" y2="39" stroke="#8a8680" stroke-width="3.5" stroke-linecap="round"/>
+              <!-- branch A (left) -->
+              <line x1="40" y1="39" x2="12" y2="10" stroke="#c85018" stroke-width="3" stroke-linecap="round" opacity="0.55"/>
+              <!-- branch B (right) -->
+              <line x1="40" y1="39" x2="68" y2="10" stroke="#1d3c28" stroke-width="3" stroke-linecap="round" opacity="0.55"/>
+              <!-- junction dot -->
+              <circle cx="40" cy="39" r="4" fill="#6a6460" stroke="#faf8f3" stroke-width="1.5"/>
+              <!-- ant on stem approaching junction, heading upward — rotate(-90) so head points up -->
+              <g transform="translate(40,55) rotate(-90)">
+                <!-- abdomen (trailing, toward nest below) -->
+                <ellipse cx="-6.5" cy="0" rx="5.5" ry="3.8" fill="#3a3028"/>
+                <!-- petiole -->
+                <ellipse cx="-0.5" cy="0" rx="1.5" ry="1.5" fill="#3a3028"/>
+                <!-- thorax -->
+                <ellipse cx="2.5" cy="0" rx="3.5" ry="2.8" fill="#3a3028"/>
+                <!-- head (pointing up toward junction) -->
+                <circle cx="7.5" cy="0" r="2.8" fill="#3a3028"/>
+                <!-- antennae reaching toward the junction to sense pheromone -->
+                <line x1="8.5" y1="-1.5" x2="13" y2="-5" stroke="#3a3028" stroke-width="1" stroke-linecap="round"/>
+                <line x1="8.5" y1="1.5"  x2="13" y2="5"  stroke="#3a3028" stroke-width="1" stroke-linecap="round"/>
+                <!-- legs (3 pairs) -->
+                <line x1="1"   y1="3"   x2="-1" y2="8"  stroke="#3a3028" stroke-width="0.9" stroke-linecap="round"/>
+                <line x1="3.5" y1="3"   x2="5"  y2="8"  stroke="#3a3028" stroke-width="0.9" stroke-linecap="round"/>
+                <line x1="1"   y1="-3"  x2="-1" y2="-8" stroke="#3a3028" stroke-width="0.9" stroke-linecap="round"/>
+                <line x1="3.5" y1="-3"  x2="5"  y2="-8" stroke="#3a3028" stroke-width="0.9" stroke-linecap="round"/>
+                <line x1="-3"  y1="2.5" x2="-5" y2="7"  stroke="#3a3028" stroke-width="0.9" stroke-linecap="round"/>
+                <line x1="-3"  y1="-2.5" x2="-5" y2="-7" stroke="#3a3028" stroke-width="0.9" stroke-linecap="round"/>
+              </g>
+              <!-- pheromone shimmer lines on branches -->
+              <text x="6"  y="10" font-family="IBM Plex Mono,monospace" font-size="9" fill="#c85018">τ<tspan baseline-shift="sub" font-size="6.5">A</tspan></text>
+              <text x="60" y="10" font-family="IBM Plex Mono,monospace" font-size="9" fill="#1d3c28">τ<tspan baseline-shift="sub" font-size="6.5">B</tspan></text>
+              <!-- question mark at junction -->
+              <text x="43" y="36" font-family="Outfit,sans-serif" font-size="11" fill="#5a5750" font-weight="700">?</text>
+            </svg>
+          </div>
+          <div class="exp-step">① Sense</div>
+          <div class="exp-desc">At the fork, the ant contacts pheromone on each branch via chemoreception.</div>
+        </div>
+
+        <!-- Panel 2: Choose -->
+        <div class="exp-panel">
+          <div class="exp-icon">
+            <div class="exp-formula-box">
+              <div class="exp-formula">
+                <span style="color:var(--green-dark)">P<sub>B</sub></span> =
+                <span class="exp-frac">
+                  <span class="en">(k+τ<sub>B</sub>)<sup>α</sup></span>
+                  <span class="ed">&Sigma;<sub>i</sub>(k+τ<sub>i</sub>)<sup>α</sup></span>
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="exp-step">② Choose</div>
+          <div class="exp-desc">She samples stochastically: stronger trails are more attractive, amplified nonlinearly by α.</div>
+        </div>
+
+        <!-- Panel 3: Deposit -->
+        <div class="exp-panel">
+          <div class="exp-icon">
+            <svg viewBox="0 0 80 68" xmlns="http://www.w3.org/2000/svg">
+              <!-- branch B: lighter so ant is visible against it -->
+              <line x1="12" y1="62" x2="68" y2="10" stroke="#4a7c5e" stroke-width="5" stroke-linecap="round"/>
+              <!-- pheromone dots laid as a trail along the branch behind the ant -->
+              <!-- branch direction unit vector: (56,-52)/|..| ≈ (0.732,-0.681) -->
+              <!-- dots behind ant (toward feeder, upper-right), spaced ~9px apart -->
+              <circle cx="55" cy="22" r="3.2" fill="#52b788" opacity="0.95"/>
+              <circle cx="62" cy="16" r="2.4" fill="#52b788" opacity="0.70"/>
+              <circle cx="67" cy="11" r="1.7" fill="#52b788" opacity="0.45"/>
+              <!-- ant body: returning (heading lower-left toward nest), at (44,34) -->
+              <!-- branch angle ≈ -43°; ant head toward nest = rotate(137°) -->
+              <g transform="translate(44,34) rotate(137)">
+                <!-- abdomen -->
+                <ellipse cx="-6.5" cy="0" rx="5.5" ry="3.8" fill="#1d3c28"/>
+                <!-- petiole -->
+                <ellipse cx="-0.5" cy="0" rx="1.5" ry="1.5" fill="#1d3c28"/>
+                <!-- thorax -->
+                <ellipse cx="2.5" cy="0" rx="3.5" ry="2.8" fill="#1d3c28"/>
+                <!-- head -->
+                <circle cx="7.5" cy="0" r="2.8" fill="#1d3c28"/>
+                <!-- antennae -->
+                <line x1="8.5" y1="-1.5" x2="13" y2="-5" stroke="#1d3c28" stroke-width="1" stroke-linecap="round"/>
+                <line x1="8.5" y1="1.5"  x2="13" y2="5"  stroke="#1d3c28" stroke-width="1" stroke-linecap="round"/>
+                <!-- legs (3 pairs on thorax) -->
+                <line x1="1"  y1="3"  x2="-1" y2="8"  stroke="#1d3c28" stroke-width="0.9" stroke-linecap="round"/>
+                <line x1="3.5" y1="3" x2="5"  y2="8"  stroke="#1d3c28" stroke-width="0.9" stroke-linecap="round"/>
+                <line x1="1"  y1="-3" x2="-1" y2="-8" stroke="#1d3c28" stroke-width="0.9" stroke-linecap="round"/>
+                <line x1="3.5" y1="-3" x2="5" y2="-8" stroke="#1d3c28" stroke-width="0.9" stroke-linecap="round"/>
+                <line x1="-3" y1="2.5" x2="-5" y2="7"  stroke="#1d3c28" stroke-width="0.9" stroke-linecap="round"/>
+                <line x1="-3" y1="-2.5" x2="-5" y2="-7" stroke="#1d3c28" stroke-width="0.9" stroke-linecap="round"/>
+                <!-- food pellet carried in mandibles -->
+                <circle cx="10.5" cy="0" r="2" fill="#c85018" opacity="0.85"/>
+              </g>
+              <!-- direction arrow near ant, pointing lower-left (toward nest) -->
+              <line x1="36" y1="42" x2="27" y2="51" stroke="#8a8680" stroke-width="1.5" stroke-linecap="round" marker-end="url(#arr)"/>
+              <defs>
+                <marker id="arr" markerWidth="5" markerHeight="5" refX="3" refY="2.5" orient="auto">
+                  <polygon points="0,0 5,2.5 0,5" fill="#8a8680"/>
+                </marker>
+              </defs>
+              <!-- +q label next to the trail dots -->
+              <text x="43" y="20" font-family="IBM Plex Mono,monospace" font-size="9" fill="#2d6a4f" font-weight="700">+q</text>
+            </svg>
+          </div>
+          <div class="exp-step">③ Deposit</div>
+          <div class="exp-desc">Returning with food (orange), she lays q pheromone per step, reinforcing the trail for nestmates.</div>
+        </div>
+
+      </div>
+    </div><!-- explainer -->
+
+    <!-- SDE Model Card -->
+    <div class="sde-card">
+      <div class="sec-lbl">Pheromone Dynamics — SDE Model <span style="font-weight:400;color:#6aaa7a">(Dussutour et al. 2009, Eq. 3.4)</span></div>
+      <div class="sde-eq">
+        d<span class="kw">c</span><sub>i</sub> &nbsp;=&nbsp;
+        [ <span class="kw">p</span><sub>i</sub> &middot; <span class="kw">q</span><sub>i</sub> &middot; <span class="dim">f(t)</span>
+        &nbsp;&minus;&nbsp; <span class="kw">&rho;</span> &middot; <span class="kw">c</span><sub>i</sub> ] dt
+        &nbsp;+&nbsp; <span class="kw">&sigma;</span> dW<sub>i</sub>
+      </div>
+      <div class="sde-eq" style="margin-top:3px">
+        <span class="kw">p</span><sub>i</sub> &nbsp;&#x225C;&nbsp;
+        (<span class="kw">k</span> + <span class="kw">c</span><sub>i</sub>)<sup><span class="kw">&alpha;</span></sup>
+        &nbsp;/&nbsp;
+        &Sigma;<sub>j</sub>(<span class="kw">k</span> + <span class="kw">c</span><sub>j</sub>)<sup><span class="kw">&alpha;</span></sup>
+      </div>
+      <div class="sde-div"></div>
+      <div class="sde-glos">
+        <div class="sde-row"><span class="sde-sym">c<sub>i</sub></span><span class="sde-def">pheromone trail strength on branch <em>i</em> — built up by returning ants, eroded by evaporation</span></div>
+        <div class="sde-row"><span class="sde-sym">p<sub>i</sub></span><span class="sde-def">choice probability — Hill function; nonlinearity α amplifies small pheromone differences</span></div>
+        <div class="sde-row"><span class="sde-sym">q<sub>i</sub></span><span class="sde-def">deposit rate per return trip &nbsp;(q<sub>B</sub> &gt; q<sub>A</sub> encodes feeder quality)</span></div>
+        <div class="sde-row"><span class="sde-sym">f(t)</span><span class="sde-def">effective colony flow — f<sub>blk</sub> when B is blocked; low (Pheidole) keeps A weak, high (Lasius) lets A build</span></div>
+        <div class="sde-row"><span class="sde-sym">k</span><span class="sde-def">spontaneous baseline — inverse-temperature-like; higher k → more uniform exploration</span></div>
+        <div class="sde-row"><span class="sde-sym">σ dW</span><span class="sde-def">Itô white noise — drives stochastic resonance; optimal σ enables escape from the A-attractor</span></div>
+      </div>
+    </div>
+
+  </div><!-- cv-bot -->
+
+  <!-- RIGHT: sidebar -->
+  <div class="sidebar">
+
+    <!-- Species presets -->
+    <div class="section spec-wide">
+      <div class="sec-lbl" style="margin-bottom:6px">Species Preset</div>
+      <div class="pills">
+        <button class="pill" id="pr-ph"><em>Pheidole</em> (noisy)</button>
+        <button class="pill" id="pr-ln"><em>Lasius</em> (deterministic)</button>
+      </div>
+      <div class="sdesc">Both <em>Pheidole megacephala</em> and <em>Lasius niger</em> establish coherent trails to food sources, but they differ in persistence and the ability to track changes in food availability. Use these presets to explore differences in trailing mechanisms and performance.</div>
+    </div>
+
+    <div class="sdiv spec-sdiv"></div>
+
+    <!-- Parameters -->
+    <div class="section">
+      <div class="sec-lbl" style="margin-bottom:6px">Parameters</div>
+      <div class="srow">
+        <span class="slbl">σ</span>
+        <input type="range" id="sl-s" min="0" max="5" step="0.1" value="1.5">
+        <span class="sval" id="vl-s">1.5</span>
+      </div>
+      <div class="sdesc-sl">Trail-following noise (Itô SDE amplitude). σ≈0: deterministic, gets locked in (Lasius). σ≈3: Pheidole — optimal noise for tracking. σ≫3: random walk, trails dissolve. Tracking MI peaks at the resonance.</div>
+      <div class="srow">
+        <span class="slbl">α</span>
+        <input type="range" id="sl-a" min="0.5" max="5" step="0.1" value="2.0">
+        <span class="sval" id="vl-a">2.0</span>
+      </div>
+      <div class="sdesc-sl">Pheromone nonlinearity exponent. Higher α → more decisive winner-take-all. α=2 fits <em>L. niger</em>.</div>
+      <div class="srow">
+        <span class="slbl">ρ</span>
+        <input type="range" id="sl-r" min="0.001" max="0.04" step="0.001" value="0.015">
+        <span class="sval" id="vl-r">0.015</span>
+      </div>
+      <div class="sdesc-sl">Pheromone evaporation rate (min⁻¹). Higher ρ → faster forgetting, more flexible but less stable. Default tuned for convergence in ~60 sim-min.</div>
+    </div>
+
+    <div class="sdiv"></div>
+
+    <!-- Feeders -->
+    <div class="section">
+      <div class="sec-lbl" style="margin-bottom:6px">Feeder Quality &amp; Trail Persistence</div>
+      <div class="srow" style="grid-template-columns:42px 1fr 42px">
+        <span class="slbl" style="font-size:0.65rem">q<sub>B</sub>/q<sub>A</sub></span>
+        <input type="range" id="sl-q" min="0.4" max="2.5" step="0.05" value="1.44">
+        <span class="sval" id="vl-q">1.44×</span>
+      </div>
+      <div class="sdesc-sl">Quality ratio: deposit rate of B (short) vs A (long). Paper default ≈ 1.44.</div>
+      <div class="srow" style="grid-template-columns:42px 1fr 50px">
+        <span class="slbl" style="font-size:0.63rem">f<sub>blk</sub></span>
+        <input type="range" id="sl-feff" min="0.01" max="1.0" step="0.01" value="0.50">
+        <span class="sval" id="vl-feff">0.50</span>
+      </div>
+      <div class="sdesc-sl">Recruiter flow when B is blocked (fraction of normal F).
+        Low → <em>Pheidole</em>-like: colony quickly stops recruiting to a lost feeder, so A barely builds.
+        High → <em>Lasius</em>-like: ants persist on established trail, A pheromone builds strongly → locked in.</div>
+      <div class="btn-row">
+        <button class="btn sec" id="btn-blk">Block B</button>
+        <button class="btn sec" id="btn-rst" disabled>Restore B</button>
+      </div>
+    </div>
+
+    <div class="sdiv"></div>
+
+    <!-- Simulation controls -->
+    <div class="section">
+      <div class="sec-lbl" style="margin-bottom:6px">Simulation</div>
+      <div class="btn-row">
+        <button class="btn" id="btn-run">▶ Run</button>
+        <button class="btn sec" id="btn-stp">Step</button>
+        <button class="btn dng" id="btn-res">↺ Reset</button>
+      </div>
+      <div class="srow" style="margin-top:7px;grid-template-columns:38px 1fr 50px">
+        <span class="slbl" style="font-size:0.65rem">speed</span>
+        <input type="range" id="sl-spd" min="1" max="10" step="0.5" value="1.5">
+        <span class="sval" id="vl-spd">1.5×</span>
+      </div>
+      <button class="btn sec full" id="btn-3p">Run 3-Phase Experiment</button>
+
+      <!-- 3-phase configuration -->
+      <div style="margin-top:8px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:8px 10px;display:flex;flex-direction:column;gap:6px">
+        <div class="srow" style="grid-template-columns:1fr 44px;margin-bottom:0">
+          <span style="font-size:0.68rem;color:var(--muted)">Phase duration (min)</span>
+          <span class="sval" id="vl-pdur">60</span>
+        </div>
+        <input type="range" id="sl-pdur" min="10" max="180" step="5" value="60" style="width:100%">
+        <div class="tog-row">
+          <span class="tog-lbl">Continuous cycling</span>
+          <label class="tog">
+            <input type="checkbox" id="tog-cyc" checked>
+            <div class="tog-track"></div>
+            <div class="tog-thumb"></div>
+          </label>
+        </div>
+        <div class="sdesc-sl" style="margin:0">When on, phases repeat indefinitely — useful for observing stochastic resonance over many switching events.</div>
+      </div>
+
+      <div class="phase-tag" id="phase-tag">
+        3-Phase: B open → B blocked → B restored. Replicates Dussutour et al. 2009.
+      </div>
+    </div>
+
+    <div class="sdiv"></div>
+
+    <!-- Stats -->
+    <div class="section">
+      <div class="sec-lbl" style="margin-bottom:6px">Statistics</div>
+      <div class="stat-grid">
+        <div class="stat-box">
+          <div class="stat-name">% on B (short)</div>
+          <div class="stat-val" id="st-p2">—</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-name">% on A (long)</div>
+          <div class="stat-val og" id="st-p1">—</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-name">τ Branch B</div>
+          <div class="stat-val" id="st-c2">—</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-name">τ Branch A</div>
+          <div class="stat-val og" id="st-c1">—</div>
+        </div>
+      </div>
+      <div class="cbar-wrap">
+        <div class="stat-name" style="margin-top:7px">Consensus |p<sub>B</sub> − p<sub>A</sub>|</div>
+        <div class="cbar-track"><div class="cbar-fill" id="cbar" style="width:0%"></div></div>
+        <div class="cbar-labels">
+          <span>split (0)</span><span>committed (1)</span>
+        </div>
+      </div>
+      <div class="cbar-wrap">
+        <div class="stat-name" style="margin-top:7px">Tracking MI
+          <span style="font-weight:400;color:var(--tiny);font-size:0.60rem"> — I(feeder ; majority on B)</span>
+        </div>
+        <div class="cbar-track"><div class="cbar-fill" id="mi-bar" style="width:0%;background:var(--green-mid)"></div></div>
+        <div class="cbar-labels">
+          <span>random (0)</span><span>perfect tracking (1)</span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- sidebar -->
+</div><!-- ymaze-grid -->
+</div><!-- tab1 -->
+
+<!-- ═══════════════════════════════ TAB 2 ═══════════════════════════════ -->
+<div id="tab2" style="display:none">
+<div class="tab2-grid">
+
+  <!-- LEFT: canvases -->
+  <!-- LEFT COL 1: network canvas -->
+  <div class="t2-top">
+    <div style="padding:8px 14px 4px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+      <span class="sec-lbl">Forager Allocation — 5 Feeders</span>
+      <span class="phase-chip" id="phase2-chip">proportional</span>
+    </div>
+    <canvas id="mc2" style="display:block;width:100%;max-width:620px"></canvas>
+  </div>
+
+  <!-- LEFT COL 2: bar chart + phase description -->
+  <div class="t2-mid">
+    <div style="padding:4px 14px 2px;border-bottom:1px solid var(--border)">
+      <span class="sec-lbl" style="font-size:0.65rem;color:var(--muted)">Allocation share &nbsp;—&nbsp; solid = actual &nbsp;·&nbsp; dashed outline = proportional reference (<span style="text-transform:none">α</span>=1)</span>
+    </div>
+    <canvas id="bc2" style="display:block;width:100%;max-width:620px"></canvas>
+    <div style="padding:6px 14px 8px;border-top:1px solid var(--border);font-size:0.72rem;color:var(--muted);line-height:1.5" id="phase2-desc">
+      Adjust α to explore how nonlinearity shapes collective allocation.
+    </div>
+  </div>
+
+  <!-- LEFT COL 3: formula card -->
+  <div class="t2-formula">
+    <div class="sde-card" style="margin-top:14px">
+      <div class="sec-lbl" style="margin-bottom:8px;color:#a0cca8">The Formula</div>
+      <div class="sde-eq" style="font-size:1em;color:#d0e8d4">
+        <span class="kw">p</span><sub>i</sub> &nbsp;=&nbsp;
+        (<span class="kw">k</span>+<span class="kw">q</span><sub>i</sub>)<sup><span class="kw">α</span></sup>
+        &nbsp;/&nbsp;
+        &Sigma;<sub>j</sub>(<span class="kw">k</span>+<span class="kw">q</span><sub>j</sub>)<sup><span class="kw">α</span></sup>
+      </div>
+      <div class="sde-div"></div>
+      <div class="sde-glos">
+        <div class="sde-row"><span class="sde-sym">q<sub>i</sub></span><span class="sde-def">feeder quality — the input driving allocation</span></div>
+        <div class="sde-row"><span class="sde-sym">α</span><span class="sde-def">nonlinearity exponent — identical role to inverse temperature β in softmax</span></div>
+        <div class="sde-row"><span class="sde-sym">k</span><span class="sde-def">spontaneous baseline — compresses quality differences; k=0 gives a pure power law</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: sidebar -->
+  <div class="t2-sidebar sidebar">
+
+    <div class="section t2-s-alpha">
+      <div class="sec-lbl" style="margin-bottom:6px">Recruitment Nonlinearity</div>
+      <div class="srow" style="grid-template-columns:22px 1fr 42px">
+        <span class="slbl">α</span>
+        <input type="range" id="sl2-a" min="-10" max="10" step="0.1" value="1.0">
+        <span class="sval" id="vl2-a">1.0</span>
+      </div>
+      <div class="sdesc-sl" style="display:flex;justify-content:space-between;font-size:0.60rem;color:var(--tiny);margin-top:1px">
+        <span>LTA</span><span>equal</span><span>proportional</span><span>WTA</span>
+      </div>
+      <div class="pills" style="margin-top:6px">
+        <button class="pill" id="p2-lta">LTA</button>
+        <button class="pill" id="p2-equal">Equal</button>
+        <button class="pill on" id="p2-prop">Proportional</button>
+        <button class="pill" id="p2-wta">WTA</button>
+      </div>
+    </div>
+
+    <div class="sdiv"></div>
+
+    <div class="section t2-s-feeder">
+      <div class="sec-lbl" style="margin-bottom:5px">Feeder Qualities</div>
+      <div class="q-srows" id="q-srows">
+        <!-- injected by JS -->
+      </div>
+      <div class="sdesc-sl" style="margin-top:4px">Drag to set quality q<sub>i</sub> of each feeder. The proportional reference (dashed bar) always shows where α=1 would put each feeder.</div>
+    </div>
+
+    <div class="sdiv"></div>
+
+    <div class="section t2-s-regime">
+      <div class="sec-lbl" style="margin-bottom:4px">Current Regime</div>
+      <div id="phase2-label" style="font-weight:700;color:var(--green-dark);font-size:0.88rem;margin-bottom:4px">—</div>
+      <div id="phase2-sb" style="font-size:0.68rem;color:var(--muted);line-height:1.5;min-height:3em">—</div>
+    </div>
+
+    <div class="sdiv"></div>
+
+    <div class="section t2-s-k">
+      <div class="sec-lbl" style="margin-bottom:6px">Spontaneous Baseline</div>
+      <div class="srow" style="grid-template-columns:22px 1fr 42px">
+        <span class="slbl">k</span>
+        <input type="range" id="sl2-k" min="0" max="5" step="0.1" value="1.0">
+        <span class="sval" id="vl2-k">1.0</span>
+      </div>
+      <div class="sdesc-sl">Added to each quality before raising to α. At k=0 the formula is a pure power law q<sub>i</sub><sup>α</sup>. Higher k compresses quality differences toward equal allocation.</div>
+    </div>
+
+  </div><!-- t2-sidebar -->
+</div><!-- tab2-grid -->
+
+<!-- Recruitment mechanism cartoons — full width below grid -->
+<div style="border-top:1px solid var(--border)">
+  <div style="padding:7px 14px 3px">
+    <span class="sec-lbl">Recruitment Mechanisms &amp; Linearity</span>
+  </div>
+  <div class="exp-panels" style="padding:8px 12px 12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+
+    <!-- Waggle Dance -->
+    <div class="exp-panel">
+      <div class="exp-icon" style="width:90px;height:76px">
+        <svg viewBox="0 0 90 76" xmlns="http://www.w3.org/2000/svg">
+          <!-- Figure-8 dance path -->
+          <path d="M45,38 C35,22 20,22 20,35 C20,48 35,48 45,38 C55,28 70,28 70,38 C70,48 55,48 45,38"
+                fill="none" stroke="#c8a870" stroke-width="1.8" stroke-dasharray="4,2.5"/>
+          <!-- Waggle run arrow (straight middle section indicating food direction) -->
+          <line x1="45" y1="55" x2="45" y2="28" stroke="#9a6010" stroke-width="1.8" stroke-linecap="round"/>
+          <polygon points="45,22 41.5,30 48.5,30" fill="#9a6010"/>
+          <!-- Dancer bee at crossing point -->
+          <ellipse cx="45" cy="38" rx="6" ry="4" fill="#c87820"/>
+          <circle cx="45" cy="33.5" r="3" fill="#c87820"/>
+          <ellipse cx="40" cy="35" rx="4.5" ry="2" fill="rgba(200,230,255,0.55)"/>
+          <ellipse cx="50" cy="35" rx="4.5" ry="2" fill="rgba(200,230,255,0.55)"/>
+          <!-- Attending bees (followers watching) -->
+          <circle cx="12" cy="32" r="3.5" fill="#1d3c28"/>
+          <circle cx="10" cy="44" r="3.5" fill="#1d3c28"/>
+          <circle cx="18" cy="54" r="3.5" fill="#1d3c28"/>
+          <!-- "food this way" tiny arrow -->
+          <text x="45" y="74" font-family="IBM Plex Mono,monospace" font-size="7" fill="#8a7a60" text-anchor="middle">▲ food direction</text>
+        </svg>
+      </div>
+      <div class="exp-step" style="margin-top:2px">Waggle Dance</div>
+      <div style="margin-bottom:3px"><span class="phase-chip" style="background:#2d7a50;font-size:0.62rem;padding:1px 8px">Linear</span></div>
+      <div class="exp-desc">A scout performs a figure-8 dance; the waggle run encodes food direction and distance. Each dance bout recruits roughly the same number of followers — no feedback between the number already foraging and the recruitment rate.</div>
+    </div>
+
+    <!-- Tandem Running -->
+    <div class="exp-panel">
+      <div class="exp-icon" style="width:90px;height:76px">
+        <svg viewBox="0 0 90 76" xmlns="http://www.w3.org/2000/svg">
+          <!-- Path / trail line -->
+          <line x1="14" y1="62" x2="76" y2="18" stroke="#c8c3b8" stroke-width="3" stroke-linecap="round"/>
+          <!-- Direction arrow -->
+          <polygon points="76,18 67,22 71,29" fill="#8a8680"/>
+          <!-- Leader ant (front, dark) — heading upper-right, rotate -43° -->
+          <g transform="translate(62,28) rotate(-43)">
+            <ellipse cx="-5.5" cy="0" rx="5" ry="3.5" fill="#1d3c28"/>
+            <ellipse cx="0" cy="0" rx="2.5" ry="2" fill="#1d3c28"/>
+            <ellipse cx="4" cy="0" rx="3.5" ry="2.8" fill="#1d3c28"/>
+            <circle cx="7.5" cy="0" r="2.5" fill="#1d3c28"/>
+            <line x1="8" y1="-1.5" x2="12" y2="-4" stroke="#1d3c28" stroke-width="0.8"/>
+            <line x1="8" y1="1.5" x2="12" y2="4" stroke="#1d3c28" stroke-width="0.8"/>
+          </g>
+          <!-- Follower ant (behind, lighter) -->
+          <g transform="translate(38,46) rotate(-43)">
+            <ellipse cx="-5.5" cy="0" rx="5" ry="3.5" fill="#6aaa7a"/>
+            <ellipse cx="0" cy="0" rx="2.5" ry="2" fill="#4a8a5a"/>
+            <ellipse cx="4" cy="0" rx="3.5" ry="2.8" fill="#4a8a5a"/>
+            <circle cx="7.5" cy="0" r="2.5" fill="#4a8a5a"/>
+            <!-- Antennae reaching toward leader -->
+            <line x1="8" y1="-1" x2="14" y2="-4" stroke="#4a8a5a" stroke-width="0.8"/>
+            <line x1="8" y1="1" x2="14" y2="4" stroke="#4a8a5a" stroke-width="0.8"/>
+          </g>
+          <!-- "1 : 1" label -->
+          <text x="45" y="72" font-family="IBM Plex Mono,monospace" font-size="9" fill="#5a4a3a" text-anchor="middle" font-weight="600">1 leader : 1 follower</text>
+        </svg>
+      </div>
+      <div class="exp-step" style="margin-top:2px">Tandem Running</div>
+      <div style="margin-bottom:3px"><span class="phase-chip" style="background:#2d7a50;font-size:0.62rem;padding:1px 8px">Linear</span></div>
+      <div class="exp-desc">An informed ant leads a single naive follower who maintains antennal contact from behind. Strictly 1-to-1: one leader can only guide one follower per run. Recruitment scales directly with the number of leaders — no amplification.</div>
+    </div>
+
+    <!-- Trail Laying -->
+    <div class="exp-panel">
+      <div class="exp-icon" style="width:90px;height:76px">
+        <svg viewBox="0 0 90 76" xmlns="http://www.w3.org/2000/svg">
+          <!-- Pheromone trail (thicker = stronger = more ants) -->
+          <line x1="10" y1="66" x2="80" y2="14" stroke="#4a8c5e" stroke-width="6" stroke-linecap="round" opacity="0.25"/>
+          <!-- Pheromone dots along trail -->
+          <circle cx="22" cy="57" r="2.2" fill="#52b788" opacity="0.8"/>
+          <circle cx="34" cy="48" r="2.6" fill="#52b788" opacity="0.85"/>
+          <circle cx="46" cy="39" r="3.0" fill="#52b788" opacity="0.9"/>
+          <circle cx="58" cy="30" r="3.4" fill="#52b788" opacity="0.95"/>
+          <!-- Three ants at different positions (density increases toward feeder) -->
+          <g transform="translate(30,52) rotate(-43)">
+            <ellipse cx="-4" cy="0" rx="4" ry="2.8" fill="#1d3c28"/>
+            <ellipse cx="1" cy="0" rx="2.5" ry="2" fill="#1d3c28"/>
+            <circle cx="5.5" cy="0" r="2.3" fill="#1d3c28"/>
+          </g>
+          <g transform="translate(50,38) rotate(-43)">
+            <ellipse cx="-4" cy="0" rx="4" ry="2.8" fill="#1d3c28"/>
+            <ellipse cx="1" cy="0" rx="2.5" ry="2" fill="#1d3c28"/>
+            <circle cx="5.5" cy="0" r="2.3" fill="#1d3c28"/>
+          </g>
+          <g transform="translate(65,27) rotate(-43)">
+            <ellipse cx="-4" cy="0" rx="4" ry="2.8" fill="#1d3c28"/>
+            <ellipse cx="1" cy="0" rx="2.5" ry="2" fill="#1d3c28"/>
+            <circle cx="5.5" cy="0" r="2.3" fill="#1d3c28"/>
+          </g>
+          <!-- Feedback arrow: more ants → stronger trail → more ants -->
+          <path d="M76,38 C84,30 84,52 76,58" fill="none" stroke="#c85018" stroke-width="1.5" stroke-linecap="round"/>
+          <polygon points="76,58 72,51 79,52" fill="#c85018"/>
+          <text x="83" y="48" font-family="IBM Plex Mono,monospace" font-size="6.5" fill="#c85018" text-anchor="middle">+</text>
+        </svg>
+      </div>
+      <div class="exp-step" style="margin-top:2px">Trail Laying</div>
+      <div style="margin-bottom:3px"><span class="phase-chip" style="background:#9a6010;font-size:0.62rem;padding:1px 8px">Nonlinear</span></div>
+      <div class="exp-desc">Returning foragers deposit pheromone; more foragers → stronger trail → yet more followers. This positive feedback between trail strength and follower count is what the Hill function with α&gt;1 models — recruitment is amplified, not just proportional.</div>
+    </div>
+
+  </div><!-- exp-panels -->
+</div><!-- recruitment cartoons -->
+
+</div><!-- tab2 -->
+
+<footer>
+  <a href="../">← All course visualizations</a>
+  <span style="white-space:nowrap">© 2026 Theodore P. Pavlic &nbsp;·&nbsp; <a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a></span>
+</footer>
+</div><!-- page -->
+
+<script>
+'use strict';
+
+// ── UTILITIES ─────────────────────────────────────────────────────────
+
+function randn() {
+  const u = Math.random() + 1e-12, v = Math.random();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+function lerpN(a, b, t) { return a + (b - a) * t; }
+
+function lerpPt(A, B, t) {
+  return { x: A.x + (B.x - A.x) * t, y: A.y + (B.y - A.y) * t };
+}
+
+function hexLerp(c1, c2, t) {
+  const p = s => parseInt(s, 16);
+  const r1=p(c1.slice(1,3)), g1=p(c1.slice(3,5)), b1=p(c1.slice(5,7));
+  const r2=p(c2.slice(1,3)), g2=p(c2.slice(3,5)), b2=p(c2.slice(5,7));
+  const h = v => Math.round(v).toString(16).padStart(2,'0');
+  return `#${h(r1+(r2-r1)*t)}${h(g1+(g2-g1)*t)}${h(b1+(b2-b1)*t)}`;
+}
+
+function setPct(sl) {
+  const pct = (sl.value - sl.min) / (sl.max - sl.min) * 100;
+  sl.style.setProperty('--pct', pct + '%');
+}
+
+// ── SIMULATION PARAMETERS & STATE ─────────────────────────────────────
+
+const P = {
+  alpha: 2.0,    // pheromone nonlinearity exponent
+  k:     3,      // spontaneous baseline — lower → stronger positive feedback, faster convergence
+  rho:   0.015,  // evaporation rate (min⁻¹) — tuned for visible dynamics in ~60 sim-min
+  sigma: 2.0,    // Itô noise amplitude
+  q1:    0.09,   // deposit rate, branch A (long/inferior)
+  q2:    0.13,   // deposit rate, branch B (short/superior), Dussutour fit
+  F:     5.0,    // normalized colony flow — scales deposit rates; increase for faster build-up
+  feff_blocked: 0.50, // fraction of F when B is blocked — low=Pheidole (quickly abandons), high=Lasius (persists)
+  dt:    1.0,    // simulation time step (minutes)
+  cMin:  0.001,  // floor pheromone
+};
+
+let c1 = 1.0, c2 = 1.0;  // pheromone levels
+let q2Eff = P.q2;          // effective q2 (0 when blocked)
+let blocked = false;
+let simTime = 0;
+let running = false;
+let simTicker = null;
+let spd = 1.5;  // steps per 100ms tick
+
+let hist = [];         // [{t,p1,p2,c1,c2,blocked}]
+const HIST_MAX = 500;
+
+// 3-phase experiment state
+let phaseMode = false;
+let phaseNum = 0;
+let phaseSteps = 0;
+let phaseDuration = 60;   // simulated minutes per phase (configurable)
+let continuousCycling = true;
+
+function getProbs() {
+  const a1 = Math.pow(P.k + c1, P.alpha);
+  const a2 = blocked ? 0 : Math.pow(P.k + c2, P.alpha);
+  const tot = a1 + a2 + 1e-15;
+  return [a1 / tot, a2 / tot];
+}
+
+function simStep() {
+  const [p1, p2] = getProbs();
+  const sq = Math.sqrt(P.dt);
+
+  // Effective colony flow drops to 50% when B is blocked (Dussutour et al. 2009, eq. 3.3).
+  // This matches the paper's fitted value and is critical for the SR story:
+  // A's pheromone now builds meaningfully during the block phase, creating a real
+  // attractor that requires noise to escape. At fEff=5% A barely builds at all —
+  // even deterministic Lasius recovers by pheromone memory, which misses the SR demo.
+  const fEff = blocked ? P.F * P.feff_blocked : P.F;
+
+  c1 += (p1 * P.q1 * fEff - P.rho * c1) * P.dt + P.sigma * sq * randn();
+  c2 += (p2 * q2Eff * fEff - P.rho * c2) * P.dt + P.sigma * sq * randn();
+  c1 = Math.max(P.cMin, c1);
+  c2 = Math.max(P.cMin, c2);
+  simTime += P.dt;
+
+  // Count ants physically on each branch right now (not on stem).
+  // This gives a gradual, realistic allocation trace: when B is blocked,
+  // ants already on B still show up until they finish returning, rather
+  // than the model probability snapping to p2=0 instantly.
+  let nA = 0, nB = 0;
+  for (const a of ants) {
+    if (a.seg === 'branch') { if (a.br === 'A') nA++; else nB++; }
+  }
+  const nBr = nA + nB;
+  // Fall back to model probability before enough ants have distributed.
+  const vA = nBr >= 4 ? nA / nBr : p1;
+  const vB = nBr >= 4 ? nB / nBr : p2;
+
+  // target = ideal allocation to B: 1.0 when B is the better open feeder, 0.0 when blocked
+  const target = blocked ? 0.0 : (q2Eff > P.q1 ? 1.0 : 0.0);
+  hist.push({ t: simTime, p1, p2, vA, vB, c1, c2, blocked, target });
+  if (hist.length > HIST_MAX) hist.shift();
+
+  if (phaseMode) advancePhase();
+}
+
+function advancePhase() {
+  phaseSteps++;
+  if (phaseNum === 1 && phaseSteps >= phaseDuration) {
+    blockB();
+    phaseNum = 2; phaseSteps = 0;
+    setPhaseTag('<em>Phase 2:</em> B blocked — colony must redirect to A');
+  } else if (phaseNum === 2 && phaseSteps >= phaseDuration) {
+    restoreB();
+    phaseNum = 3; phaseSteps = 0;
+    setPhaseTag('<em>Phase 3:</em> B restored — can colony switch back?');
+  } else if (phaseNum === 3 && phaseSteps >= phaseDuration) {
+    if (continuousCycling) {
+      // Cycle: block again immediately for stochastic resonance observation
+      blockB();
+      phaseNum = 2; phaseSteps = 0;
+      setPhaseTag('<em>Cycling:</em> B blocked again — observing repeated switching');
+    } else {
+      phaseMode = false;
+      setPhaseTag('Experiment complete. See history above.');
+      el('btn-3p').textContent = 'Run 3-Phase Experiment';
+      el('btn-3p').disabled = false;
+    }
+  }
+}
+
+function resetSim() {
+  c1 = 1.0; c2 = 1.0;
+  simTime = 0; hist = [];
+  blocked = false; q2Eff = P.q2;
+  phaseMode = false; phaseNum = 0; phaseSteps = 0;
+  el('btn-blk').disabled = false;
+  el('btn-rst').disabled = true;
+  el('btn-3p').textContent = 'Run 3-Phase Experiment';
+  el('btn-3p').disabled = false;
+  setPhaseTag('3-Phase: B open (60 min) → B blocked (60 min) → B restored (60 min). Replicates Dussutour et al. 2009.');
+  initAnts();
+}
+
+// ── ANT VISUAL SYSTEM ─────────────────────────────────────────────────
+
+const N_ANTS = 30;
+// ANT_SPD is now computed dynamically in updateAnts, scaled with spd so ants
+// always complete ~1 round trip per simulated minute regardless of clock speed.
+let ants = [];
+
+function initAnts() {
+  ants = [];
+  for (let i = 0; i < N_ANTS; i++) {
+    // Spread ants across all segments for a natural initial state
+    const seg = Math.random() < 0.30 ? 'stem' : 'branch';
+    ants.push({
+      seg,
+      br:   Math.random() < 0.5 ? 'A' : 'B',
+      t:    Math.random(),                      // 0 = base of segment, 1 = tip
+      dir:  Math.random() < 0.5 ? 1 : -1,      // +1 outbound, -1 returning
+      wait: Math.floor(Math.random() * 40),
+      sz:   0.80 + 0.45 * Math.random(),
+    });
+  }
+}
+
+function updateAnts() {
+  const [p1, p2] = getProbs();
+  const uTurn = P.sigma * 0.0010; // U-turn prob per frame, σ-scaled (branch only)
+
+  // Scale traversal speed with simulation speed so ants complete ~1 round trip
+  // per simulated minute at any clock rate.
+  // Target: 1 one-way trip ≈ (1 sim-min) / (spd sim-min per real-sec) real-secs
+  //       = 1/spd/10 real-secs → at 60fps: 6/spd frames.
+  // Speed needed = 1 / (6/spd) = spd/6 ≈ 0.17*spd per frame.
+  // Cap at 0.35 so ants stay visible as individual entities.
+  const vspd = Math.min(0.17 * spd, 0.35);
+
+  // Wait times (frames) also scale down with spd so a "pause at feeder"
+  // stays proportional to simulated foraging time, not wall-clock time.
+  const wscale = Math.max(1, spd);
+
+  for (const a of ants) {
+    if (a.wait > 0) { a.wait--; continue; }
+
+    a.t += a.dir * vspd * (0.75 + 0.50 * a.sz);
+
+    if (a.seg === 'stem') {
+      // ── On stem (NEST ↔ JUNCTION) ──
+      if (a.dir === 1 && a.t >= 1) {
+        // Reached junction — pause briefly, then commit to a branch
+        a.t = 0; a.seg = 'branch';
+        a.br = Math.random() < p2 ? 'B' : 'A';
+        a.dir = 1;
+        a.wait = Math.max(1, Math.round((4 + Math.random() * 8) / wscale));
+      } else if (a.dir === -1 && a.t <= 0) {
+        // Back at nest — rest, then head out again
+        a.t = 0; a.dir = 1;
+        a.wait = Math.max(1, Math.round((12 + Math.random() * 20) / wscale));
+      }
+    } else {
+      // ── On a branch (JUNCTION ↔ FEEDER) ──
+      if (Math.random() < uTurn) a.dir *= -1;
+
+      if (a.t >= 1) {
+        if (a.br === 'B' && blocked) {
+          a.t = 0.70; a.dir = -1;
+        } else {
+          a.t = 1; a.dir = -1;
+          a.wait = Math.max(1, Math.round((14 + Math.random() * 22) / wscale));
+        }
+      } else if (a.t <= 0) {
+        a.t = 1; a.seg = 'stem'; a.dir = -1;
+        a.wait = Math.max(1, Math.round(3 / wscale));
+      }
+    }
+  }
+}
+
+// ── Y-MAZE GEOMETRY ───────────────────────────────────────────────────
+
+// Logical coords for 620×380 canvas
+const G = {
+  NEST:  { x: 310, y: 354 },
+  JNC:   { x: 310, y: 215 },
+  FDA:   { x: 90,  y: 56  },   // Feeder A — long branch (upper-left)
+  FDB:   { x: 500, y: 118 },   // Feeder B — short branch (upper-right)
+};
+
+// Travel angle for ant rendering — handles both stem and branch segments
+function antAngle(a) {
+  if (a.seg === 'stem') {
+    const dx = (G.JNC.x - G.NEST.x) * a.dir;
+    const dy = (G.JNC.y - G.NEST.y) * a.dir;
+    return Math.atan2(dy, dx);
+  }
+  const to = a.br === 'A' ? G.FDA : G.FDB;
+  const dx = (to.x - G.JNC.x) * a.dir;
+  const dy = (to.y - G.JNC.y) * a.dir;
+  return Math.atan2(dy, dx);
+}
+
+// ── CANVAS RENDERING ──────────────────────────────────────────────────
+
+const mc  = el('mc'),  mctx = mc.getContext('2d');
+const tc  = el('tc'),  tctx = tc.getContext('2d');
+const cc  = el('cc'),  cctx = cc.getContext('2d');
+
+function drawMaze() {
+  const ctx = mctx;
+  const W = 620, H = 380;  // logical CSS-pixel dimensions
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+
+  // Background
+  ctx.fillStyle = '#faf8f3';
+  ctx.fillRect(0, 0, W, H);
+
+  // Pheromone-normalized values
+  const maxC = Math.max(c1, c2, 0.01);
+  const tA = Math.min(c1 / maxC, 1);
+  const tB = Math.min(c2 / maxC, 1);
+
+  // Branch thicknesses (3..22)
+  const wA   = 3 + 19 * tA;
+  const wB   = 3 + 19 * (blocked ? 0.15 : tB);
+  const wStem = 7;
+
+  // Branch colors
+  const colA    = hexLerp('#c8c3b8', '#c85018', tA);
+  const colBraw = hexLerp('#c8c3b8', '#1d3c28', tB);
+  const colB    = blocked ? '#b0a898' : colBraw;
+  const colStem = '#8a8680';
+
+  // Helper: draw a branch segment
+  function branch(A, B, lw, col, dash=[]) {
+    ctx.save();
+    ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.lineCap = 'round';
+    if (dash.length) ctx.setLineDash(dash);
+    ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke();
+    ctx.restore();
+  }
+
+  // Soft drop-shadow pass
+  ctx.save(); ctx.globalAlpha = 0.07;
+  branch(G.NEST, G.JNC,  wStem+4, '#000');
+  branch(G.JNC,  G.FDA,  wA+4,    '#000');
+  branch(G.JNC,  G.FDB,  wB+4,    '#000');
+  ctx.restore();
+
+  // Stem
+  branch(G.NEST, G.JNC, wStem, colStem);
+
+  // Branch A (long)
+  branch(G.JNC, G.FDA, wA, colA);
+
+  // Branch B (short)
+  if (blocked) {
+    const bpt = lerpPt(G.JNC, G.FDB, 0.70);
+    branch(G.JNC, bpt, wB, colB);
+    branch(bpt, G.FDB, 2, '#c82828', [5, 4]);
+    // Block X
+    ctx.save();
+    ctx.strokeStyle = '#c82828'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+    const s = 9;
+    ctx.beginPath();
+    ctx.moveTo(bpt.x-s, bpt.y-s); ctx.lineTo(bpt.x+s, bpt.y+s);
+    ctx.moveTo(bpt.x+s, bpt.y-s); ctx.lineTo(bpt.x-s, bpt.y+s);
+    ctx.stroke();
+    ctx.restore();
+  } else {
+    branch(G.JNC, G.FDB, wB, colB);
+  }
+
+  // Ants — only advance positions while sim is running
+  if (running) updateAnts();
+  for (const a of ants) {
+    let pos;
+    if (a.seg === 'stem') {
+      pos = lerpPt(G.NEST, G.JNC, Math.min(Math.max(a.t, 0), 1));
+    } else {
+      const feederPt = a.br === 'A' ? G.FDA
+                     : (blocked ? lerpPt(G.JNC, G.FDB, 0.70) : G.FDB);
+      pos = lerpPt(G.JNC, feederPt, Math.min(Math.max(a.t, 0), 1));
+    }
+    const angle  = antAngle(a);
+    // Stem ants are neutral; branch ants take branch colour
+    const antCol = a.seg === 'stem'  ? '#5a4a3a'
+                 : (a.br === 'B' && !blocked) ? '#74c99c' : '#e07840';
+    drawAnt(ctx, pos.x, pos.y, a.sz, angle, antCol);
+  }
+
+  // Junction dot
+  ctx.save();
+  ctx.fillStyle = '#6a6460'; ctx.strokeStyle = '#faf8f3'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(G.JNC.x, G.JNC.y, 7, 0, Math.PI*2);
+  ctx.fill(); ctx.stroke();
+  ctx.restore();
+
+  // Nest node
+  ctx.save();
+  ctx.fillStyle = '#1d3c28';
+  ctx.beginPath(); ctx.arc(G.NEST.x, G.NEST.y, 22, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#e8f2ea'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `700 9.5px 'Outfit',sans-serif`;
+  ctx.fillText('NEST', G.NEST.x, G.NEST.y);
+  ctx.restore();
+
+  // Feeder A
+  const colFA = c1 > c2 ? '#c85018' : '#9a8a7c';
+  drawFeeder(ctx, G.FDA, 'A', colFA, 'Long branch\n(inferior)');
+
+  // Feeder B
+  if (blocked) {
+    drawFeeder(ctx, G.FDB, '✕', '#b0a898', 'Short branch\n(blocked)');
+  } else {
+    const colFB = c2 >= c1 ? '#1d3c28' : '#6a8a72';
+    drawFeeder(ctx, G.FDB, 'B', colFB, 'Short branch\n(superior)');
+  }
+
+  // τ labels mid-branch
+  tauLabel(ctx, lerpPt(G.JNC, G.FDA, 0.52), `τ=${c1.toFixed(1)}`, '#c85018', -18);
+  if (!blocked) tauLabel(ctx, lerpPt(G.JNC, G.FDB, 0.52), `τ=${c2.toFixed(1)}`, '#1d3c28', 14);
+
+  // ── Majority-feeder highlight ring ────────────────────────────────────
+  const lastH = hist[hist.length - 1];
+  const curVB = lastH ? lastH.vB : getProbs()[1];
+  const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 500);
+  const ringAlpha = 0.28 + 0.52 * pulse;
+  const ringW     = 2.5 + 2 * pulse;
+  const ringPt    = (!blocked && curVB > 0.5) ? G.FDB : G.FDA;
+  const ringCol   = (!blocked && curVB > 0.5) ? `rgba(29,110,58,${ringAlpha})`
+                                               : `rgba(200,80,24,${ringAlpha})`;
+  ctx.save();
+  ctx.strokeStyle = ringCol; ctx.lineWidth = ringW;
+  ctx.beginPath(); ctx.arc(ringPt.x, ringPt.y, 24, 0, Math.PI * 2); ctx.stroke();
+  ctx.restore();
+}
+
+function drawFeeder(ctx, pt, label, col, subtitle) {
+  ctx.save();
+  ctx.fillStyle = col;
+  ctx.beginPath(); ctx.arc(pt.x, pt.y, 17, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `700 10px 'Outfit',sans-serif`;
+  ctx.fillText(label, pt.x, pt.y);
+  ctx.fillStyle = '#7a7470';
+  ctx.font = `500 9px 'Outfit',sans-serif`;
+  subtitle.split('\n').forEach((line, i) => {
+    ctx.fillText(line, pt.x, pt.y - 44 + i * 12);
+  });
+  ctx.restore();
+}
+
+function drawAnt(ctx, x, y, sz, angle, color) {
+  ctx.save();
+  ctx.translate(x, y); ctx.rotate(angle); ctx.scale(sz, sz);
+  // Outline stroke — separates ant from trail regardless of color
+  ctx.strokeStyle = 'rgba(250,248,243,0.7)'; ctx.lineWidth = 1.8;
+  ctx.beginPath(); ctx.ellipse(0, 0, 5.5, 3, 0, 0, Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(5.5, 0, 3, 0, Math.PI*2); ctx.stroke();
+  // Body
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.ellipse(0, 0, 5.5, 3, 0, 0, Math.PI*2); ctx.fill();
+  // Head
+  ctx.beginPath(); ctx.arc(5.5, 0, 3, 0, Math.PI*2); ctx.fill();
+  // Sheen
+  ctx.fillStyle = 'rgba(255,255,255,0.22)';
+  ctx.beginPath(); ctx.ellipse(0, -1.2, 3.2, 1.6, 0, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+function tauLabel(ctx, pt, text, color, yOff) {
+  ctx.save();
+  ctx.font = `500 9px 'IBM Plex Mono',monospace`;
+  ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  // Small white halo
+  ctx.strokeStyle = 'rgba(250,248,243,0.8)'; ctx.lineWidth = 3;
+  ctx.strokeText(text, pt.x, pt.y + (yOff||0));
+  ctx.fillText(text, pt.x, pt.y + (yOff||0));
+  ctx.restore();
+}
+
+// ── TIME SERIES ───────────────────────────────────────────────────────
+
+function drawTimeSeries() {
+  const ctx = tctx;
+  const W = 620, H = 170;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const PL = 36, PR = 8, PT = 26, PB = 22;
+  const STRIPE = 5;  // px of B-availability stripe above the plot
+  const pw = W-PL-PR, ph = H-PT-PB;
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#faf8f3'; ctx.fillRect(0, 0, W, H);
+
+  if (hist.length < 2) {
+    ctx.fillStyle = '#aaa'; ctx.font = `13px 'Outfit',sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('Run the simulation to see allocation history', W/2, H/2);
+    return;
+  }
+
+  // ── B-availability stripe (thin band above the chart) ──────────────
+  // Green = B open, orange = B blocked.  Runs in the PT margin space.
+  hist.forEach((h, i) => {
+    const x  = PL + (i / HIST_MAX) * pw;
+    const dx = Math.max(1, pw / HIST_MAX) + 0.5;
+    ctx.fillStyle = h.blocked ? 'rgba(200,80,24,0.75)' : 'rgba(29,100,60,0.60)';
+    ctx.fillRect(x, PT - STRIPE - 2, dx, STRIPE);
+  });
+  // Stripe label
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.font = `8px 'Outfit',sans-serif`;
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.fillText('B:', PL - 20, PT - STRIPE/2 - 2);
+
+  // ── Y gridlines + ticks ─────────────────────────────────────────────
+  [0, 0.25, 0.5, 0.75, 1].forEach(v => {
+    const y = PT + ph * (1-v);
+    ctx.strokeStyle = 'rgba(0,0,0,0.06)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(PL, y); ctx.lineTo(PL+pw, y); ctx.stroke();
+    ctx.fillStyle = 'rgba(0,0,0,0.42)';
+    ctx.font = `9.5px 'IBM Plex Mono',monospace`;
+    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    ctx.fillText((v * 100).toFixed(0) + '%', PL-4, y);
+  });
+
+  // ── Blocked-phase background tint ───────────────────────────────────
+  hist.forEach((h, i) => {
+    if (!h.blocked) return;
+    const x  = PL + (i / HIST_MAX) * pw;
+    const dx = Math.max(1, pw / HIST_MAX);
+    ctx.fillStyle = 'rgba(200,80,24,0.07)';
+    ctx.fillRect(x, PT, dx + 0.5, ph);
+  });
+
+  // ── Phase-transition markers ─────────────────────────────────────────
+  for (let i = 1; i < hist.length; i++) {
+    if (hist[i].blocked === hist[i-1].blocked) continue;
+    const x = PL + (i / HIST_MAX) * pw;
+    const isBlock = hist[i].blocked;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(0,0,0,0.28)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(x, PT); ctx.lineTo(x, PT+ph); ctx.stroke();
+    // Label anchored just RIGHT of the vertical line so it sits inside the new state region
+    const label = isBlock ? 'B blocked' : 'B restored';
+    ctx.font = `bold 8px 'Outfit',sans-serif`;
+    ctx.fillStyle = isBlock ? '#c82828' : '#2d6a4f';
+    ctx.textBaseline = 'bottom'; ctx.textAlign = 'left';
+    const lx = Math.min(x + 3, PL + pw - ctx.measureText(label).width - 2);
+    ctx.fillText(label, lx, PT - STRIPE - 2);
+    ctx.restore();
+  }
+
+  // ── Step-response target line ────────────────────────────────────────
+  // Dashed line at 100% when B is the better open option, 0% when blocked.
+  // This is the "ideal" instantaneous response; the solid line tracks it
+  // with the inertia of pheromone dynamics — a classic step-response view.
+  ctx.strokeStyle = 'rgba(29,60,40,0.40)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([7, 4]);
+  ctx.beginPath();
+  hist.forEach((h, i) => {
+    const x = PL + (i / HIST_MAX) * pw;
+    const y = PT + ph * (1 - h.target);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // ── Actual proportion on B — green above 50%, orange below ──────────
+  ctx.lineWidth = 2.4; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const midY = PT + ph * 0.5;
+
+  // Build path function (drawn twice with different clips)
+  const drawVBPath = () => {
+    ctx.beginPath();
+    hist.forEach((h, i) => {
+      const x = PL + (i / HIST_MAX) * pw;
+      const y = PT + ph * (1 - h.vB);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+  };
+
+  // Green: vB > 50% (upper half of chart)
+  ctx.save();
+  ctx.beginPath(); ctx.rect(PL, PT, pw, ph * 0.5 + 1); ctx.clip();
+  ctx.strokeStyle = '#1d6e3a';
+  drawVBPath(); ctx.stroke();
+  ctx.restore();
+
+  // Orange: vB < 50% (lower half of chart)
+  ctx.save();
+  ctx.beginPath(); ctx.rect(PL, midY, pw, ph * 0.5 + 2); ctx.clip();
+  ctx.strokeStyle = '#c85018';
+  drawVBPath(); ctx.stroke();
+  ctx.restore();
+
+  // 50% threshold reference line
+  ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+  ctx.beginPath(); ctx.moveTo(PL, midY); ctx.lineTo(PL + pw, midY); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // ── Axis labels ──────────────────────────────────────────────────────
+  ctx.fillStyle = 'rgba(0,0,0,0.38)';
+  ctx.font = `9px 'IBM Plex Mono',monospace`;
+  ctx.textAlign = 'left';  ctx.textBaseline = 'bottom'; ctx.fillText('← past', PL+2, H-2);
+  ctx.textAlign = 'right'; ctx.fillText('now →', PL+pw-2, H-2);
+
+  ctx.save();
+  ctx.translate(11, PT + ph/2); ctx.rotate(-Math.PI/2);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('% on B (short)', 0, 0);
+  ctx.restore();
+}
+
+// ── UI UPDATES ────────────────────────────────────────────────────────
+
+function updateStats() {
+  const [p1, p2] = getProbs();
+  el('st-p2').textContent = (p2*100).toFixed(1) + '%';
+  el('st-p1').textContent = (p1*100).toFixed(1) + '%';
+  el('st-c2').textContent = c2.toFixed(2);
+  el('st-c1').textContent = c1.toFixed(2);
+  el('time-lbl').textContent = `t = ${simTime.toFixed(0)} min`;
+
+  const consensus = Math.abs(p2 - p1);
+  el('cbar').style.width = (consensus * 100) + '%';
+  el('cbar').style.background = consensus > 0.6 ? 'var(--green-dark)' : consensus > 0.3 ? '#9a7020' : 'var(--orange)';
+
+  // ── Tracking MI — binary: I(feeder available ; majority on B) ──
+  // X = feeder state (open=1, blocked=0), Y = vB > 0.5 (1=majority on B, 0=not)
+  // 2×2 contingency table; normalised by H(Y) so MI∈[0,1].
+  const hasBoth = hist.some(h => h.blocked) && hist.some(h => !h.blocked);
+  if (hasBoth && hist.length >= 40) {
+    let n00=0, n01=0, n10=0, n11=0;
+    for (const h of hist) {
+      const y = h.vB > 0.5 ? 1 : 0;
+      if ( h.blocked && y===0) n00++;
+      else if ( h.blocked && y===1) n01++;
+      else if (!h.blocked && y===0) n10++;
+      else                           n11++;
+    }
+    const N = hist.length;
+    const binent = p => (p > 0 && p < 1) ? -p*Math.log2(p) - (1-p)*Math.log2(1-p) : 0;
+    const HY  = binent((n01 + n11) / N);
+    const n0  = n00 + n01, n1 = n10 + n11;
+    const HYgX = (n0/N) * binent(n0 > 0 ? n01/n0 : 0)
+               + (n1/N) * binent(n1 > 0 ? n11/n1 : 0);
+    const mi = HY > 0 ? Math.max(0, (HY - HYgX) / HY) : 0;
+    el('mi-bar').style.width = (mi * 100) + '%';
+    el('mi-bar').style.background = mi > 0.5 ? 'var(--green-mid)' : mi > 0.25 ? '#9a7020' : 'var(--orange)';
+  }
+
+  // ── Majority legend indicator ────────────────────────────────────────
+  const lastH = hist[hist.length - 1];
+  const curVB = lastH ? lastH.vB : getProbs()[1];
+  const majB  = !blocked && curVB > 0.5;
+  el('leg-maj-dot').style.borderColor = majB ? 'var(--green-dark)' : 'var(--orange)';
+  el('leg-maj-txt').textContent = majB ? '>50% on B (short)' : '>50% on A (long)';
+}
+
+// ── FEEDER CONTROLS ───────────────────────────────────────────────────
+
+function blockB() {
+  blocked = true; q2Eff = 0;
+  el('btn-blk').disabled = true;
+  el('btn-rst').disabled = false;
+}
+
+function restoreB() {
+  blocked = false; q2Eff = P.q2;
+  el('btn-blk').disabled = false;
+  el('btn-rst').disabled = true;
+}
+
+// ── PRESETS ───────────────────────────────────────────────────────────
+
+function applyPreset(spec) {
+  if (spec === 'ph') {
+    // Pheidole megacephala — optimal-noise SR.
+    // feff_blocked=0.20: Pheidole quickly stops recruiting to a lost feeder
+    // (tramp species, exploits ephemeral sources). This keeps c_A weak during
+    // blocking, so B is still competitive at restore. High σ then drives rapid
+    // noise-assisted escape back to the B attractor. Demonstrates the SR sweet spot.
+    P.sigma = 3.0; P.alpha = 2.0; P.rho = 0.015; P.k = 3; P.F = 5.0;
+    P.feff_blocked = 0.20;
+  } else {
+    // Lasius niger — too-little-noise, locked-in failure mode.
+    // feff_blocked=0.80: Lasius continues sending ants down an established trail
+    // even after the feeder disappears — trail persistence. This lets c_A build
+    // strongly during blocking. With σ≈0 the colony is then trapped on A even
+    // when B reopens — a deterministic dead end. Demonstrates the low-noise limit.
+    P.sigma = 0.1; P.alpha = 2.0; P.rho = 0.020; P.k = 4; P.F = 5.0;
+    P.feff_blocked = 0.80;
+  }
+  syncSliders();
+  hist = [];  // clear history so MI recomputes from scratch with new parameters
+}
+
+function syncSliders() {
+  function set(id, vId, val, fmt) {
+    const sl = el(id); sl.value = val;
+    el(vId).textContent = fmt(val); setPct(sl);
+  }
+  set('sl-s',    'vl-s',    P.sigma,        v => v.toFixed(1));
+  set('sl-a',    'vl-a',    P.alpha,        v => v.toFixed(1));
+  set('sl-r',    'vl-r',    P.rho,          v => v.toFixed(3));
+  set('sl-feff', 'vl-feff', P.feff_blocked, v => v.toFixed(2));
+}
+
+// ── MAIN LOOP ─────────────────────────────────────────────────────────
+
+function startSim() {
+  if (simTicker) return;
+  simTicker = setInterval(() => {
+    for (let i = 0; i < spd; i++) simStep();
+  }, 100);
+  running = true;
+  el('sim-badge').textContent = 'RUNNING';
+  el('sim-badge').className = 'badge running';
+  el('btn-run').textContent = '⏸ Pause';
+}
+
+function stopSim() {
+  clearInterval(simTicker); simTicker = null;
+  running = false;
+  el('sim-badge').textContent = 'PAUSED';
+  el('sim-badge').className = 'badge paused';
+  el('btn-run').textContent = '▶ Run';
+}
+
+function drawConcentrations() {
+  const ctx = cctx;
+  const W = 620, H = 130;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const PL = 36, PR = 8, PT = 10, PB = 18;
+  const pw = W-PL-PR, ph = H-PT-PB;
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#faf8f3'; ctx.fillRect(0, 0, W, H);
+
+  if (hist.length < 2) {
+    ctx.fillStyle = '#aaa'; ctx.font = `12px 'Outfit',sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('Run the simulation to see pheromone history', W/2, H/2);
+    return;
+  }
+
+  // Auto-scale y-axis to the maximum τ seen in history
+  const cMax = Math.max(...hist.map(h => Math.max(h.c1, h.c2)), 1);
+  const yScale = v => PT + ph * (1 - v / cMax);
+
+  // Blocked-phase background tint
+  hist.forEach((h, i) => {
+    if (!h.blocked) return;
+    const x  = PL + (i / HIST_MAX) * pw;
+    const dx = Math.max(1, pw / HIST_MAX);
+    ctx.fillStyle = 'rgba(200,80,24,0.07)';
+    ctx.fillRect(x, PT, dx + 0.5, ph);
+  });
+
+  // Y gridlines — 3 evenly spaced
+  [0, 0.5, 1].forEach(v => {
+    const y = PT + ph * (1-v);
+    ctx.strokeStyle = 'rgba(0,0,0,0.06)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(PL, y); ctx.lineTo(PL+pw, y); ctx.stroke();
+    ctx.fillStyle = 'rgba(0,0,0,0.40)';
+    ctx.font = `9px 'IBM Plex Mono',monospace`;
+    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    ctx.fillText((v * cMax).toFixed(0), PL-4, y);
+  });
+
+  // Phase-transition markers (match allocation chart style)
+  for (let i = 1; i < hist.length; i++) {
+    if (hist[i].blocked === hist[i-1].blocked) continue;
+    const x = PL + (i / HIST_MAX) * pw;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(0,0,0,0.22)'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(x, PT); ctx.lineTo(x, PT+ph); ctx.stroke();
+    ctx.restore();
+  }
+
+  // Concentration lines — solid, both on same axes
+  function drawC(key, color) {
+    ctx.strokeStyle = color; ctx.lineWidth = 2.0;
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.setLineDash([]);
+    ctx.beginPath();
+    hist.forEach((h, i) => {
+      const x = PL + (i / HIST_MAX) * pw;
+      const y = yScale(h[key]);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+  }
+  drawC('c2', '#1d3c28');   // τ_B — green
+  drawC('c1', '#c85018');   // τ_A — orange
+
+  // Axis labels
+  ctx.fillStyle = 'rgba(0,0,0,0.38)';
+  ctx.font = `9px 'IBM Plex Mono',monospace`;
+  ctx.textAlign = 'left';  ctx.textBaseline = 'bottom'; ctx.fillText('← past', PL+2, H-2);
+  ctx.textAlign = 'right'; ctx.fillText('now →', PL+pw-2, H-2);
+  ctx.save();
+  ctx.translate(11, PT + ph/2); ctx.rotate(-Math.PI/2);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('τ (pheromone)', 0, 0);
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// TAB 2 — RECRUITMENT LINEARITY EXPLORER
+// ═══════════════════════════════════════════════════════════════════════
+
+const T2_COLORS = ['#c85018','#1d6e3a','#7a5020','#2a5f8a','#7a3a80'];
+const T2_N  = 5;
+let t2Q     = [0.5, 1.0, 1.5, 2.5, 4.0];
+let t2Alpha = 1.0;
+let t2K     = 1.0;
+let t2Ants  = [];    // {fi, t} objects
+
+// Canvas logical dimensions
+const T2_MW = 620, T2_MH = 330;
+const T2_BW = 620, T2_BH = 155;
+
+// Geometry
+const T2_NEST = {x:310, y:295};
+const T2_FPT  = [
+  {x:72,  y:92},
+  {x:195, y:59},
+  {x:310, y:51},
+  {x:425, y:59},
+  {x:548, y:92}
+];
+
+function t2Alloc(alpha, k) {
+  const w = t2Q.map(q => Math.pow(Math.max(0, k + q), alpha));
+  const tot = w.reduce((a,b) => a+b, 0) || 1;
+  return w.map(x => x / tot);
+}
+
+function t2PropRef(k) {          // α=1 reference (proportional)
+  return t2Alloc(1, k);
+}
+
+function t2InitAnts() {
+  const alloc = t2Alloc(t2Alpha, t2K);
+  t2Ants = [];
+  for (let fi = 0; fi < T2_N; fi++) {
+    const n = Math.max(0, Math.round(alloc[fi] * 28));
+    for (let j = 0; j < n; j++) {
+      t2Ants.push({fi, t: Math.random()});
+    }
+  }
+}
+
+function t2SyncAnts() {
+  const alloc = t2Alloc(t2Alpha, t2K);
+  const targets = alloc.map(a => Math.max(0, Math.round(a * 28)));
+  const counts  = Array(T2_N).fill(0);
+  t2Ants.forEach(a => counts[a.fi]++);
+  for (let fi = 0; fi < T2_N; fi++) {
+    while (counts[fi] < targets[fi]) { t2Ants.push({fi, t: Math.random()}); counts[fi]++; }
+    while (counts[fi] > targets[fi]) {
+      const idx = t2Ants.findIndex(a => a.fi === fi);
+      if (idx >= 0) { t2Ants.splice(idx, 1); counts[fi]--; }
+    }
+  }
+  t2Ants.forEach(a => { a.t = (a.t + 0.0035) % 1; });
+}
+
+function t2DrawNetwork() {
+  const cv = el('mc2'); if (!cv) return;
+  const ctx = cv.getContext('2d');
+  const DPR2 = window.devicePixelRatio || 1;
+  ctx.setTransform(DPR2, 0, 0, DPR2, 0, 0);
+  ctx.clearRect(0, 0, T2_MW, T2_MH);
+  ctx.fillStyle = '#faf8f3'; ctx.fillRect(0, 0, T2_MW, T2_MH);
+
+  const alloc = t2Alloc(t2Alpha, t2K);
+
+  // Flow lines — width proportional to allocation
+  for (let fi = 0; fi < T2_N; fi++) {
+    const fp = T2_FPT[fi];
+    ctx.save();
+    ctx.strokeStyle = T2_COLORS[fi];
+    ctx.globalAlpha = 0.18 + alloc[fi] * 0.55;
+    ctx.lineWidth   = 3 + alloc[fi] * 48;
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(T2_NEST.x, T2_NEST.y); ctx.lineTo(fp.x, fp.y); ctx.stroke();
+    ctx.restore();
+  }
+
+  // Animated ants
+  t2Ants.forEach(a => {
+    const fp = T2_FPT[a.fi];
+    const x  = T2_NEST.x + (fp.x - T2_NEST.x) * a.t;
+    const y  = T2_NEST.y + (fp.y - T2_NEST.y) * a.t;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(250,248,243,0.75)'; ctx.lineWidth = 1.8;
+    ctx.fillStyle   = T2_COLORS[a.fi];
+    ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI*2); ctx.stroke(); ctx.fill();
+    ctx.restore();
+  });
+
+  // Feeder circles
+  for (let fi = 0; fi < T2_N; fi++) {
+    const fp  = T2_FPT[fi];
+    const col = T2_COLORS[fi];
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.arc(fp.x, fp.y, 19, 0, Math.PI*2); ctx.fill();
+
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `700 10px 'Outfit',sans-serif`;
+    ctx.fillText(`F${fi+1}`, fp.x, fp.y);
+
+    ctx.fillStyle = col;
+    ctx.font = `500 9px 'IBM Plex Mono',monospace`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillText(`q=${t2Q[fi].toFixed(1)}`, fp.x, fp.y + 24);
+
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(`${(alloc[fi]*100).toFixed(0)}%`, fp.x, fp.y - 24);
+  }
+
+  // Nest circle
+  ctx.fillStyle = '#1d3c28';
+  ctx.beginPath(); ctx.arc(T2_NEST.x, T2_NEST.y, 24, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#e8f2ea'; ctx.font = `700 10px 'Outfit',sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('NEST', T2_NEST.x, T2_NEST.y);
+}
+
+function t2DrawBars() {
+  const cv = el('bc2'); if (!cv) return;
+  const ctx = cv.getContext('2d');
+  const DPR2 = window.devicePixelRatio || 1;
+  ctx.setTransform(DPR2, 0, 0, DPR2, 0, 0);
+  ctx.clearRect(0, 0, T2_BW, T2_BH);
+  ctx.fillStyle = '#faf8f3'; ctx.fillRect(0, 0, T2_BW, T2_BH);
+
+  const alloc = t2Alloc(t2Alpha, t2K);
+  const prop  = t2PropRef(t2K);
+  const PL = 44, PR = 52, PT = 12, PB = 22;
+  const pw = T2_BW - PL - PR, ph = T2_BH - PT - PB;
+  const rowH = ph / T2_N, pad = 3;
+
+  // Equal-allocation reference line (1/N)
+  const eqX = PL + pw / T2_N;
+  ctx.strokeStyle = 'rgba(0,0,0,0.14)'; ctx.lineWidth = 1; ctx.setLineDash([3,3]);
+  ctx.beginPath(); ctx.moveTo(eqX, PT-4); ctx.lineTo(eqX, PT+ph+4); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(0,0,0,0.32)'; ctx.font = `8px 'IBM Plex Mono',monospace`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+  ctx.fillText('1/N', eqX, PT-2);
+
+  // 100% line
+  ctx.strokeStyle = 'rgba(0,0,0,0.10)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(PL+pw, PT); ctx.lineTo(PL+pw, PT+ph); ctx.stroke();
+
+  for (let fi = 0; fi < T2_N; fi++) {
+    const y  = PT + fi * rowH;
+    const bw = alloc[fi] * pw;
+    const rw = prop[fi]  * pw;
+    const col = T2_COLORS[fi];
+
+    // Feeder label
+    ctx.fillStyle = col; ctx.font = `600 9.5px 'Outfit',sans-serif`;
+    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    ctx.fillText(`F${fi+1}`, PL - 5, y + rowH/2);
+
+    // Proportional reference bar (dashed outline)
+    ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.setLineDash([3, 2]);
+    ctx.strokeRect(PL + 0.5, y + pad + 0.5, rw - 1, rowH - 2*pad - 1);
+    ctx.setLineDash([]);
+
+    // Actual allocation bar (solid, slightly inset)
+    const inset = 2;
+    ctx.fillStyle = col;
+    ctx.fillRect(PL, y + pad + inset, bw, rowH - 2*(pad + inset));
+
+    // % label
+    ctx.fillStyle = 'rgba(0,0,0,0.50)'; ctx.font = `8.5px 'IBM Plex Mono',monospace`;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(`${(alloc[fi]*100).toFixed(1)}%`, PL + bw + 4, y + rowH/2);
+  }
+
+  // Axis: 0% and 100%
+  ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.font = `8.5px 'IBM Plex Mono',monospace`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.fillText('0%',   PL,    PT+ph+3);
+  ctx.fillText('100%', PL+pw, PT+ph+3);
+}
+
+function t2UpdatePhase() {
+  const a = t2Alpha;
+  let chip, label, desc, chipBg;
+  if (a < -0.3) {
+    chip = 'anti-quality'; chipBg = '#a02828';
+    label = 'Anti-quality allocation';
+    desc  = 'α < 0: more ants go to WORSE feeders — trail reinforcement inverts quality signals.';
+  } else if (a < 0.35) {
+    chip = 'equal'; chipBg = '#6a6460';
+    label = 'Near-equal allocation';
+    desc  = 'α ≈ 0: quality differences are largely ignored; all feeders receive roughly equal shares.';
+  } else if (a < 0.85) {
+    chip = 'sub-proportional'; chipBg = '#3a6a90';
+    label = 'Sub-proportional allocation';
+    desc  = 'Quality differences are underweighted — allocation is more even than quality alone would predict.';
+  } else if (a < 1.25) {
+    chip = 'proportional (α≈1)'; chipBg = '#2d7a50';
+    label = 'Proportional allocation — linear recruitment';
+    desc  = 'Ants are distributed in proportion to feeder quality. Allocation exactly tracks the quality vector.';
+  } else if (a < 3.2) {
+    chip = 'super-proportional'; chipBg = '#9a6010';
+    label = 'Super-proportional allocation';
+    desc  = 'Quality differences are amplified — better feeders attract disproportionately more ants than their quality alone warrants.';
+  } else {
+    chip = 'winner-take-all'; chipBg = '#c85018';
+    label = 'Near winner-take-all';
+    desc  = 'α → ∞: almost all foragers converge on the single best feeder; weaker feeders are effectively abandoned.';
+  }
+  const chipEl = el('phase2-chip');
+  chipEl.textContent = chip; chipEl.style.background = chipBg;
+  el('phase2-label').textContent = label;
+  el('phase2-sb').textContent    = desc;
+  el('phase2-desc').textContent  = desc;
+}
+
+function t2SetupCanvases() {
+  const DPR2 = window.devicePixelRatio || 1;
+  const mc2 = el('mc2'); if (!mc2) return;
+  mc2.width  = T2_MW * DPR2; mc2.height = T2_MH * DPR2;
+  const bc2 = el('bc2');
+  bc2.width  = T2_BW * DPR2; bc2.height = T2_BH * DPR2;
+}
+
+function t2SetupQSliders() {
+  const container = el('q-srows'); if (!container) return;
+  container.innerHTML = '';
+  for (let fi = 0; fi < T2_N; fi++) {
+    const col = T2_COLORS[fi];
+    const row = document.createElement('div');
+    row.className = 'q-srow';
+    row.innerHTML = `
+      <span class="q-lbl" style="color:${col}">q<sub>${fi+1}</sub></span>
+      <input type="range" id="sl2-q${fi}" min="0.1" max="5.0" step="0.1" value="${t2Q[fi]}">
+      <span class="q-val" id="vl2-q${fi}">${t2Q[fi].toFixed(1)}</span>`;
+    container.appendChild(row);
+  }
+  for (let fi = 0; fi < T2_N; fi++) {
+    const sl = el(`sl2-q${fi}`);
+    setPct(sl);
+    sl.addEventListener('input', () => {
+      t2Q[fi] = parseFloat(sl.value);
+      el(`vl2-q${fi}`).textContent = t2Q[fi].toFixed(1);
+      setPct(sl);
+      t2SyncAnts();
+      t2UpdatePhase();
+    });
+  }
+}
+
+function t2Setup() {
+  t2SetupCanvases();
+  t2SetupQSliders();
+  // α slider
+  const sla = el('sl2-a');
+  const T2_PRESETS = {'p2-lta': -10, 'p2-equal': 0, 'p2-prop': 1, 'p2-wta': 10};
+  const syncAlphaPills = () => {
+    for (const [id, v] of Object.entries(T2_PRESETS))
+      el(id).classList.toggle('on', Math.abs(t2Alpha - v) < 0.05);
+  };
+  sla.addEventListener('input', () => {
+    t2Alpha = parseFloat(sla.value);
+    el('vl2-a').textContent = t2Alpha.toFixed(1);
+    setPct(sla); syncAlphaPills();
+    t2SyncAnts(); t2UpdatePhase();
+  });
+  setPct(sla);
+  // α presets
+  const setAlpha2 = (v) => {
+    t2Alpha = v; sla.value = v;
+    el('vl2-a').textContent = v.toFixed(1); setPct(sla);
+    syncAlphaPills(); t2SyncAnts(); t2UpdatePhase();
+  };
+  el('p2-lta').addEventListener('click',   () => setAlpha2(-10));
+  el('p2-equal').addEventListener('click', () => setAlpha2(0));
+  el('p2-prop').addEventListener('click',  () => setAlpha2(1));
+  el('p2-wta').addEventListener('click',   () => setAlpha2(10));
+  // k slider
+  const slk = el('sl2-k');
+  slk.addEventListener('input', () => {
+    t2K = parseFloat(slk.value);
+    el('vl2-k').textContent = t2K.toFixed(1);
+    setPct(slk); t2SyncAnts(); t2UpdatePhase();
+  });
+  setPct(slk);
+  t2InitAnts();
+  t2UpdatePhase();
+}
+
+function t2RenderFrame() {
+  t2SyncAnts();
+  t2DrawNetwork();
+  t2DrawBars();
+}
+
+let t2Ready = false;
+function renderLoop() {
+  const onTab2 = el('tab2').style.display !== 'none';
+  if (!onTab2) {
+    drawMaze();
+    drawTimeSeries();
+    drawConcentrations();
+    updateStats();
+  } else {
+    t2RenderFrame();
+  }
+  requestAnimationFrame(renderLoop);
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────
+
+function el(id) { return document.getElementById(id); }
+
+function setPhaseTag(html) {
+  el('phase-tag').innerHTML = html;
+}
+
+// ── EVENT WIRING ──────────────────────────────────────────────────────
+
+// Tabs — shared switchTab keeps buttons and dropdown in sync
+function switchTab(id) {
+  el('tab1').style.display = id === 't1' ? '' : 'none';
+  el('tab2').style.display = id === 't2' ? '' : 'none';
+  el('btn-t1').classList.toggle('active', id === 't1');
+  el('btn-t2').classList.toggle('active', id === 't2');
+  el('tab-select').value = id;
+  if (id === 't2' && !t2Ready) { t2Setup(); t2Ready = true; }
+}
+el('btn-t1').addEventListener('click',    () => switchTab('t1'));
+el('btn-t2').addEventListener('click',    () => switchTab('t2'));
+el('tab-select').addEventListener('change', e => switchTab(e.target.value));
+
+// Run / step / reset
+el('btn-run').addEventListener('click', () => { running ? stopSim() : startSim(); });
+el('btn-stp').addEventListener('click', () => { if (!running) { simStep(); } });
+el('btn-res').addEventListener('click', () => {
+  stopSim(); resetSim(); syncSliders();
+});
+
+// Presets — wire both the sidebar buttons and the narrow-clone buttons
+function setPillState(spec) {
+  el('pr-ph').classList.toggle('on', spec === 'ph');
+  el('pr-ln').classList.toggle('on', spec === 'ln');
+  el('pr-ph-n').classList.toggle('on', spec === 'ph');
+  el('pr-ln-n').classList.toggle('on', spec === 'ln');
+}
+el('pr-ph').addEventListener('click', () => { applyPreset('ph'); setPillState('ph'); });
+el('pr-ln').addEventListener('click', () => { applyPreset('ln'); setPillState('ln'); });
+el('pr-ph-n').addEventListener('click', () => { applyPreset('ph'); setPillState('ph'); });
+el('pr-ln-n').addEventListener('click', () => { applyPreset('ln'); setPillState('ln'); });
+
+// Sliders
+function mkSlider(id, vId, param, fmt, xform) {
+  const sl = el(id);
+  sl.addEventListener('input', () => {
+    const v = parseFloat(sl.value);
+    P[param] = xform ? xform(v) : v;
+    el(vId).textContent = fmt(P[param]);
+    setPct(sl);
+    el('pr-ph').classList.remove('on');
+    el('pr-ln').classList.remove('on');
+    el('pr-ph-n').classList.remove('on');
+    el('pr-ln-n').classList.remove('on');
+  });
+  setPct(sl);
+}
+mkSlider('sl-s', 'vl-s', 'sigma', v => v.toFixed(1));
+mkSlider('sl-a', 'vl-a', 'alpha', v => v.toFixed(1));
+mkSlider('sl-r', 'vl-r', 'rho',   v => v.toFixed(3));
+mkSlider('sl-feff', 'vl-feff', 'feff_blocked', v => v.toFixed(2));
+
+// Quality ratio
+el('sl-q').addEventListener('input', () => {
+  const ratio = parseFloat(el('sl-q').value);
+  P.q2 = P.q1 * ratio;
+  if (!blocked) q2Eff = P.q2;
+  el('vl-q').textContent = ratio.toFixed(2) + '×';
+  setPct(el('sl-q'));
+});
+setPct(el('sl-q'));
+
+// Speed
+el('sl-spd').addEventListener('input', () => {
+  spd = parseFloat(el('sl-spd').value);
+  el('vl-spd').textContent = spd.toFixed(1) + '×';
+  setPct(el('sl-spd'));
+});
+setPct(el('sl-spd'));
+
+// Phase duration slider
+el('sl-pdur').addEventListener('input', () => {
+  phaseDuration = parseInt(el('sl-pdur').value, 10);
+  el('vl-pdur').textContent = phaseDuration;
+  setPct(el('sl-pdur'));
+});
+setPct(el('sl-pdur'));
+
+// Continuous cycling toggle
+el('tog-cyc').addEventListener('change', () => {
+  continuousCycling = el('tog-cyc').checked;
+});
+
+// Feeder buttons
+el('btn-blk').addEventListener('click', blockB);
+el('btn-rst').addEventListener('click', restoreB);
+
+// 3-phase experiment
+el('btn-3p').addEventListener('click', () => {
+  stopSim();
+  resetSim();
+  phaseMode = true; phaseNum = 1; phaseSteps = 0;
+  setPhaseTag(`<em>Phase 1:</em> Both feeders available (${phaseDuration} min)…`);
+  el('btn-3p').textContent = continuousCycling ? '⏳ Cycling…' : '⏳ Running…';
+  el('btn-3p').disabled = !continuousCycling;
+  startSim();
+});
+
+// ── BOOT ──────────────────────────────────────────────────────────────
+
+// HiDPI: scale canvas physical dimensions by devicePixelRatio so text
+// and lines are sharp on retina / high-DPI screens.  All drawing code
+// continues to use logical (CSS-pixel) coordinates; ctx.setTransform()
+// at the start of each draw function handles the scaling transparently.
+const DPR = window.devicePixelRatio || 1;
+(function initHiDPI() {
+  const MAZE_W = 620, MAZE_H = 380;
+  const TS_W   = 620, TS_H   = 170;
+  const CC_W   = 620, CC_H   = 130;
+  mc.width  = MAZE_W * DPR;  mc.height = MAZE_H * DPR;
+  tc.width  = TS_W   * DPR;  tc.height = TS_H   * DPR;
+  cc.width  = CC_W   * DPR;  cc.height = CC_H   * DPR;
+  // canvas { width: 100%; } in CSS — height follows the new aspect ratio
+  // via the browser's intrinsic size calculation.  No style override needed.
+})();
+
+initAnts();
+syncSliders();
+renderLoop();
+
+// When embedded in an iframe, hide the back-navigation link but keep
+// the copyright line visible in the bottom-right.
+if (window.self !== window.top) {
+  const backLink = document.querySelector('footer a:first-child');
+  if (backLink) backLink.style.visibility = 'hidden';
+}
+</script>
+</body>
+</html>
