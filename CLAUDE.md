@@ -169,6 +169,7 @@ Add a row to the appropriate table under `## Contents`:
 
 ### Physics-Inspired Methods
 
+- `monte_carlo/mc_explorer.html`
 - `simulated_annealing/simulated_annealing_demo.html`
 - `parallel_tempering/parallel_tempering.html`
 - `softmax/softmax_temperature_explorer.html`
