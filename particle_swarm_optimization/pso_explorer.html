@@ -407,7 +407,7 @@ input[type=range] { width: 100%; accent-color: var(--green-dark); cursor: pointe
 
 <div class="theory-wrap">
 
-  <!-- Left: animated diagram -->
+  <!-- Left: animated diagram + New Velocity summary -->
   <div class="theory-canvas-col">
     <div class="canvas-row">
       <span class="canvas-section-label">Velocity decomposition</span>
@@ -422,11 +422,15 @@ input[type=range] { width: 100%; accent-color: var(--green-dark); cursor: pointe
       <span class="leg"><span class="leg-star" style="color:#9030c0">&#10022;</span>Global best <em>g</em></span>
       <span class="leg"><span class="leg-arrow" style="color:#3a8fd0">&#x2192;</span>Current velocity <em>v</em></span>
     </div>
+    <div class="force-card fc-result" style="margin-top:6px">
+      <div class="force-card-title">&#10145; New Velocity</div>
+      <div class="force-card-eq">v<sub>i</sub>(t+1) = <span class="pr">&omega;v<sub>i</sub></span> + <span class="sc">&phi;<sub>p</sub>r<sub>p</sub>(p<sub>i</sub>&minus;x<sub>i</sub>)</span> + <span class="so">&phi;<sub>g</sub>r<sub>g</sub>(g&minus;x<sub>i</sub>)</span> <span class="no">+ &eta;</span></div>
+      <div class="force-card-desc">Clamped to |v| &le; v<sub>max</sub>. Position updated: x<sub>i</sub>(t+1) = x<sub>i</sub>(t) + v<sub>i</sub>(t+1). The <span class="no">&eta;</span> term is optional.</div>
+    </div>
   </div>
 
-  <!-- Right: equations + pseudocode -->
+  <!-- Right: component force cards -->
   <div class="theory-info-col">
-
     <div class="sec">
       <div class="sec-label">Velocity Update</div>
       <div class="force-cards">
@@ -454,24 +458,24 @@ input[type=range] { width: 100%; accent-color: var(--green-dark); cursor: pointe
           <div class="force-card-eq"><span class="no">&eta; &sim; &Nscr;(0, &sigma;<sup>2</sup><b>I</b>)</span></div>
           <div class="force-card-desc">
             Additive Gaussian noise applied each step, independent of pbest and gbest.
-            Not part of Kennedy &amp; Eberhart's (1995) canonical PSO —
+            Not part of Kennedy &amp; Eberhart's (1995) canonical PSO &mdash;
             inspired by the Vicsek (1995) flocking model and enables independent hill climbing by individuals.
           </div>
         </div>
 
-        <div class="force-card fc-result">
-          <div class="force-card-title">&#10145; New Velocity</div>
-          <div class="force-card-eq">v<sub>i</sub>(t+1) = <span class="pr">&omega;v<sub>i</sub></span> + <span class="sc">&phi;<sub>p</sub>r<sub>p</sub>(p<sub>i</sub>&minus;x<sub>i</sub>)</span> + <span class="so">&phi;<sub>g</sub>r<sub>g</sub>(g&minus;x<sub>i</sub>)</span> <span class="no">+ &eta;</span></div>
-          <div class="force-card-desc">Clamped to |v| &le; v<sub>max</sub>. Position updated: x<sub>i</sub>(t+1) = x<sub>i</sub>(t) + v<sub>i</sub>(t+1). The <span class="no">&eta;</span> term is optional — see above.</div>
-        </div>
-
       </div>
     </div>
+  </div>
 
-    <div class="sec">
-      <div class="sec-label">Algorithm Sketch</div>
-      <div class="algo-block">
-        <div class="algo-code"><span class="kw">initialize</span> N particles randomly
+</div><!-- theory-wrap -->
+
+<div class="theory-wrap" style="border-top:none">
+
+  <!-- Left: Algorithm Sketch -->
+  <div class="theory-canvas-col">
+    <div class="sec-label">Algorithm Sketch</div>
+    <div class="algo-block">
+      <div class="algo-code"><span class="kw">initialize</span> N particles randomly
   x<sub>i</sub> &sim; U(lb, ub); v<sub>i</sub> &sim; U(&minus;v<sub>max</sub>, v<sub>max</sub>)
   p<sub>i</sub> &larr; x<sub>i</sub>;  g &larr; argmax<sub>i</sub> f(x<sub>i</sub>)
 
@@ -487,9 +491,11 @@ input[type=range] { width: 100%; accent-color: var(--green-dark); cursor: pointe
     <span class="kw">if</span> f(x<sub>i</sub>) > f(p<sub>i</sub>): p<sub>i</sub> &larr; x<sub>i</sub>
     <span class="kw">if</span> f(x<sub>i</sub>) > f(g):  g  &larr; x<sub>i</sub>
 <span class="kw">until</span> <span class="cm">// mean|v| &lt; &epsilon; or iter &ge; max</span></div>
-      </div>
     </div>
+  </div>
 
+  <!-- Right: Convergence Guarantee -->
+  <div class="theory-info-col">
     <div class="sec">
       <div class="sec-label">Convergence guarantee</div>
       <div style="font-size:0.78rem; color:var(--text-muted); line-height:1.6;">
@@ -505,9 +511,9 @@ input[type=range] { width: 100%; accent-color: var(--green-dark); cursor: pointe
         The displayed &phi;<sub>p</sub>, &phi;<sub>g</sub> sliders on Tab&nbsp;&#9313; control these distributed effective coefficients (which sum to &gt;&nbsp;4&chi;).
       </div>
     </div>
-
   </div>
-</div><!-- theory-wrap -->
+
+</div><!-- theory-wrap-2 -->
 
 </div><!-- tab-theory -->
 
@@ -679,7 +685,6 @@ input[type=range] { width: 100%; accent-color: var(--green-dark); cursor: pointe
   </div>
 </div>
 
-</div><!-- tab-sim -->
 
 <div style="border-top:1px solid var(--border);padding:12px 20px;background:var(--surface-alt)">
   <span style="font-size:0.67rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);margin-right:8px">Convergence</span>
@@ -691,6 +696,8 @@ input[type=range] { width: 100%; accent-color: var(--green-dark); cursor: pointe
     See Tab&nbsp;&#9312; for the full derivation.
   </span>
 </div>
+</div><!-- tab-sim -->
+
 
 <footer class="footer">
   &copy; 2026 Theodore P. Pavlic &middot;
