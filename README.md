@@ -69,6 +69,7 @@ as iframes.
 | Directory | Description |
 | --- | --- |
 | [`radial_basis_function_nn/`](radial_basis_function_nn/) | Interactive explorer for RBF neural networks: centers, widths, weights, and the kernel-trick connection to SVMs |
+| [`optimal_foraging_theory/mvt_explorer.html`](optimal_foraging_theory/mvt_explorer.html) | Interactive MVT explorer: drag the tangent line to find optimal patch residence times under Charnov's Marginal Value Theorem — R* as opportunity cost mirrors the temporal discount rate in the reinforcement learning Bellman equation |
 
 ### Cellular Automata
 

@@ -5,7 +5,24 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="Interactive explorer for Charnov's Marginal Value Theorem (MVT) — optimal patch residence time in foraging ecology. The long-term habitat rate R* is the opportunity cost of time and acts as a temporal discount rate: foragers leave a patch when marginal returns fall to R*, exactly as a Bellman-optimal agent discounts future rewards. Relevant to reinforcement learning (discount rates, opportunity costs, explore–exploit tradeoffs) and to animal behavior / behavioral ecology courses.">
 <meta name="keywords" content="Marginal Value Theorem, foraging ecology, optimal foraging, opportunity cost, temporal discount rate, reinforcement learning, equimarginal principle, patch residence time, behavioral ecology">
-<title>MVT Explorer — Marginal Value Theorem</title>
+<title>MVT Explorer — Marginal Value Theorem — interactive explainer</title>
+
+<!-- Open Graph (Facebook, LinkedIn, Slack, iMessage, etc.) -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="MVT Explorer — Marginal Value Theorem — interactive explainer">
+<meta property="og:description" content="Interactive explorer for Charnov's Marginal Value Theorem (MVT): drag the tangent to find optimal patch residence time and see how the habitat-wide rate R* acts as a temporal discount rate — a structural parallel to the Bellman equation in reinforcement learning.">
+<meta property="og:image" content="https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/optimal_foraging_theory/mvt_explorer-preview.png">
+<meta property="og:image:width" content="2226">
+<meta property="og:image:height" content="1108">
+<meta property="og:url" content="https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/optimal_foraging_theory/mvt_explorer.html">
+<meta property="fb:app_id" content="2385695445236853">
+
+<!-- Twitter/X card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="MVT Explorer — Marginal Value Theorem — interactive explainer">
+<meta name="twitter:description" content="Interactive explorer for Charnov's Marginal Value Theorem (MVT): drag the tangent to find optimal patch residence time and see how the habitat-wide rate R* acts as a temporal discount rate — a structural parallel to the Bellman equation in reinforcement learning.">
+<meta name="twitter:image" content="https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/optimal_foraging_theory/mvt_explorer-preview.png">
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
 <style>
@@ -953,6 +970,12 @@ requestAnimationFrame(()=>{
   renderSingle();
   ensureTri();drawTri();
 });
+</script>
+<footer id="course-nav-footer" style="margin-top:0;padding-top:0.75rem;border-top:1px solid #e0e0e0;font-size:0.8rem;color:#888;text-align:left;">
+  <a href="../" style="color:#2e7d32;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">&larr; All course visualizations</a>
+</footer>
+<script>
+if (window.self !== window.top) { var f = document.getElementById('course-nav-footer'); if (f) { f.style.display = 'none'; } }
 </script>
 </body>
 </html>

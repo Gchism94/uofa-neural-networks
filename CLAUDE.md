@@ -189,6 +189,7 @@ Add a row to the appropriate table under `## Contents`:
 ### Neural Networks
 
 - `radial_basis_function_nn/rbfnn_explorer.html`
+- `optimal_foraging_theory/mvt_explorer.html`
 
 ### Cellular Automata
 
