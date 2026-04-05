@@ -1,0 +1,1496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Echo State Network Explorer</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#faf8f2;--surf:#f0ece0;--surf2:#e4dece;
+  --green:#2d5016;--green2:#3d6b1e;
+  --orange:#e87722;
+  --text:#1c1a10;--muted:#5c4a1e;--border:#c8b89a;
+  --hi:#eef5e6;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden;}
+.wh{background:var(--green);color:#faf8f2;padding:13px 20px;border-bottom:3px solid var(--orange);}
+.wh h1{font-size:1.18rem;font-weight:600;letter-spacing:.02em;}
+.wh p{font-size:.76rem;opacity:.82;margin-top:2px;font-family:'IBM Plex Mono',monospace;}
+.tabs{display:flex;background:var(--surf);border-bottom:2px solid var(--border);padding:0 14px;}
+.tab{padding:9px 15px;border:none;background:transparent;font-family:'Outfit';font-size:.82rem;font-weight:500;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .15s;}
+.tab.on{color:var(--green);border-bottom-color:var(--orange);font-weight:600;}
+.tab:hover:not(.on){color:var(--green2);}
+.panel{display:none;padding:13px 14px;}
+.panel.on{display:block;}
+.cbar{display:flex;flex-wrap:wrap;gap:9px;align-items:center;padding:8px 11px;background:var(--surf);border-radius:6px;border:1px solid var(--border);margin-bottom:11px;}
+.cg{display:flex;align-items:center;gap:5px;}
+label{font-size:.74rem;font-weight:500;color:var(--muted);white-space:nowrap;}
+select{font-family:'IBM Plex Mono';font-size:.73rem;padding:3px 5px;border:1.5px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);}
+input[type=range]{width:72px;cursor:pointer;accent-color:var(--green);}
+.vl{font-family:'IBM Plex Mono';font-size:.73rem;color:var(--green);min-width:28px;}
+.btn{padding:5px 11px;background:var(--green);color:#faf8f2;border:none;border-radius:4px;font-family:'Outfit';font-size:.77rem;font-weight:500;cursor:pointer;transition:background .15s;white-space:nowrap;}
+.btn:hover{background:var(--green2);}
+.btn.tog{background:var(--surf2);color:var(--green);border:1.5px solid var(--border);}
+.btn.tog.on{background:var(--green);color:#faf8f2;border-color:var(--green);}
+.cw{border:1.5px solid var(--border);border-radius:6px;overflow:hidden;background:var(--bg);}
+canvas{display:block;}
+.ins{margin-top:10px;padding:9px 13px;background:var(--hi);border-left:3px solid var(--green);border-radius:0 4px 4px 0;font-size:.79rem;color:var(--green);line-height:1.58;}
+.ins strong{font-weight:600;}
+.row{display:flex;gap:11px;}
+.col{flex:1;min-width:0;}
+.ml{font-family:'IBM Plex Mono';font-size:.68rem;color:var(--muted);margin-bottom:3px;}
+.acc-row{display:flex;flex-wrap:wrap;gap:11px;margin-bottom:11px;}
+.acc-card{flex:1;min-width:180px;background:var(--surf);border:1.5px solid var(--border);border-radius:6px;padding:12px;text-align:center;}
+.acc-card.hi{border-color:var(--green);background:var(--hi);}
+.acc-num{font-family:'IBM Plex Mono';font-size:2rem;font-weight:500;color:var(--green);margin:5px 0 3px;}
+.acc-lbl{font-size:.73rem;color:var(--muted);}
+.acc-sub{font-size:.66rem;color:var(--muted);margin-top:1px;}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:sp .7s linear infinite;vertical-align:middle;}
+@keyframes sp{to{transform:rotate(360deg);}}
+.ssel{display:flex;align-items:center;gap:5px;}
+.sw{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+#c1-tr{cursor:col-resize;}
+#t1-lbl{height:1.3em;overflow:hidden;white-space:nowrap;}
+.tab-select{display:none;width:100%;padding:9px 14px;font-family:'Outfit';font-size:.85rem;font-weight:500;color:var(--muted);background:var(--surf);border:none;border-bottom:2px solid var(--border);cursor:pointer;outline:none;}
+@media(max-width:560px){.tabs{display:none;}.tab-select{display:block;}}
+.cr-block{margin-left:auto;font-family:'IBM Plex Mono';font-size:.62rem;opacity:.65;text-align:right;line-height:1.6;padding-bottom:2px;}
+.cr-block a{color:inherit;text-decoration:none;border-bottom:1px dotted rgba(255,255,255,.5);}
+.cr-sep{display:none;}
+@media(max-width:920px){.cr-br{display:none;}.cr-sep{display:inline;}}
+@media(max-width:400px){.cr-br{display:block;}.cr-sep{display:none;}}
+.cbar-row{display:flex;flex-wrap:wrap;gap:9px;align-items:center;}
+.cbar-row+.cbar-row{padding-top:5px;}
+</style>
+</head>
+<body>
+
+<div class="wh" style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:4px 12px">
+  <div>
+    <h1>Echo State Network / Reservoir Computing Explorer</h1>
+    <p>A frozen random dynamical system converts temporal patterns into trainable spatial features</p>
+  </div>
+  <div class="cr-block">
+    © 2026 Theodore P. Pavlic<br class="cr-br"><span class="cr-sep"> · </span><a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a>
+  </div>
+</div>
+<div class="tabs">
+  <button class="tab on" onclick="showTab(0)">① Echo &amp; Memory</button>
+  <button class="tab"    onclick="showTab(1)">② RMS Fingerprint</button>
+  <button class="tab"    onclick="showTab(2)">③ Pattern Fingerprints</button>
+  <button class="tab"    onclick="showTab(3)">④ Classification Comparison</button>
+</div>
+<select class="tab-select" id="tab-dropdown" onchange="showTab(parseInt(this.value))">
+  <option value="0">① Echo &amp; Memory</option>
+  <option value="1">② RMS Fingerprint</option>
+  <option value="2">③ Pattern Fingerprints</option>
+  <option value="3">④ Classification Comparison</option>
+</select>
+
+<!-- ═══ TAB 1 ═══ -->
+<div class="panel on" id="p0">
+  <div class="cbar" style="flex-direction:column;gap:0">
+    <div class="cbar-row">
+      <div class="cg"><label>Input pattern:</label>
+        <select id="t1-pat" onchange="renderTab1()">
+          <option value="sine_slow">Slow sine (f = 0.04)</option>
+          <option value="sine_fast">Fast sine (f = 0.14)</option>
+          <option value="square">Square wave (f = 0.05)</option>
+          <option value="chirp">Chirp (sweep)</option>
+        </select></div>
+      <div class="cg"><label title="ρ = spectral radius (largest eigenvalue) of the random recurrent weight matrix. Controls how fast activation echoes decay. ρ &lt; 1: stable; ρ ≥ 1: diverges.">Recurrent weight scale ρ:</label>
+        <input type="range" id="t1-rho" min="0.20" max="1.30" value="0.90" step="0.05" oninput="upRho1()">
+        <span class="vl" id="t1-rhov">0.90</span></div>
+    </div>
+    <div class="cbar-row">
+      <button class="btn tog" id="t1-ic" onclick="toggleIC()">Show different initial conditions</button>
+    </div>
+  </div>
+
+  <div class="ml" id="t1-inp-lbl">input x(t) — driven for t = 0 … 149, then silenced</div>
+  <div class="cw" style="margin-bottom:5px"><canvas id="c1-inp"></canvas></div>
+
+  <div class="ml" id="t1-lbl">6 reservoir neuron traces h<sub>i</sub>(t) — drag bar to select snapshot</div>
+  <div class="cw" style="margin-bottom:5px"><canvas id="c1-tr"></canvas></div>
+
+  <div class="ml">
+    Spatial fingerprint at selected t &nbsp;·&nbsp; colored dots = the 6 traced neurons &nbsp;·&nbsp; gallery: all 4 signal families × 10 time slices &nbsp;·&nbsp; <strong style="color:var(--green)">highlight = single best L² match</strong>
+  </div>
+  <div class="cw"><canvas id="c1-snap"></canvas></div>
+
+  <div class="ml" style="margin-top:8px">Classifier vote — best-match family at each of 80 time slices across the driven phase (t = 20 … 99) · ★ = plurality winner</div>
+  <div class="cw"><canvas id="c1-hist"></canvas></div>
+
+  <div class="ins" id="t1-ins">
+    <strong>The reservoir is working memory.</strong> See below for explanation.
+  </div>
+<div style="margin-top:10px;padding:9px 12px;background:var(--surf);border-radius:6px;border:1px solid var(--border)">
+<svg viewBox="0 0 660 90" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:660px;display:block;margin:0 auto;height:auto">
+<defs>
+  <marker id="arh" markerWidth="7" markerHeight="7" refX="5.5" refY="3" orient="auto">
+    <path d="M0,0 L0,6 L7,3z" fill="#5c4a1e" opacity=".6"/>
+  </marker>
+</defs>
+<!-- input: x=8, w=90, right=98 -->
+<rect x="8" y="22" width="90" height="46" rx="5" fill="#e4dece" stroke="#c8b89a" stroke-width="1.3"/>
+<text x="53" y="41" font-family="IBM Plex Mono" font-size="9.5" fill="#3a2c10" text-anchor="middle" dominant-baseline="middle" font-weight="bold">input x(t)</text>
+<text x="53" y="57" font-family="IBM Plex Mono" font-size="8.5" fill="#5c4a1e" text-anchor="middle" dominant-baseline="middle">time series</text>
+<!-- arrow 98→120 -->
+<line x1="98" y1="45" x2="118" y2="45" stroke="#5c4a1e" stroke-width="1.5" opacity=".55" marker-end="url(#arh)"/>
+<!-- reservoir: x=121, w=148, right=269 -->
+<rect x="121" y="9" width="148" height="72" rx="6" fill="#eef5e6" stroke="#2d5016" stroke-width="1.8"/>
+<rect x="163" y="2" width="62" height="13" rx="4" fill="#c8b89a"/>
+<text x="194" y="10" font-family="IBM Plex Mono" font-size="7.5" fill="#3a2c10" text-anchor="middle" dominant-baseline="middle">FROZEN</text>
+<text x="195" y="30" font-family="IBM Plex Mono" font-size="11" fill="#2d5016" text-anchor="middle" dominant-baseline="middle" font-weight="bold">Reservoir</text>
+<text x="195" y="47" font-family="IBM Plex Mono" font-size="8.5" fill="#2d5016" text-anchor="middle" dominant-baseline="middle">random fixed weights</text>
+<text x="195" y="61" font-family="IBM Plex Mono" font-size="8.5" fill="#2d5016" text-anchor="middle" dominant-baseline="middle">N neurons</text>
+<text x="195" y="74" font-family="IBM Plex Mono" font-size="8" fill="#2d5016" text-anchor="middle" dominant-baseline="middle">&#x3c1; controls memory decay</text>
+<!-- arrow 269→291 -->
+<line x1="269" y1="45" x2="289" y2="45" stroke="#5c4a1e" stroke-width="1.5" opacity=".55" marker-end="url(#arh)"/>
+<!-- fingerprint: x=292, w=106, right=398 -->
+<rect x="292" y="22" width="106" height="46" rx="5" fill="#e4dece" stroke="#c8b89a" stroke-width="1.3"/>
+<text x="345" y="37" font-family="IBM Plex Mono" font-size="9.5" fill="#3a2c10" text-anchor="middle" dominant-baseline="middle" font-weight="bold">h(T) &#x2208; &#x211d;&#x1d3a;</text>
+<text x="345" y="50" font-family="IBM Plex Mono" font-size="8" fill="#5c4a1e" text-anchor="middle" dominant-baseline="middle">instantaneous</text>
+<text x="345" y="62" font-family="IBM Plex Mono" font-size="8" fill="#5c4a1e" text-anchor="middle" dominant-baseline="middle">reservoir state</text>
+<!-- arrow 398→420 -->
+<line x1="398" y1="45" x2="418" y2="45" stroke="#5c4a1e" stroke-width="1.5" opacity=".55" marker-end="url(#arh)"/>
+<!-- classifier: x=421, w=152, right=573 -->
+<rect x="421" y="9" width="152" height="72" rx="6" fill="#fff8e6" stroke="#e87722" stroke-width="1.8"/>
+<rect x="467" y="2" width="58" height="13" rx="4" fill="#e87722" opacity=".8"/>
+<text x="496" y="10" font-family="IBM Plex Mono" font-size="7.5" fill="#fff" text-anchor="middle" dominant-baseline="middle">TRAINED</text>
+<text x="497" y="30" font-family="IBM Plex Mono" font-size="11" fill="#c04818" text-anchor="middle" dominant-baseline="middle" font-weight="bold">Linear Classifier</text>
+<text x="497" y="47" font-family="IBM Plex Mono" font-size="8.5" fill="#c04818" text-anchor="middle" dominant-baseline="middle">one layer &#x00b7; w &#x00b7; h(T)</text>
+<text x="497" y="61" font-family="IBM Plex Mono" font-size="8" fill="#c04818" text-anchor="middle" dominant-baseline="middle">reservoir maps signal to</text>
+<text x="497" y="74" font-family="IBM Plex Mono" font-size="8" fill="#c04818" text-anchor="middle" dominant-baseline="middle">separable &#x211d;&#x1d3a; → linear works</text>
+<!-- arrow 573→595 -->
+<line x1="573" y1="45" x2="595" y2="45" stroke="#5c4a1e" stroke-width="1.5" opacity=".55" marker-end="url(#arh)"/>
+<!-- class label -->
+<text x="602" y="45" font-family="IBM Plex Mono" font-size="10" fill="#3a2c10" text-anchor="start" dominant-baseline="middle" font-weight="bold">class</text>
+</svg>
+</div>
+</div>
+
+<!-- ═══ TAB 2 (NEW): RMS Fingerprint ═══ -->
+<div class="panel" id="p1">
+  <div class="cbar" style="flex-direction:column;gap:0">
+    <div class="cbar-row">
+      <div class="cg"><label>Signal A:</label>
+        <div class="ssel"><div class="sw" style="background:#2d5016"></div>
+          <select id="rms-pA" onchange="renderRMSTab()">
+            <option value="sine_slow">Slow sine</option><option value="sine_fast">Fast sine</option>
+            <option value="square">Square wave</option><option value="chirp">Chirp</option>
+          </select></div></div>
+      <div class="cg"><label>Signal B:</label>
+        <div class="ssel"><div class="sw" style="background:#e87722"></div>
+          <select id="rms-pB" onchange="renderRMSTab()">
+            <option value="sine_slow">Slow sine</option><option value="sine_fast" selected>Fast sine</option>
+            <option value="square">Square wave</option><option value="chirp">Chirp</option>
+          </select></div></div>
+    </div>
+    <div class="cbar-row">
+      <div class="cg"><label title="Phase offset applied to Signal B only. Watch the waveform shift while the RMS fingerprint stays identical.">Signal B phase shift:</label>
+        <input type="range" id="rms-phase" min="0" max="360" value="0" step="10" style="accent-color:#e87722"
+          oninput="document.getElementById('rms-phasev').textContent=this.value+'°';renderRMSTab()">
+        <span class="vl" id="rms-phasev">0°</span></div>
+    </div>
+  </div>
+
+  <div class="ml">① Input signals — 100 steps each</div>
+  <div class="cw" style="margin-bottom:4px"><canvas id="c-rms-inp"></canvas></div>
+  <div style="text-align:center;font-size:.9rem;color:var(--muted);margin:2px 0 4px">↓ &nbsp;drives reservoir (N = 20 neurons, ρ = 0.9) &nbsp;↓</div>
+
+  <div class="ml">② Reservoir neuron traces h<sub>i</sub>(t) — 8 of 20 shown · shaded = averaging window (t = 50 … 99)</div>
+  <div class="cw" style="margin-bottom:4px"><canvas id="c-rms-traces"></canvas></div>
+  <div style="text-align:center;font-size:.9rem;color:var(--muted);margin:2px 0 4px">↓ &nbsp;√(mean(h<sub>i</sub>(t)²)) over shaded window &nbsp;↓</div>
+
+  <div class="ml">③ Response-amplitude fingerprint — one bar per neuron · height = RMS over averaging window</div>
+  <div class="cw" style="margin-bottom:6px"><canvas id="c-rms-bars"></canvas></div>
+
+  <div class="ins"><strong>How the fingerprint forms.</strong> Each reservoir neuron responds to the input with its own oscillation. During the steady-state window (shaded) the pattern is stable and repeating — it encodes the input's character, not its phase. Taking the RMS of each neuron's output collapses the time dimension into a single number per neuron: the oscillation amplitude. Different input signals produce distinct bar-height signatures. <strong>Try the phase shift slider</strong> — drag Signal B's phase from 0° to 360°. Watch the waveform slide in panel ①, the traces shift in panel ②, but the orange bars in panel ③ stay locked in place. <strong>Why is this?</strong> For periodic signals (sine, square wave), the averaging window spans many complete cycles and mean(x²) over any integer number of cycles equals amplitude²/2 exactly — the phase cancels algebraically. For the chirp, the instantaneous frequency at each time step is fixed by <em>t</em> (not by the starting phase), so different phases trace the same frequency sweep in the window; the RMS averages over many frequencies and nearly cancels the phase. The slight jitter you see with the chirp is the residual from this approximate (not exact) cancellation — the chirp never completes full cycles at any single frequency, so there is no perfect algebraic cancellation, only statistical averaging.</div>
+</div>
+
+<!-- ═══ TAB 2 ═══ -->
+<div class="panel" id="p2">
+  <div class="cbar" style="flex-direction:column;gap:0">
+    <div class="cbar-row">
+      <div class="cg"><label>Pattern A:</label>
+        <div class="ssel"><div class="sw" style="background:#2d5016"></div>
+          <select id="t2-pA" onchange="renderTab2()">
+            <option value="sine_slow">Slow sine</option><option value="sine_fast">Fast sine</option>
+            <option value="square">Square wave</option><option value="chirp">Chirp</option>
+          </select></div></div>
+      <div class="cg"><label>Pattern B:</label>
+        <div class="ssel"><div class="sw" style="background:#e87722"></div>
+          <select id="t2-pB" onchange="renderTab2()">
+            <option value="sine_slow">Slow sine</option><option value="sine_fast" selected>Fast sine</option>
+            <option value="square">Square wave</option><option value="chirp">Chirp</option>
+          </select></div></div>
+    </div>
+    <div class="cbar-row">
+      <div class="cg"><label title="N = number of neurons in the reservoir. Larger N = higher-dimensional fingerprint.">Reservoir size N:</label>
+        <input type="range" id="t2-N" min="5" max="100" value="50" step="5" oninput="document.getElementById('t2-Nv').textContent=this.value;renderTab2()">
+        <span class="vl" id="t2-Nv">50</span></div>
+      <div class="cg"><label title="ρ = spectral radius of the recurrent weight matrix. Same ρ as Tab 1.">Recurrent weight scale ρ:</label>
+        <input type="range" id="t2-rho" min="0.20" max="1.30" value="0.90" step="0.05" oninput="document.getElementById('t2-rhov').textContent=parseFloat(this.value).toFixed(2);renderTab2()">
+        <span class="vl" id="t2-rhov">0.90</span></div>
+      <div class="cg"><label title="Gaussian noise added independently to each trial.">Noise σ per trial:</label>
+        <input type="range" id="t2-ns" min="0" max="0.5" value="0.10" step="0.05" oninput="document.getElementById('t2-nsv').textContent=parseFloat(this.value).toFixed(2);renderTab2()">
+        <span class="vl" id="t2-nsv">0.10</span></div>
+    </div>
+    <div class="cbar-row">
+      <div class="cg"><label title="Number of independent trials generated per class.">Trials per class:</label>
+        <input type="range" id="t2-nt" min="20" max="100" value="60" step="20" oninput="document.getElementById('t2-ntv').textContent=this.value;renderTab2()">
+        <span class="vl" id="t2-ntv">60</span></div>
+      <div class="cg"><label>Latent visualization:</label>
+        <select id="t2-viz" onchange="renderTab2()" style="font-family:'Outfit';font-size:.8rem">
+          <option value="pca">PCA</option>
+          <option value="lda">LDA</option>
+        </select></div>
+    </div>
+  </div>
+  <div class="row" style="flex-wrap:wrap">
+    <div class="col" style="min-width:260px"><div class="ml">Raw x(T=end)</div><div class="cw"><canvas id="c2-raw"></canvas></div></div>
+    <div class="col" style="min-width:260px"><div class="ml" id="t2-esn-lbl">LDA of ESN fingerprint</div><div class="cw"><canvas id="c2-esn"></canvas></div></div>
+  </div>
+  <div class="ins"><strong>Each dot = one noisy trial</strong> (random phase + noise). <strong>Left — raw x(T=end):</strong> uniformly distributed on [−1, 1] regardless of frequency — zero information. <strong>Right — LDA of response-amplitude fingerprint:</strong> for each trial the ESN is driven for 100 steps; then for each of the N neurons we compute sqrt(mean(hᵢ(t)²)) over the steady-state window. This <em>per-neuron oscillation amplitude</em> is phase-invariant (mean(x²) over a full cycle of any sinusoid equals amplitude²/2, regardless of starting phase), so random phases no longer scatter the feature vectors. The two classes form compact, well-separated clusters along the Fisher discriminant axis; the vertical line is the LDA decision boundary. This is why Tab 3 achieves high accuracy with a simple Linear Classifier: the reservoir converts a hard temporal classification problem into an easy spatial one.</div>
+<div style="margin-top:10px;padding:9px 12px;background:var(--surf);border-radius:6px;border:1px solid var(--border)">
+<svg viewBox="0 0 660 90" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:660px;display:block;margin:0 auto;height:auto">
+<defs>
+  <marker id="arh" markerWidth="7" markerHeight="7" refX="5.5" refY="3" orient="auto">
+    <path d="M0,0 L0,6 L7,3z" fill="#5c4a1e" opacity=".6"/>
+  </marker>
+</defs>
+<!-- input: x=8, w=90, right=98 -->
+<rect x="8" y="22" width="90" height="46" rx="5" fill="#e4dece" stroke="#c8b89a" stroke-width="1.3"/>
+<text x="53" y="41" font-family="IBM Plex Mono" font-size="9.5" fill="#3a2c10" text-anchor="middle" dominant-baseline="middle" font-weight="bold">input x(t)</text>
+<text x="53" y="57" font-family="IBM Plex Mono" font-size="8.5" fill="#5c4a1e" text-anchor="middle" dominant-baseline="middle">time series</text>
+<!-- arrow 98→120 -->
+<line x1="98" y1="45" x2="118" y2="45" stroke="#5c4a1e" stroke-width="1.5" opacity=".55" marker-end="url(#arh)"/>
+<!-- reservoir: x=121, w=148, right=269 -->
+<rect x="121" y="9" width="148" height="72" rx="6" fill="#eef5e6" stroke="#2d5016" stroke-width="1.8"/>
+<rect x="163" y="2" width="62" height="13" rx="4" fill="#c8b89a"/>
+<text x="194" y="10" font-family="IBM Plex Mono" font-size="7.5" fill="#3a2c10" text-anchor="middle" dominant-baseline="middle">FROZEN</text>
+<text x="195" y="30" font-family="IBM Plex Mono" font-size="11" fill="#2d5016" text-anchor="middle" dominant-baseline="middle" font-weight="bold">Reservoir</text>
+<text x="195" y="47" font-family="IBM Plex Mono" font-size="8.5" fill="#2d5016" text-anchor="middle" dominant-baseline="middle">random fixed weights</text>
+<text x="195" y="61" font-family="IBM Plex Mono" font-size="8.5" fill="#2d5016" text-anchor="middle" dominant-baseline="middle">N neurons</text>
+<text x="195" y="74" font-family="IBM Plex Mono" font-size="8" fill="#2d5016" text-anchor="middle" dominant-baseline="middle">&#x3c1; controls memory decay</text>
+<!-- arrow 269→291 -->
+<line x1="269" y1="45" x2="289" y2="45" stroke="#5c4a1e" stroke-width="1.5" opacity=".55" marker-end="url(#arh)"/>
+<!-- fingerprint: x=278, w=126, right=404 -->
+<rect x="278" y="16" width="126" height="58" rx="5" fill="#e4dece" stroke="#c8b89a" stroke-width="1.3"/>
+<text x="341" y="32" font-family="IBM Plex Mono" font-size="9" fill="#3a2c10" text-anchor="middle" dominant-baseline="middle" font-weight="bold">amplitude &#x2208; &#x211d;&#x1d3a;</text>
+<text x="341" y="45" font-family="IBM Plex Mono" font-size="7.5" fill="#5c4a1e" text-anchor="middle" dominant-baseline="middle">&#x221a;( time-avg of h&#x1d62;(t)² )</text>
+<text x="341" y="57" font-family="IBM Plex Mono" font-size="7.5" fill="#5c4a1e" text-anchor="middle" dominant-baseline="middle">over steady-state window</text>
+<text x="341" y="68" font-family="IBM Plex Mono" font-size="7.5" fill="#9a7a40" text-anchor="middle" dominant-baseline="middle">phase-invariant</text>
+<!-- arrow 404→418 -->
+<line x1="404" y1="45" x2="418" y2="45" stroke="#5c4a1e" stroke-width="1.5" opacity=".55" marker-end="url(#arh)"/>
+<!-- classifier: x=421, w=152, right=573 -->
+<rect x="421" y="9" width="152" height="72" rx="6" fill="#fff8e6" stroke="#e87722" stroke-width="1.8"/>
+<rect x="467" y="2" width="58" height="13" rx="4" fill="#e87722" opacity=".8"/>
+<text x="496" y="10" font-family="IBM Plex Mono" font-size="7.5" fill="#fff" text-anchor="middle" dominant-baseline="middle">TRAINED</text>
+<text x="497" y="30" font-family="IBM Plex Mono" font-size="11" fill="#c04818" text-anchor="middle" dominant-baseline="middle" font-weight="bold">Linear Classifier</text>
+<text x="497" y="47" font-family="IBM Plex Mono" font-size="8.5" fill="#c04818" text-anchor="middle" dominant-baseline="middle">one layer &#x00b7; w &#x00b7; h(T)</text>
+<text x="497" y="61" font-family="IBM Plex Mono" font-size="8" fill="#c04818" text-anchor="middle" dominant-baseline="middle">reservoir maps signal to</text>
+<text x="497" y="74" font-family="IBM Plex Mono" font-size="8" fill="#c04818" text-anchor="middle" dominant-baseline="middle">separable &#x211d;&#x1d3a; → linear works</text>
+<!-- arrow 573→595 -->
+<line x1="573" y1="45" x2="595" y2="45" stroke="#5c4a1e" stroke-width="1.5" opacity=".55" marker-end="url(#arh)"/>
+<!-- class label -->
+<text x="602" y="45" font-family="IBM Plex Mono" font-size="10" fill="#3a2c10" text-anchor="start" dominant-baseline="middle" font-weight="bold">class</text>
+</svg>
+</div>
+</div>
+
+<!-- ═══ TAB 3 ═══ -->
+<div class="panel" id="p3">
+  <div class="cbar" style="flex-direction:column;gap:0">
+    <div class="cbar-row">
+      <div class="cg"><label>Pattern A:</label>
+        <div class="ssel"><div class="sw" style="background:#2d5016"></div>
+          <select id="t3-pA" onchange="onT3Change('A')">
+            <option value="sine_slow">Slow sine</option><option value="sine_fast">Fast sine</option>
+            <option value="square">Square wave</option><option value="chirp">Chirp</option>
+          </select></div></div>
+      <div class="cg"><label>Pattern B:</label>
+        <div class="ssel"><div class="sw" style="background:#e87722"></div>
+          <select id="t3-pB" onchange="onT3Change('B')">
+            <option value="sine_slow">Slow sine</option><option value="sine_fast" selected>Fast sine</option>
+            <option value="square">Square wave</option><option value="chirp">Chirp</option>
+          </select></div></div>
+    </div>
+    <div class="cbar-row">
+      <div class="cg"><label title="Gaussian noise added independently to each trial.">Noise σ:</label>
+        <input type="range" id="t3-ns" min="0" max="0.5" value="0.10" step="0.05" oninput="document.getElementById('t3-nsv').textContent=parseFloat(this.value).toFixed(2)">
+        <span class="vl" id="t3-nsv">0.10</span></div>
+      <button class="btn" onclick="runTab3()">▶ Run experiment</button>
+    </div>
+  </div>
+  <div id="t3-task" style="font-size:.78rem;color:var(--muted);margin-bottom:10px;padding:8px 10px;background:var(--surf);border-radius:4px;border:1px solid var(--border);line-height:1.55">
+  </div>
+  <div class="acc-row">
+    <div class="acc-card"><div class="acc-lbl">Raw — x(T=end) only</div><div class="acc-sub">single instantaneous value; no pattern info</div><div class="acc-num" id="t3-raw">—</div><div style="font-size:.64rem;color:rgba(92,74,30,.5);border-top:1px solid var(--border);margin-top:6px;padding-top:5px">random guessing = 50%</div></div>
+    <div class="acc-card hi"><div class="acc-lbl">ESN — response-amplitude fingerprint ∈ ℝᴺ</div><div class="acc-sub">per-neuron oscillation amplitude over steady state (N=35)</div><div class="acc-num" id="t3-esn">—</div><div style="font-size:.64rem;color:rgba(45,80,22,.5);border-top:1px solid var(--border);margin-top:6px;padding-top:5px">random guessing = 50%</div></div>
+  </div>
+  <div class="ml" style="margin-bottom:4px">Test accuracy vs. reservoir size N &nbsp;·&nbsp; dashed line = 50% chance level</div>
+  <div class="cw"><canvas id="c3-curve"></canvas></div>
+  <div class="ins"><strong>Why raw fails:</strong> x(T=end) is uniformly distributed regardless of frequency — no better than a coin flip. <strong>Why the Linear Readout works at ~100%:</strong> the per-neuron response amplitude — sqrt(mean(hᵢ(t)²)) over the steady-state window — is phase-invariant: for a periodic input, mean(x²) over a full cycle equals amplitude²/2 regardless of starting phase. Each neuron’s response amplitude is frequency-specific, landing different signal types in distinct regions of ℝᴺ. In that high-dimensional space, a single hyperplane separates the classes. This is a general property of reservoir computing: the reservoir's random nonlinear dynamics expand the input into ℝᴺ, making the problem <em>linearly</em> solvable. High accuracy from a simple one-layer readout is expected — the reservoir did the hard work.</div>
+<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px">
+
+  <!-- WITHOUT RESERVOIR -->
+  <div style="flex:1;min-width:280px;padding:9px 12px;background:var(--surf);border-radius:6px;border:1px solid var(--border)">
+  <svg viewBox="0 0 360 104" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;height:auto">
+  <defs>
+    <marker id="arNO" markerWidth="7" markerHeight="7" refX="5.5" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L7,3z" fill="#b03a2e" opacity=".7"/>
+    </marker>
+  </defs>
+  <!-- title — raised above diagram -->
+  <text x="180" y="11" font-family="Outfit" font-size="10.5" fill="#b03a2e" text-anchor="middle" font-weight="600">Without reservoir</text>
+  <!-- x(t): x=10, w=58, cy=52 -->
+  <rect x="10" y="32" width="58" height="40" rx="5" fill="#e4dece" stroke="#c8b89a" stroke-width="1.3"/>
+  <text x="39" y="48" font-family="IBM Plex Mono" font-size="9.5" fill="#3a2c10" text-anchor="middle" dominant-baseline="middle" font-weight="bold">x(t)</text>
+  <text x="39" y="62" font-family="IBM Plex Mono" font-size="8" fill="#5c4a1e" text-anchor="middle" dominant-baseline="middle">input</text>
+  <!-- arrow + label: 68→82, label above -->
+  <line x1="68" y1="52" x2="82" y2="52" stroke="#b03a2e" stroke-width="1.4" opacity=".7" marker-end="url(#arNO)"/>
+  <text x="75" y="42" font-family="IBM Plex Mono" font-size="7.5" fill="#b03a2e" text-anchor="middle">x(T=end)</text>
+  <!-- 1 scalar: x=84, w=82, cy=52 -->
+  <rect x="84" y="32" width="82" height="40" rx="5" fill="#fde8e4" stroke="#b03a2e" stroke-width="1.3"/>
+  <text x="125" y="48" font-family="IBM Plex Mono" font-size="9" fill="#b03a2e" text-anchor="middle" dominant-baseline="middle" font-weight="bold">1 scalar</text>
+  <text x="125" y="63" font-family="IBM Plex Mono" font-size="7.5" fill="#b03a2e" text-anchor="middle" dominant-baseline="middle">no history</text>
+  <!-- arrow: 166→180 -->
+  <line x1="166" y1="52" x2="180" y2="52" stroke="#b03a2e" stroke-width="1.4" opacity=".7" marker-end="url(#arNO)"/>
+  <!-- classifier: x=182, w=110, cy=52 -->
+  <rect x="182" y="23" width="110" height="58" rx="6" fill="#fdf0e8" stroke="#b03a2e" stroke-width="1.5"/>
+  <rect x="209" y="16" width="52" height="12" rx="3" fill="#e87722" opacity=".7"/>
+  <text x="235" y="23" font-family="IBM Plex Mono" font-size="7.5" fill="#fff" text-anchor="middle" dominant-baseline="middle">TRAINED</text>
+  <text x="237" y="40" font-family="IBM Plex Mono" font-size="9.5" fill="#b03a2e" text-anchor="middle" dominant-baseline="middle" font-weight="bold">Linear</text>
+  <text x="237" y="53" font-family="IBM Plex Mono" font-size="9.5" fill="#b03a2e" text-anchor="middle" dominant-baseline="middle" font-weight="bold">Classifier</text>
+  <text x="237" y="67" font-family="IBM Plex Mono" font-size="7.5" fill="#b03a2e" text-anchor="middle" dominant-baseline="middle">1-layer · trained</text>
+  <!-- arrow: 292→306 -->
+  <line x1="292" y1="52" x2="306" y2="52" stroke="#b03a2e" stroke-width="1.4" opacity=".7" marker-end="url(#arNO)"/>
+  <!-- result — vertically aligned with arrow -->
+  <text x="312" y="48" font-family="IBM Plex Mono" font-size="10" fill="#b03a2e" text-anchor="start" dominant-baseline="middle" font-weight="bold">&#x2248;50%</text>
+  <text x="312" y="62" font-family="IBM Plex Mono" font-size="7.5" fill="#b03a2e" text-anchor="start" dominant-baseline="middle">chance</text>
+  <!-- note -->
+  <text x="180" y="97" font-family="IBM Plex Mono" font-size="7" fill="#b03a2e" text-anchor="middle">random phase &#x2192; x(T=end) uniform &#x2192; no info</text>
+  </svg>
+  </div>
+
+  <!-- WITH RESERVOIR -->
+  <div style="flex:1;min-width:280px;padding:9px 12px;background:#eef5e6;border-radius:6px;border:1.5px solid #2d5016">
+  <svg viewBox="0 0 380 114" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;height:auto">
+  <defs>
+    <marker id="arYES" markerWidth="7" markerHeight="7" refX="5.5" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L7,3z" fill="#2d5016" opacity=".7"/>
+    </marker>
+  </defs>
+  <!-- title -->
+  <text x="190" y="11" font-family="Outfit" font-size="10.5" fill="#2d5016" text-anchor="middle" font-weight="600">With reservoir</text>
+  <!-- x(t): x=10, w=58, cy=52 -->
+  <rect x="10" y="32" width="58" height="40" rx="5" fill="#e4dece" stroke="#c8b89a" stroke-width="1.3"/>
+  <text x="39" y="48" font-family="IBM Plex Mono" font-size="9.5" fill="#3a2c10" text-anchor="middle" dominant-baseline="middle" font-weight="bold">x(t)</text>
+  <text x="39" y="62" font-family="IBM Plex Mono" font-size="8" fill="#5c4a1e" text-anchor="middle" dominant-baseline="middle">input</text>
+  <!-- arrow: 68→80 -->
+  <line x1="68" y1="52" x2="80" y2="52" stroke="#2d5016" stroke-width="1.4" opacity=".7" marker-end="url(#arYES)"/>
+  <!-- reservoir: x=82, w=104, cy=52 -->
+  <rect x="82" y="23" width="104" height="58" rx="6" fill="#eef5e6" stroke="#2d5016" stroke-width="1.8"/>
+  <rect x="109" y="16" width="50" height="12" rx="3" fill="#c8b89a"/>
+  <text x="134" y="23" font-family="IBM Plex Mono" font-size="7.5" fill="#3a2c10" text-anchor="middle" dominant-baseline="middle">FROZEN</text>
+  <text x="134" y="39" font-family="IBM Plex Mono" font-size="9.5" fill="#2d5016" text-anchor="middle" dominant-baseline="middle" font-weight="bold">Reservoir</text>
+  <text x="134" y="52" font-family="IBM Plex Mono" font-size="8" fill="#2d5016" text-anchor="middle" dominant-baseline="middle">N neurons</text>
+  <text x="134" y="65" font-family="IBM Plex Mono" font-size="7.5" fill="#2d5016" text-anchor="middle" dominant-baseline="middle">random fixed weights</text>
+  <!-- arrow + RMS label: 186→200 -->
+  <line x1="186" y1="52" x2="200" y2="52" stroke="#2d5016" stroke-width="1.4" opacity=".7" marker-end="url(#arYES)"/>
+  <!-- classifier: x=202, w=110, cy=52 -->
+  <rect x="202" y="23" width="110" height="58" rx="6" fill="#edf6ed" stroke="#2d5016" stroke-width="1.5"/>
+  <rect x="229" y="16" width="52" height="12" rx="3" fill="#e87722" opacity=".7"/>
+  <text x="255" y="23" font-family="IBM Plex Mono" font-size="7.5" fill="#fff" text-anchor="middle" dominant-baseline="middle">TRAINED</text>
+  <text x="257" y="39" font-family="IBM Plex Mono" font-size="9.5" fill="#2d5016" text-anchor="middle" dominant-baseline="middle" font-weight="bold">Linear</text>
+  <text x="257" y="52" font-family="IBM Plex Mono" font-size="9.5" fill="#2d5016" text-anchor="middle" dominant-baseline="middle" font-weight="bold">Classifier</text>
+  <text x="257" y="65" font-family="IBM Plex Mono" font-size="7.5" fill="#2d5016" text-anchor="middle" dominant-baseline="middle">1-layer · trained</text>
+  <!-- arrow: 312→326 -->
+  <line x1="312" y1="52" x2="326" y2="52" stroke="#2d5016" stroke-width="1.4" opacity=".7" marker-end="url(#arYES)"/>
+  <!-- result — aligned with arrow (y=52) -->
+  <text x="332" y="52" font-family="IBM Plex Mono" font-size="10" fill="#2d5016" text-anchor="start" dominant-baseline="middle" font-weight="bold">&#x226b;50%</text>
+  <!-- notes -->
+  <text x="190" y="94" font-family="IBM Plex Mono" font-size="7" fill="#2d5016" text-anchor="middle">classifier sees time-avg of h&#x1d62;(t)&#x00b2; over steady-state window</text>
+  <text x="190" y="104" font-family="IBM Plex Mono" font-size="7" fill="#2d5016" text-anchor="middle">response amplitude is phase-invariant &#x2192; classifiable</text>
+  </svg>
+  </div>
+
+</div>
+
+<script>
+'use strict';
+
+// ── HiDPI canvas ──────────────────────────────────────────────
+function setupCanvas(cv,w,h){
+  const dpr=window.devicePixelRatio||1;
+  cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);
+  cv.style.width=w+'px';cv.style.height=h+'px';
+  const ctx=cv.getContext('2d');ctx.scale(dpr,dpr);return ctx;
+}
+function cssW(el){const w=el.parentElement.offsetWidth;return w>60?w:560;}
+
+// ── Seeded RNG ────────────────────────────────────────────────
+function mkRng(seed){
+  return()=>{
+    seed=(seed+0x6D2B79F5)|0;
+    let t=Math.imul(seed^(seed>>>15),1|seed);
+    t=(t+Math.imul(t^(t>>>7),61|t))^t;
+    return((t^(t>>>14))>>>0)/4294967296;
+  };
+}
+function gauss(rng,s){const u1=rng()+1e-12,u2=rng();return s*Math.sqrt(-2*Math.log(u1))*Math.cos(2*Math.PI*u2);}
+function hex2rgba(h,a){const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16);return`rgba(${r},${g},${b},${a})`;}
+
+// ── Signals ───────────────────────────────────────────────────
+function sigVal(type,t,T,phase){
+  switch(type){
+    case 'sine_slow':return Math.sin(2*Math.PI*0.04*t+phase);
+    case 'sine_fast':return Math.sin(2*Math.PI*0.14*t+phase);
+    case 'square':   return Math.sign(Math.sin(2*Math.PI*0.05*t+phase));
+    case 'chirp':    return Math.sin(2*Math.PI*(0.02+0.10*t/T)*t+phase);
+  }return 0;
+}
+function makeSig(type,T,phase=0,noise=0,noiseSeed=1){
+  const s=new Float64Array(T);
+  for(let t=0;t<T;t++) s[t]=sigVal(type,t,T,phase);
+  if(noise>0){const rng=mkRng(noiseSeed);for(let t=0;t<T;t++) s[t]+=gauss(rng,noise);}
+  return s;
+}
+function makeSigDisplay(type,T,phase=0,over=8){
+  const s=new Float64Array(T*over);
+  for(let k=0;k<s.length;k++) s[k]=sigVal(type,k/over,T,phase);
+  return s;
+}
+const SIG_SHORT={sine_slow:'slow sine',sine_fast:'fast sine',square:'square wave',chirp:'chirp'};
+const ALL_TYPES=['sine_slow','sine_fast','square','chirp'];
+const FAM_COLORS=['#0096b4','#c04818','#6030a0','#1e7a42'];  // distinct from trace colors
+
+// ── ESN ───────────────────────────────────────────────────────
+class ESN{
+  constructor(N,rho=0.9,seed=42,sparsity=0.15){
+    this.N=N;this.h=new Float64Array(N);
+    const rng=mkRng(seed);
+    this.B=new Float64Array(N);for(let i=0;i<N;i++) this.B[i]=rng()*2-1;
+    this.A=new Float64Array(N*N);for(let i=0;i<N*N;i++) if(rng()<sparsity) this.A[i]=rng()*2-1;
+    const sr=this._sr(mkRng(seed^0xDEAD));
+    if(sr>1e-8){const sc=rho/sr;for(let i=0;i<N*N;i++) this.A[i]*=sc;}
+  }
+  _sr(rng){
+    const N=this.N,A=this.A;let v=new Float64Array(N);
+    for(let i=0;i<N;i++) v[i]=rng()*2-1;
+    let nm=0;for(let i=0;i<N;i++) nm+=v[i]*v[i];nm=Math.sqrt(nm)||1;for(let i=0;i<N;i++) v[i]/=nm;
+    let ev=0;
+    for(let it=0;it<200;it++){
+      const w=new Float64Array(N);
+      for(let i=0;i<N;i++){const ri=i*N;for(let j=0;j<N;j++) w[i]+=A[ri+j]*v[j];}
+      nm=0;for(let i=0;i<N;i++) nm+=w[i]*w[i];nm=Math.sqrt(nm);
+      if(nm<1e-12)return 0;ev=nm;for(let i=0;i<N;i++) v[i]=w[i]/nm;
+    }
+    return ev;
+  }
+  reset(ic){if(ic)this.h=Float64Array.from(ic);else this.h.fill(0);}
+  step(x){
+    const N=this.N,A=this.A,B=this.B,h=this.h,hn=new Float64Array(N);
+    for(let i=0;i<N;i++){let s=B[i]*x,ri=i*N;for(let j=0;j<N;j++) s+=A[ri+j]*h[j];hn[i]=Math.tanh(s);}
+    this.h=hn;return hn;
+  }
+  runAll(sig,ic){this.reset(ic);const r=[];for(const x of sig) r.push(Float64Array.from(this.step(x)));return r;}
+  runFinal(sig,ic){this.reset(ic);for(const x of sig) this.step(x);return Float64Array.from(this.h);}
+  // Per-neuron response amplitude: sqrt(mean(h_i(t)^2)) over steady state — phase-invariant
+  runRmsFinal(sig,avgStart=50){
+    this.reset(null);
+    const ssq=new Float64Array(this.N);let cnt=0;
+    for(let t=0;t<sig.length;t++){
+      const h=this.step(sig[t]);
+      if(t>=avgStart){for(let i=0;i<this.N;i++) ssq[i]+=h[i]*h[i];cnt++;}
+    }
+    const rms=new Float64Array(this.N);
+    for(let i=0;i<this.N;i++) rms[i]=cnt>0?Math.sqrt(ssq[i]/cnt):0;
+    return rms;
+  }
+}
+
+// ── Ridge ─────────────────────────────────────────────────────
+function ridge(X,y,lam=1e-3){
+  const n=X.length,d=X[0].length;
+  const A=Array.from({length:d},()=>new Float64Array(d));
+  const bv=new Float64Array(d);
+  for(let k=0;k<n;k++){for(let i=0;i<d;i++){bv[i]+=X[k][i]*y[k];for(let j=0;j<d;j++) A[i][j]+=X[k][i]*X[k][j];}}
+  for(let i=0;i<d;i++) A[i][i]+=lam;
+  const aug=A.map((row,i)=>{const r=new Float64Array(d+1);for(let j=0;j<d;j++) r[j]=row[j];r[d]=bv[i];return r;});
+  for(let c=0;c<d;c++){
+    let mr=c;for(let r=c+1;r<d;r++) if(Math.abs(aug[r][c])>Math.abs(aug[mr][c])) mr=r;
+    [aug[c],aug[mr]]=[aug[mr],aug[c]];
+    const pv=aug[c][c];if(Math.abs(pv)<1e-14)continue;
+    for(let j=c;j<=d;j++) aug[c][j]/=pv;
+    for(let r=0;r<d;r++){if(r===c)continue;const f=aug[r][c];for(let j=c;j<=d;j++) aug[r][j]-=f*aug[c][j];}
+  }
+  return aug.map(r=>r[d]);
+}
+
+// ── PCA 2D ────────────────────────────────────────────────────
+function pca2D(rows){
+  const n=rows.length,d=rows[0].length;
+  const mean=new Float64Array(d);
+  for(const r of rows) for(let j=0;j<d;j++) mean[j]+=r[j];
+  for(let j=0;j<d;j++) mean[j]/=n;
+  const C=rows.map(r=>{const c=new Float64Array(d);for(let j=0;j<d;j++) c[j]=r[j]-mean[j];return c;});
+  const cov=new Float64Array(d*d);
+  for(const c of C) for(let i=0;i<d;i++){const ri=i*d;for(let j=0;j<d;j++) cov[ri+j]+=c[i]*c[j];}
+  for(let k=0;k<d*d;k++) cov[k]/=n;
+  const rng=mkRng(777);
+  function pi(defl){
+    let v=new Float64Array(d);for(let i=0;i<d;i++) v[i]=rng()*2-1;
+    if(defl){let dot=0;for(let i=0;i<d;i++) dot+=v[i]*defl[i];for(let i=0;i<d;i++) v[i]-=dot*defl[i];}
+    let nm=0;for(let i=0;i<d;i++) nm+=v[i]*v[i];nm=Math.sqrt(nm)||1;for(let i=0;i<d;i++) v[i]/=nm;
+    for(let it=0;it<400;it++){
+      const w=new Float64Array(d);
+      for(let i=0;i<d;i++){const ri=i*d;for(let j=0;j<d;j++) w[i]+=cov[ri+j]*v[j];}
+      if(defl){let dot=0;for(let i=0;i<d;i++) dot+=w[i]*defl[i];for(let i=0;i<d;i++) w[i]-=dot*defl[i];}
+      nm=0;for(let i=0;i<d;i++) nm+=w[i]*w[i];nm=Math.sqrt(nm);
+      if(nm<1e-12)break;for(let i=0;i<d;i++) v[i]=w[i]/nm;
+    }
+    return v;
+  }
+  const pc1=pi(null),pc2=pi(pc1);
+  const projs=C.map(c=>{let p1=0,p2=0;for(let j=0;j<d;j++){p1+=c[j]*pc1[j];p2+=c[j]*pc2[j];}return[p1,p2];});
+  // Variance explained
+  let ev1=0,ev2=0,etot=0;
+  for(const[p1,p2]of projs){ev1+=p1*p1;ev2+=p2*p2;}
+  ev1/=n;ev2/=n;
+  for(const c of C) for(const v of c) etot+=v*v;
+  etot/=n;
+  return{proj:projs,ve1:etot>0?ev1/etot:0,ve2:etot>0?ev2/etot:0};
+}
+
+// ════════════════════════════════════════════════════
+// TAB 1 constants
+// ════════════════════════════════════════════════════
+const N1=40, T1_ON=100, T1_OFF=55, T1=T1_ON+T1_OFF;
+const PICKS=[2,7,13,20,28,36];  // 6 displayed neuron indices
+const NCOLS6=['#2d5016','#e87722','#1a4a6e','#8b2fa8','#b03a2e','#3d7a5c'];  // trace line colors
+const GALL_T=[20,30,40,50,58,66,74,82,90,97];  // 10 stable-oscillation gallery times
+
+// ════════════════════════════════════════════════════
+// TAB 1 state
+// ════════════════════════════════════════════════════
+let t1ShowIC=false;
+let t1States=[], t1States2IC=[];
+let t1GalleryByType={};  // type -> Float64Array[]  (length = GALL_T.length)
+let t1SelectedTime=110;
+let t1VoteHist=new Int32Array(4);
+let t1CurrentType='sine_slow';
+let t1CachedParams=null;
+let traceInteractionInit=false;
+
+function computeAllFamilies(rho){
+  t1GalleryByType={};
+  for(const type of ALL_TYPES){
+    const esn=new ESN(N1,rho,42);
+    const states=esn.runAll(makeSig(type,T1_ON),null);
+    t1GalleryByType[type]=GALL_T.map(t=>states[Math.min(t,states.length-1)]);
+  }
+}
+
+// Returns {fi, ti} of single best-matching exemplar across all 4×5=20
+function bestSingleMatch(state){
+  let bFi=0,bTi=0,bDist=Infinity;
+  for(let fi=0;fi<ALL_TYPES.length;fi++){
+    const snaps=t1GalleryByType[ALL_TYPES[fi]];
+    if(!snaps) continue;
+    for(let ti=0;ti<snaps.length;ti++){
+      let d=0;for(let i=0;i<N1;i++){const df=state[i]-snaps[ti][i];d+=df*df;}
+      if(d<bDist){bDist=d;bFi=fi;bTi=ti;}
+    }
+  }
+  return{fi:bFi,ti:bTi};
+}
+
+// Deterministic jitter for colSeed
+function makeJitter(colSeed,N,spread){
+  const rng=mkRng(colSeed),j=new Float32Array(N);
+  for(let i=0;i<N;i++) j[i]=(rng()-0.5)*2*spread;
+  return j;
+}
+
+// Draw a single projected column (all N1 neurons as jittered dots on 1D)
+// vals: Float64Array(N1), range ±1
+// highlightPicks: if true, overdraw the 6 PICKS neurons with emphasis
+function drawProjCol(ctx,vals,cx,y0,innerH,innerW,colSeed,dotR,borderCol,highlight,label1,label2,highlightPicks){
+  const left=cx-innerW/2;
+  ctx.fillStyle=highlight?hex2rgba(borderCol,0.14):'#f0ece0';
+  ctx.fillRect(left,y0,innerW,innerH);
+  // Grid lines
+  for(const v of[-1,-0.5,0,0.5,1]){
+    const gy=y0+innerH*(1-(v+1)/2);
+    ctx.strokeStyle=v===0?'rgba(180,160,120,.55)':'rgba(200,184,154,.22)';
+    ctx.lineWidth=v===0?.7:.4;
+    ctx.beginPath();ctx.moveTo(left,gy);ctx.lineTo(left+innerW,gy);ctx.stroke();
+  }
+  // All neurons
+  const jitter=makeJitter(colSeed,N1,innerW*0.37);
+  ctx.globalAlpha=0.68;
+  for(let i=0;i<N1;i++){
+    const dy=y0+innerH*(1-(vals[i]+1)/2);
+    ctx.fillStyle='#8a7050';  // neutral gray-brown for background neurons
+    ctx.beginPath();ctx.arc(cx+jitter[i],dy,dotR,0,2*Math.PI);ctx.fill();
+  }
+  ctx.globalAlpha=1;
+  // Overdraw PICKS with trace colors
+  if(highlightPicks){
+    for(let k=0;k<PICKS.length;k++){
+      const i=PICKS[k];
+      const dy=y0+innerH*(1-(vals[i]+1)/2);
+      const dx=cx+jitter[i];
+      ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(dx,dy,dotR*2.4,0,2*Math.PI);ctx.fill();
+      ctx.fillStyle=NCOLS6[k];ctx.beginPath();ctx.arc(dx,dy,dotR*1.8,0,2*Math.PI);ctx.fill();
+    }
+  }
+  // Border
+  if(highlight){
+    ctx.strokeStyle=borderCol;ctx.lineWidth=2.2;
+    ctx.strokeRect(left-2,y0-3,innerW+4,innerH+6);
+  } else {
+    ctx.strokeStyle='rgba(200,184,154,.65)';ctx.lineWidth=.7;
+    ctx.strokeRect(left,y0,innerW,innerH);
+  }
+  // Labels
+  ctx.font='7px IBM Plex Mono';ctx.textAlign='center';
+  if(label1){ctx.fillStyle=highlight?borderCol:'rgba(80,60,28,.72)';ctx.fillText(label1,cx,y0-5);}
+  if(label2){ctx.fillStyle=highlight?borderCol:'rgba(120,96,50,.6)';ctx.fillText(label2,cx,y0+innerH+11);}
+}
+
+function toggleIC(){t1ShowIC=!t1ShowIC;document.getElementById('t1-ic').classList.toggle('on',t1ShowIC);updateT1Labels();renderTab1();}
+function upRho1(){document.getElementById('t1-rhov').textContent=parseFloat(document.getElementById('t1-rho').value).toFixed(2);renderTab1();}
+
+function updateT1Labels(){
+  document.getElementById('t1-inp-lbl').innerHTML='input x(t) — driven for t = 0 … '+(T1_ON-1)+', then silenced';
+  const lbl=document.getElementById('t1-lbl');
+  if(!t1ShowIC) lbl.innerHTML='6 reservoir neuron traces h<sub>i</sub>(t) — drag bar to select snapshot';
+  else lbl.innerHTML='IC comparison: solid = zero initial state · dashed = random initial state (same input)';
+  const ins=document.getElementById('t1-ins');
+  if(t1ShowIC)
+    ins.innerHTML='<strong>Echo state property: initial conditions are washed out.</strong> Both runs start from different reservoir states but converge rapidly to the same trajectory — confirming the fingerprint depends only on the driving signal. This is why the reservoir acts as <em>working memory</em>: the present drives out the past. <em>ρ</em> is the spectral radius (largest eigenvalue) of the random recurrent weight matrix; it controls how quickly activity fades once input stops.';
+  else
+    ins.innerHTML='<strong>The reservoir is working memory.</strong> Each neuron oscillates in a pattern unique to the input — like a standing wave whose shape encodes the driving signal. Drag the time bar: colored dots on the bar mark the 6 traced neurons; the same 6 appear highlighted in the fingerprint. The vote histogram below counts which family best matches each moment in the driven phase — more votes = stronger evidence for that class. <em>ρ is the spectral radius (largest eigenvalue) of the random recurrent weight matrix — it controls how quickly reservoir activity fades once the input stops (τ ≈ 1/(1−ρ) steps); ρ ≥ 1.0 = unstable.</em>';
+}
+
+function renderTab1(){
+  const type=document.getElementById('t1-pat').value;
+  const rho=parseFloat(document.getElementById('t1-rho').value);
+
+  const sig=new Float64Array(T1);
+  const onSig=makeSig(type,T1_ON);
+  for(let t=0;t<T1_ON;t++) sig[t]=onSig[t];
+
+  const esn=new ESN(N1,rho,42);
+  t1States=esn.runAll(sig,null);
+
+  if(t1ShowIC){
+    const ic=new Float64Array(N1);const rng=mkRng(9999);
+    for(let i=0;i<N1;i++) ic[i]=rng()*2-1;
+    t1States2IC=esn.runAll(sig,ic);
+  }
+
+  computeAllFamilies(rho);
+  t1CurrentType=type;
+  updateT1Labels();
+
+  // Vote histogram across all driven time slices
+  const VSTART=20, VEND=T1_ON-1;
+  // (computed after t1States is built below)
+
+  const W=cssW(document.getElementById('c1-inp'));
+  const pL=36,pR=10,cw=W-pL-pR,xSil=pL+T1_ON*cw/T1;
+  t1CachedParams={W,pL,pR,cw,xSil,rho,type};
+
+  drawInput1();
+  drawTraces1();
+  drawSnapshotPanel();
+  setupTraceInteraction();
+
+  // Compute and draw vote histogram
+  const vH=new Int32Array(4);
+  for(let tv=20;tv<=T1_ON-1;tv++){const{fi}=bestSingleMatch(t1States[tv]);vH[fi]++;}
+  t1VoteHist=vH;
+  drawHistogram(vH,T1_ON-20,type);
+}
+
+function drawInput1(){
+  if(!t1CachedParams) return;
+  const{W,pL,pR,cw,xSil,type}=t1CachedParams;
+  const cv=document.getElementById('c1-inp');
+  const H=55,pT=7,pB=16,ch=H-pT-pB;
+  const ctx=setupCanvas(cv,W,H);
+  ctx.fillStyle='#faf8f2';ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='rgba(200,184,154,.18)';ctx.fillRect(xSil,pT,pL+cw-xSil,ch);
+  ctx.strokeStyle='#c8b89a';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(pL,pT);ctx.lineTo(pL,pT+ch);ctx.lineTo(pL+cw,pT+ch);ctx.stroke();
+  ctx.strokeStyle='rgba(200,184,154,.4)';ctx.lineWidth=.6;ctx.setLineDash([2,3]);
+  ctx.beginPath();ctx.moveTo(pL,pT+ch/2);ctx.lineTo(pL+cw,pT+ch/2);ctx.stroke();ctx.setLineDash([]);
+  ctx.strokeStyle='rgba(176,58,46,.5)';ctx.lineWidth=1;ctx.setLineDash([3,2]);
+  ctx.beginPath();ctx.moveTo(xSil,pT);ctx.lineTo(xSil,pT+ch);ctx.stroke();ctx.setLineDash([]);
+  const OVER=14;
+  const ds=makeSigDisplay(type,T1_ON,0,OVER);
+  ctx.strokeStyle='#2d5016';ctx.lineWidth=1.6;
+  ctx.beginPath();
+  for(let k=0;k<ds.length+T1_OFF*OVER;k++){
+    const v=k<ds.length?ds[k]:0;
+    const x=pL+(k/OVER)*cw/T1,y=pT+ch/2-v*ch/2.3;
+    k===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  ctx.font='9px IBM Plex Mono';ctx.fillStyle='#5c4a1e';ctx.textAlign='right';
+  ctx.fillText('+1',pL-3,pT+5);ctx.fillText('0',pL-3,pT+ch/2+4);ctx.fillText('−1',pL-3,pT+ch+5);
+  ctx.fillStyle='rgba(176,58,46,.7)';ctx.textAlign='left';ctx.font='8px IBM Plex Mono';
+  ctx.fillText('silent',xSil+4,pT+9);
+}
+
+function drawTraces1(){
+  if(!t1CachedParams||!t1States.length) return;
+  const{W,pL,pR,cw,xSil,rho}=t1CachedParams;
+  const cv=document.getElementById('c1-tr');
+  const H=205,pT=8,pB=20,ch=H-pT-pB;
+  const ctx=setupCanvas(cv,W,H);
+  ctx.fillStyle='#faf8f2';ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='rgba(200,184,154,.13)';ctx.fillRect(xSil,pT,pL+cw-xSil,ch);
+  ctx.strokeStyle='rgba(176,58,46,.35)';ctx.lineWidth=1;ctx.setLineDash([3,2]);
+  ctx.beginPath();ctx.moveTo(xSil,pT);ctx.lineTo(xSil,pT+ch);ctx.stroke();ctx.setLineDash([]);
+  ctx.strokeStyle='rgba(200,184,154,.35)';ctx.lineWidth=.6;ctx.setLineDash([2,3]);
+  ctx.beginPath();ctx.moveTo(pL,pT+ch/2);ctx.lineTo(pL+cw,pT+ch/2);ctx.stroke();ctx.setLineDash([]);
+
+  function drawNLine(states,ni,col,dash){
+    if(!states.length) return;
+    ctx.strokeStyle=col;ctx.lineWidth=1.5;
+    if(dash) ctx.setLineDash([5,3]);
+    const pts=[];
+    for(let t=0;t<T1;t++)
+      pts.push({x:pL+t*cw/T1, y:pT+ch/2-states[t][PICKS[ni]]*ch/2.3});
+    ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);
+    for(let i=0;i<pts.length-1;i++){
+      const p0=pts[Math.max(0,i-1)],p1=pts[i],p2=pts[i+1],p3=pts[Math.min(pts.length-1,i+2)];
+      ctx.bezierCurveTo(p1.x+(p2.x-p0.x)/6,p1.y+(p2.y-p0.y)/6,
+                        p2.x-(p3.x-p1.x)/6,p2.y-(p3.y-p1.y)/6,p2.x,p2.y);
+    }
+    ctx.stroke();ctx.setLineDash([]);
+  }
+  for(let i=0;i<PICKS.length;i++) drawNLine(t1States,i,NCOLS6[i],false);
+  if(t1ShowIC) for(let i=0;i<PICKS.length;i++) drawNLine(t1States2IC,i,NCOLS6[i],true);
+
+  if(rho<1.0){
+    const tau=1/(1-rho);
+    const xTau=pL+(T1_ON+Math.min(tau,T1_OFF*0.85))*cw/T1;
+    ctx.strokeStyle='rgba(45,80,22,.4)';ctx.lineWidth=1;ctx.setLineDash([2,2]);
+    ctx.beginPath();ctx.moveTo(xTau,pT+2);ctx.lineTo(xTau,pT+ch);ctx.stroke();ctx.setLineDash([]);
+    ctx.font='9px IBM Plex Mono';ctx.fillStyle='rgba(45,80,22,.65)';ctx.textAlign='center';
+    ctx.fillText('τ≈'+tau.toFixed(0),xTau,pT+10);
+  }
+  ctx.strokeStyle='#c8b89a';ctx.lineWidth=1;ctx.strokeRect(pL,pT,cw,ch);
+  ctx.font='9px IBM Plex Mono';ctx.fillStyle='#5c4a1e';ctx.textAlign='right';
+  ctx.fillText('+1',pL-3,pT+5);ctx.fillText('0',pL-3,pT+ch/2+4);ctx.fillText('−1',pL-3,pT+ch+5);
+  ctx.textAlign='left';ctx.fillText('t=0',pL,pT+ch+12);ctx.textAlign='right';ctx.fillText('t='+T1,pL+cw,pT+ch+12);
+  ctx.save();ctx.translate(12,pT+ch/2);ctx.rotate(-Math.PI/2);ctx.textAlign='center';
+  ctx.fillText('h\u1D62(t)',0,0);ctx.restore();
+
+  // ── Time bar ──
+  const barT=Math.max(0,Math.min(T1-1,t1SelectedTime));
+  const xBar=pL+barT*cw/T1;
+  ctx.strokeStyle='rgba(40,30,10,.55)';ctx.lineWidth=1.8;
+  ctx.beginPath();ctx.moveTo(xBar,pT);ctx.lineTo(xBar,pT+ch);ctx.stroke();
+  // Handles
+  ctx.fillStyle='rgba(40,30,10,.55)';
+  ctx.beginPath();ctx.arc(xBar,pT+5,5,0,2*Math.PI);ctx.fill();
+  ctx.beginPath();ctx.arc(xBar,pT+ch-5,5,0,2*Math.PI);ctx.fill();
+  // Time label
+  ctx.font='8px IBM Plex Mono';ctx.fillStyle='rgba(30,20,5,.58)';
+  const lblX=xBar<pL+cw-40?xBar+6:xBar-38;
+  ctx.textAlign='left';ctx.fillText('t='+barT,lblX,pT+ch-8);
+
+  // ── Intersection dots: 6 neurons at bar position ──
+  const state=t1States[Math.min(barT,t1States.length-1)];
+  for(let k=0;k<PICKS.length;k++){
+    const v=state[PICKS[k]];
+    const y=pT+ch/2-v*ch/2.3;
+    // White halo
+    ctx.fillStyle='#faf8f2';ctx.beginPath();ctx.arc(xBar,y,7,0,2*Math.PI);ctx.fill();
+    // Colored fill
+    ctx.fillStyle=NCOLS6[k];ctx.beginPath();ctx.arc(xBar,y,5,0,2*Math.PI);ctx.fill();
+    // Thin ring
+    ctx.strokeStyle='rgba(255,255,255,.7)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.arc(xBar,y,5,0,2*Math.PI);ctx.stroke();
+  }
+}
+
+// ── Snapshot panel ────────────────────────────────────────────
+function drawSnapshotPanel(){
+  const cv=document.getElementById('c1-snap');
+  if(!cv||!t1States.length||!Object.keys(t1GalleryByType).length) return;
+
+  const W=cssW(cv);
+  const NGALL=GALL_T.length;  // 10
+  const NFAM=4;
+  const pL=10,pR=10;
+  const intraGap=3,htGap=12;
+  const labelT=22,labelB=14,pT=6,pB=8,midGap=28;
+
+  // Wide 2×2 layout: [pL][left 10-col block][htGap][h(t) col][htGap][right 10-col block][pR]
+  // Total = pL+pR + 21*colW + 18*intraGap + 2*htGap
+  const ohWide=pL+pR+2*htGap+(NGALL-1)*intraGap*2; // 36+8+24+54=122
+  const minCW=16;
+  const WIDE_THRESH=ohWide+21*minCW; // ≈458
+  const isWide=W>=WIDE_THRESH;
+
+  let colW,innerH;
+  if(isWide){
+    colW=Math.max(minCW,Math.floor((W-pL-pR-2*htGap-2*(NGALL-1)*intraGap)/21));
+    innerH=Math.min(130,Math.max(68,Math.round(colW*2.1)));
+  } else {
+    colW=Math.max(minCW,Math.floor((W-pL-pR-(NGALL-1)*intraGap)/NGALL));
+    innerH=68;
+  }
+  const innerW=Math.max(14,colW-2);
+  const fullRowH=labelT+innerH+labelB;
+  // Narrow height: 5 rows (1 h(t) + 4 families) + 4 gaps — NOT (NGALL+1) which would be 11!
+  const H=isWide ? pT+labelT+2*innerH+midGap+labelB+pB : pT+5*fullRowH+4*midGap+pB;
+
+  cv.style.height=H+'px';
+  const ctx=setupCanvas(cv,W,H);
+  ctx.fillStyle='#faf8f2';ctx.fillRect(0,0,W,H);
+
+  const t=Math.max(0,Math.min(t1SelectedTime,t1States.length-1));
+  const state=t1States[t];
+  const{fi:bFi,ti:bTi}=bestSingleMatch(state);
+
+  // ── Draw one family's NGALL sub-columns ──
+  function drawFamily(fi,startX,innerY0){
+    const type=ALL_TYPES[fi];
+    const color=FAM_COLORS[fi];
+    const snaps=t1GalleryByType[type];
+    if(!snaps||!snaps.length) return;
+    const famBlockW=NGALL*colW+(NGALL-1)*intraGap;
+    const isFamBest=(fi===bFi);
+    const title=SIG_SHORT[type];
+    ctx.font='7px IBM Plex Mono';
+    const tw=ctx.measureText(title).width;
+    const titleCX=startX+famBlockW/2;
+    const titleY=innerY0-7;
+    if(isFamBest){
+      ctx.fillStyle=hex2rgba(color,0.22);
+      ctx.fillRect(titleCX-tw/2-4,titleY-9,tw+8,12);
+    }
+    ctx.fillStyle=hex2rgba(color,isFamBest?1.0:0.78);
+    ctx.textAlign='center';
+    ctx.fillText(title,titleCX,titleY);
+    for(let ti=0;ti<NGALL;ti++){
+      const cx=startX+ti*(colW+intraGap)+colW/2;
+      const isBest=(fi===bFi&&ti===bTi);
+      drawProjCol(ctx,snaps[ti],cx,innerY0,innerH,innerW,
+        fi*100+ti,1.8,color,isBest,null,'t='+GALL_T[ti],false);
+    }
+  }
+
+  // ── h(t) column (height = innerH, same as a single family row) ──
+  function drawHtCol(cx,innerY0){
+    const left=cx-innerW/2;
+    // No fill or border — just dots floating on canvas background
+    const jitter=makeJitter(99999,N1,innerW*0.37);
+    ctx.globalAlpha=0.5;
+    for(let i=0;i<N1;i++){
+      const dy=innerY0+innerH*(1-(state[i]+1)/2);
+      ctx.fillStyle='#8a7050';ctx.beginPath();ctx.arc(cx+jitter[i],dy,1.6,0,2*Math.PI);ctx.fill();
+    }
+    ctx.globalAlpha=1;
+    for(let k=0;k<PICKS.length;k++){
+      const i=PICKS[k],dy=innerY0+innerH*(1-(state[i]+1)/2),dx=cx+jitter[i];
+      ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(dx,dy,4.5,0,2*Math.PI);ctx.fill();
+      ctx.fillStyle=NCOLS6[k];ctx.beginPath();ctx.arc(dx,dy,3.2,0,2*Math.PI);ctx.fill();
+    }
+    // No border — avoids asymmetric bar artifact
+    // Small label above only
+    ctx.font='7px IBM Plex Mono';ctx.fillStyle='#3a3020';ctx.textAlign='center';
+    ctx.fillText('h(t)',cx,innerY0-5);
+  }
+
+  if(isWide){
+    const famBlockW=NGALL*colW+(NGALL-1)*intraGap;
+    // Center content: distribute any fractional leftover equally on both sides
+    const totalUsed=2*famBlockW+colW+2*htGap;
+    const leftPad=pL+Math.floor((W-pL-pR-totalUsed)/2);
+    const leftStart=leftPad;
+    const htCX=leftPad+famBlockW+htGap+colW/2;
+    const rightStart=htCX+colW/2+htGap;
+
+    const row0Y=pT+labelT;
+    const row1Y=pT+labelT+innerH+midGap;
+
+    // h(t) centered vertically between the two rows (same height as one row)
+    const gridSpan=2*innerH+midGap;
+    const htInnerY0=pT+labelT+(gridSpan-innerH)/2;
+
+    drawFamily(0,leftStart,row0Y);   // slow sine — top left
+    drawFamily(1,rightStart,row0Y);  // fast sine — top right
+    drawFamily(2,leftStart,row1Y);   // square    — bottom left
+    drawFamily(3,rightStart,row1Y);  // chirp     — bottom right
+
+    drawHtCol(htCX,htInnerY0);  // h(t) centered in the gap column
+
+  } else {
+    // Narrow: h(t) top row, 4 family rows below, h(t) centered over block
+    const famBlockW=NGALL*colW+(NGALL-1)*intraGap;
+    const famStart=Math.max(pL,Math.round((W-famBlockW)/2));
+    const htCX=famStart+Math.round(famBlockW/2);
+
+    drawHtCol(htCX,pT+labelT);
+
+    for(let fi=0;fi<NFAM;fi++){
+      const innerY0=pT+(fi+1)*fullRowH+fi*midGap+labelT;
+      drawFamily(fi,famStart,innerY0);
+    }
+  }
+}
+
+function drawHistogram(votes, total, currentType){
+  const cv=document.getElementById('c1-hist');
+  if(!cv) return;
+  const W=cssW(cv);
+  const pL=82,pR=10,pT=8,pB=8;
+  const barH=20,barGap=7;
+  const H=pT+4*(barH+barGap)-barGap+pB;
+  cv.style.height=H+'px';
+  const ctx=setupCanvas(cv,W,H);
+  ctx.fillStyle='#faf8f2';ctx.fillRect(0,0,W,H);
+  const maxBarW=W-pL-pR;
+  const maxV=Math.max(...votes,1);
+  const winnerFi=Array.from(votes).reduce((mi,v,i,a)=>v>a[mi]?i:mi,0);
+
+  for(let fi=0;fi<4;fi++){
+    const y=pT+fi*(barH+barGap);
+    const type=ALL_TYPES[fi];
+    const color=FAM_COLORS[fi];
+    const isCurrent=(type===currentType);
+    const isWinner=(fi===winnerFi);
+    const pct=votes[fi]/total;
+    const bw=Math.max(0,Math.round(pct*maxBarW));
+
+    // Track
+    ctx.fillStyle='rgba(200,184,154,.18)';ctx.fillRect(pL,y,maxBarW,barH);
+
+    // Bar fill
+    ctx.fillStyle=hex2rgba(color,isCurrent?0.85:0.35);
+    if(bw>0) ctx.fillRect(pL,y,bw,barH);
+
+    // Border
+    ctx.strokeStyle=hex2rgba(color,isCurrent?1:0.35);
+    ctx.lineWidth=isCurrent?1.8:0.6;
+    ctx.strokeRect(pL,y,maxBarW,barH);
+
+    // Winner star (always, just indicates plurality)
+    if(isWinner){
+      ctx.font='bold 9px IBM Plex Mono';ctx.fillStyle=color;ctx.textAlign='left';
+      ctx.fillText('★',pL-18,y+barH/2+3.5);
+    }
+
+    // Family label
+    ctx.font=(isCurrent?'bold ':'')+'8px IBM Plex Mono';
+    ctx.fillStyle=hex2rgba(color,isCurrent?1:0.7);
+    ctx.textAlign='right';
+    ctx.fillText(SIG_SHORT[type],pL-22,y+barH/2+3.5);
+
+    // Count label — right-aligned at track right edge
+    ctx.font='8px IBM Plex Mono';ctx.textAlign='right';
+    ctx.fillStyle=hex2rgba(color,isCurrent?0.9:0.55);
+    ctx.fillText(votes[fi]+'  ('+Math.round(pct*100)+'%)',pL+maxBarW-4,y+barH/2+3.5);
+  }
+}
+
+function setupTraceInteraction(){
+  if(traceInteractionInit) return;
+  traceInteractionInit=true;
+  const cv=document.getElementById('c1-tr');
+  function getT(clientX){
+    if(!t1CachedParams) return t1SelectedTime;
+    const rect=cv.getBoundingClientRect();
+    const{pL,cw}=t1CachedParams;
+    return Math.max(0,Math.min(T1-1,Math.round((clientX-rect.left-pL)/cw*T1)));
+  }
+  function update(clientX){t1SelectedTime=getT(clientX);drawTraces1();drawSnapshotPanel();}
+  let drag=false;
+  cv.addEventListener('mousedown',e=>{drag=true;update(e.clientX);});
+  cv.addEventListener('mousemove',e=>{if(drag)update(e.clientX);});
+  cv.addEventListener('mouseup',()=>drag=false);
+  cv.addEventListener('mouseleave',()=>drag=false);
+  cv.addEventListener('touchstart',e=>{drag=true;update(e.touches[0].clientX);e.preventDefault();},{passive:false});
+  cv.addEventListener('touchmove',e=>{if(drag){update(e.touches[0].clientX);e.preventDefault();}},{passive:false});
+  cv.addEventListener('touchend',()=>drag=false);
+}
+
+// ════════════════════════════════════════════════════
+// TAB 2
+// ════════════════════════════════════════════════════
+
+// LDA projection: project onto Fisher discriminant axis (x) + orthogonal max-variance (y)
+function lda2D(rowsA, rowsB){
+  const nA=rowsA.length, nB=rowsB.length, d=rowsA[0].length;
+  // Class means
+  const mA=new Float64Array(d), mB=new Float64Array(d);
+  for(const r of rowsA) for(let j=0;j<d;j++) mA[j]+=r[j]/nA;
+  for(const r of rowsB) for(let j=0;j<d;j++) mB[j]+=r[j]/nB;
+  // Pooled within-class scatter (as d×d, but we only need Sw^-1 * delta via conjugate gradient)
+  // For large d, use power iteration on Sw^-1 * delta via CG
+  // delta = mB - mA
+  const delta=new Float64Array(d);
+  for(let j=0;j<d;j++) delta[j]=mB[j]-mA[j];
+  // Build Sw as array of d vectors (only need matrix-vector product)
+  // Use simple gradient: w = Sw^-1 * delta via 50 CG steps
+  // Sw * v = sum_class sum_i (xi - mu)(xi - mu)^T v
+  function swMul(v){
+    const out=new Float64Array(d);
+    for(const r of rowsA){const dot=r.reduce((s,x,j)=>s+(x-mA[j])*v[j],0)/nA;for(let j=0;j<d;j++) out[j]+=(r[j]-mA[j])*dot;}
+    for(const r of rowsB){const dot=r.reduce((s,x,j)=>s+(x-mB[j])*v[j],0)/nB;for(let j=0;j<d;j++) out[j]+=(r[j]-mB[j])*dot;}
+    // Regularise
+    for(let j=0;j<d;j++) out[j]+=1e-4*v[j];
+    return out;
+  }
+  // CG: solve Sw*w = delta
+  let w=Float64Array.from(delta);
+  let r=Float64Array.from(delta);
+  let p=Float64Array.from(delta);
+  let rr=r.reduce((s,v)=>s+v*v,0);
+  for(let it=0;it<80;it++){
+    const Ap=swMul(p);
+    const pAp=p.reduce((s,v,j)=>s+v*Ap[j],0);
+    if(Math.abs(pAp)<1e-14) break;
+    const alpha=rr/pAp;
+    for(let j=0;j<d;j++){w[j]+=alpha*p[j]; r[j]-=alpha*Ap[j];}
+    const rr2=r.reduce((s,v)=>s+v*v,0);
+    if(rr2<1e-12) break;
+    const beta=rr2/rr; rr=rr2;
+    for(let j=0;j<d;j++) p[j]=r[j]+beta*p[j];
+  }
+  // Normalise w
+  const wn=Math.sqrt(w.reduce((s,v)=>s+v*v,0))||1;
+  for(let j=0;j<d;j++) w[j]/=wn;
+  // Project all points onto w (LDA axis)
+  const allRows=[...rowsA,...rowsB];
+  const ldaProj=allRows.map(r=>r.reduce((s,v,j)=>s+v*w[j],0));
+  // Find threshold (midpoint of class means in LDA space)
+  const tA=rowsA.reduce((s,r)=>s+r.reduce((ss,v,j)=>ss+v*w[j],0),0)/nA;
+  const tB=rowsB.reduce((s,r)=>s+r.reduce((ss,v,j)=>ss+v*w[j],0),0)/nB;
+  const threshold=(tA+tB)/2;
+  // Second axis: jitter for visibility (no information, just separation)
+  const rng=mkRng(4242);
+  const pts=ldaProj.map(x=>[x,(rng()-0.5)*0.6]);
+  return{proj:pts.slice(0,nA),projB:pts.slice(nA),threshold};
+}
+
+// ════════════════════════════════════════════════════
+// TAB 2 — RMS Fingerprint
+// ════════════════════════════════════════════════════
+const N_RMS=20, T_RMS=100, RMS_AVG=50;
+const PICKS_RMS=[1,3,5,8,11,14,17,19];  // 8 of 20 neurons to trace
+const COL_A='#2d5016', COL_B='#e87722';
+
+function renderRMSTab(){
+  const typeA=document.getElementById('rms-pA')?.value||'sine_slow';
+  const typeB=document.getElementById('rms-pB')?.value||'sine_fast';
+  const phaseB=(parseInt(document.getElementById('rms-phase')?.value||0))*Math.PI/180;
+  const esn=new ESN(N_RMS,0.9,42);
+  const sigA=makeSig(typeA,T_RMS);
+  // Signal B with phase offset applied
+  const sigB=makeSig(typeB,T_RMS,phaseB);
+  // Reference Signal B at phase 0 for RMS comparison (show invariance)
+  const sigB0=makeSig(typeB,T_RMS,0);
+  const statesA=esn.runAll(sigA,null);
+  const rmsA=esn.runRmsFinal(sigA,RMS_AVG);
+  const statesB=esn.runAll(sigB,null);
+  const rmsB=esn.runRmsFinal(sigB,RMS_AVG);
+  const rmsB0=esn.runRmsFinal(sigB0,RMS_AVG);
+  drawRMSInput(typeA,typeB,sigA,sigB,phaseB);
+  drawRMSTraces(statesA,statesB,typeA,typeB);
+  drawRMSBars(rmsA,rmsB,rmsB0,typeA,typeB,phaseB);
+}
+
+function drawRMSInput(typeA,typeB,sigA,sigB,phaseB){
+  const cv=document.getElementById('c-rms-inp');if(!cv)return;
+  const W=cssW(cv),H=80,pL=36,pR=8,pT=8,pB=14;
+  const ctx=setupCanvas(cv,W,H);
+  ctx.fillStyle='#faf8f2';ctx.fillRect(0,0,W,H);
+  const cw=W-pL-pR,ch=H-pT-pB;
+  ctx.strokeStyle='rgba(200,184,154,.3)';ctx.lineWidth=.5;
+  ctx.beginPath();ctx.moveTo(pL,pT+ch/2);ctx.lineTo(pL+cw,pT+ch/2);ctx.stroke();
+  ctx.strokeStyle='#c8b89a';ctx.lineWidth=1;ctx.strokeRect(pL,pT,cw,ch);
+  function drawSig(type,sig,col,dash){
+    ctx.strokeStyle=col;ctx.lineWidth=2;if(dash)ctx.setLineDash([4,3]);
+    ctx.beginPath();
+    if(type==='square'){
+      // True step function — no diagonal transitions
+      for(let t=0;t<T_RMS;t++){
+        const x=pL+t*cw/T_RMS,xN=pL+(t+1)*cw/T_RMS,y=pT+ch/2-sig[t]*ch/2.3;
+        if(t===0) ctx.moveTo(x,y);
+        else ctx.lineTo(x,y);   // horizontal from prev
+        ctx.lineTo(xN,y);        // hold to next step boundary
+      }
+    } else {
+      // Smooth rendering via oversampled display signal
+      const OVER=14;const ds=makeSigDisplay(type,T_RMS,0,OVER);
+      for(let k=0;k<ds.length;k++){
+        const x=pL+(k/OVER)*cw/T_RMS,y=pT+ch/2-ds[k]*ch/2.3;
+        k===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+      }
+    }
+    ctx.stroke();ctx.setLineDash([]);
+  }
+  drawSig(typeA,sigA,COL_A,false);drawSig(typeB,sigB,COL_B,true);
+  ctx.font='8px IBM Plex Mono';ctx.textAlign='left';
+  const phaseLabel=phaseB?(' +'+Math.round(phaseB*180/Math.PI)+'°'):'';
+  const lblA=SIG_SHORT[typeA], lblB=SIG_SHORT[typeB]+phaseLabel+' (dashed)';
+  const twA=ctx.measureText(lblA).width, twB=ctx.measureText(lblB).width;
+  ctx.fillStyle='rgba(250,248,242,.82)';ctx.fillRect(pL+1,pT+1,twA+4,12);
+  ctx.fillStyle=COL_A;ctx.fillText(lblA,pL+2,pT+10);
+  ctx.fillStyle='rgba(250,248,242,.82)';ctx.fillRect(pL+1,pT+13,twB+4,12);
+  ctx.fillStyle=COL_B;ctx.fillText(lblB,pL+2,pT+22);
+  ctx.fillStyle='rgba(92,74,30,.5)';ctx.textAlign='left';ctx.fillText('t=0',pL,H-2);
+  ctx.textAlign='right';ctx.fillText('t=99',pL+cw,H-2);
+}
+
+function drawRMSTraces(statesA,statesB,typeA,typeB){
+  const cv=document.getElementById('c-rms-traces');if(!cv)return;
+  const W=cssW(cv),H=220,pL=36,pR=8,pT=8,pB=20;
+  const ctx=setupCanvas(cv,W,H);
+  ctx.fillStyle='#faf8f2';ctx.fillRect(0,0,W,H);
+  const cw=W-pL-pR,ch=H-pT-pB;
+  // Averaging window shading
+  const xWin=pL+RMS_AVG*cw/T_RMS;
+  ctx.fillStyle='rgba(45,80,22,.07)';ctx.fillRect(xWin,pT,pL+cw-xWin,ch);
+  ctx.strokeStyle='rgba(45,80,22,.25)';ctx.lineWidth=1;ctx.setLineDash([3,2]);
+  ctx.beginPath();ctx.moveTo(xWin,pT);ctx.lineTo(xWin,pT+ch);ctx.stroke();ctx.setLineDash([]);
+  ctx.font='7.5px IBM Plex Mono';ctx.fillStyle='rgba(45,80,22,.65)';ctx.textAlign='left';
+  ctx.fillText('averaging window',xWin+4,pT+10);
+  ctx.fillText('(t = 50 \u2026 99)',xWin+4,pT+20);
+  ctx.strokeStyle='rgba(200,184,154,.3)';ctx.lineWidth=.5;
+  ctx.beginPath();ctx.moveTo(pL,pT+ch/2);ctx.lineTo(pL+cw,pT+ch/2);ctx.stroke();
+  ctx.strokeStyle='#c8b89a';ctx.lineWidth=1;ctx.strokeRect(pL,pT,cw,ch);
+  // Catmull-Rom spline trace
+  function trace(states,ni,col,dash){
+    ctx.strokeStyle=col;ctx.lineWidth=1.4;if(dash)ctx.setLineDash([3,2]);ctx.globalAlpha=0.7;
+    const pts=[];
+    for(let t=0;t<T_RMS;t++) pts.push({x:pL+t*cw/T_RMS,y:pT+ch/2-states[t][ni]*ch/2.3});
+    ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);
+    for(let i=0;i<pts.length-1;i++){
+      const p0=pts[Math.max(0,i-1)],p1=pts[i],p2=pts[i+1],p3=pts[Math.min(pts.length-1,i+2)];
+      ctx.bezierCurveTo(p1.x+(p2.x-p0.x)/6,p1.y+(p2.y-p0.y)/6,
+                        p2.x-(p3.x-p1.x)/6,p2.y-(p3.y-p1.y)/6,p2.x,p2.y);
+    }
+    ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1;
+  }
+  for(const ni of PICKS_RMS){trace(statesA,ni,COL_A,false);trace(statesB,ni,COL_B,true);}
+  ctx.font='9px IBM Plex Mono';ctx.fillStyle='rgba(92,74,30,.5)';
+  ctx.textAlign='left';ctx.fillText('t=0',pL,H-4);
+  ctx.textAlign='right';ctx.fillText('t=99',pL+cw,H-4);
+  ctx.textAlign='right';ctx.fillStyle='rgba(92,74,30,.5)';ctx.fillText('+1',pL-3,pT+6);ctx.fillText('0',pL-3,pT+ch/2+4);ctx.fillText('\u22121',pL-3,pT+ch+5);
+  ctx.font='8px IBM Plex Mono';ctx.textAlign='left';
+  const lA=SIG_SHORT[typeA], lB=SIG_SHORT[typeB]+' (dashed)';
+  const twLA=ctx.measureText(lA).width, twLB=ctx.measureText(lB).width;
+  ctx.fillStyle='rgba(250,248,242,.82)';ctx.fillRect(pL+3,pT+ch-15,twLB+4,12);
+  ctx.fillStyle=COL_B;ctx.fillText(lB,pL+4,pT+ch-6);
+  ctx.fillStyle='rgba(250,248,242,.82)';ctx.fillRect(pL+3,pT+ch-27,twLA+4,12);
+  ctx.fillStyle=COL_A;ctx.fillText(lA,pL+4,pT+ch-18);
+}
+
+function drawRMSBars(rmsA,rmsB,rmsB0,typeA,typeB,phaseB){
+  const cv=document.getElementById('c-rms-bars');if(!cv)return;
+  const W=cssW(cv),H=180,pL=36,pR=8,pT=10,pB=32;
+  const ctx=setupCanvas(cv,W,H);
+  ctx.fillStyle='#faf8f2';ctx.fillRect(0,0,W,H);
+  const cw=W-pL-pR,ch=H-pT-pB;
+  const N=rmsA.length;
+  const maxRMS=Math.max(...rmsA,...rmsB,0.01);
+  // Fill the full width: no gap within each A/B pair, fixed gap between pairs
+  const pairGap=0, groupGap=6;
+  const barW=Math.max(3,Math.floor((cw-(N-1)*groupGap)/(N*2)));
+  const grpW=barW*2+groupGap;
+  const totalW=grpW*N-groupGap;
+  const startX=pL+Math.floor((cw-totalW)/2);
+  // Grid
+  ctx.strokeStyle='rgba(200,184,154,.35)';ctx.lineWidth=.5;
+  for(let v=0;v<=1;v+=0.25){ctx.beginPath();ctx.moveTo(pL,pT+ch*(1-v));ctx.lineTo(pL+cw,pT+ch*(1-v));ctx.stroke();}
+  ctx.strokeStyle='#c8b89a';ctx.lineWidth=1;ctx.strokeRect(pL,pT,cw,ch);
+  // Bars
+  for(let i=0;i<N;i++){
+    const x=startX+i*grpW;
+    const hA=Math.max(1,Math.round(rmsA[i]/maxRMS*ch));
+    const hB=Math.max(1,Math.round(rmsB[i]/maxRMS*ch));
+    ctx.fillStyle=hex2rgba(COL_A,0.85);ctx.fillRect(x,pT+ch-hA,barW,hA);
+    ctx.fillStyle=hex2rgba(COL_B,0.85);ctx.fillRect(x+barW,pT+ch-hB,barW,hB);
+    // Ghost outline showing B at phase=0 when phase is shifted (should overlap exactly)
+    if(phaseB&&rmsB0){
+      const hB0=Math.max(1,Math.round(rmsB0[i]/maxRMS*ch));
+      ctx.strokeStyle=hex2rgba(COL_B,0.35);ctx.lineWidth=1;ctx.setLineDash([2,2]);
+      ctx.strokeRect(x+barW,pT+ch-hB0,barW,hB0);ctx.setLineDash([]);
+    }
+  }
+  // Y-axis
+  ctx.font='8px IBM Plex Mono';ctx.fillStyle='rgba(92,74,30,.6)';ctx.textAlign='right';
+  for(let v=0;v<=1;v+=0.25) ctx.fillText(v.toFixed(2),pL-3,pT+ch*(1-v)+3);
+  ctx.save();ctx.translate(10,pT+ch/2);ctx.rotate(-Math.PI/2);ctx.textAlign='center';ctx.fillText('RMS amplitude',0,0);ctx.restore();
+  // X-axis labels
+  ctx.font='8px IBM Plex Mono';ctx.fillStyle='rgba(92,74,30,.6)';ctx.textAlign='center';
+  for(let i=0;i<N;i+=4){ctx.fillText(i,startX+i*grpW+barW,pT+ch+12);}
+  ctx.fillText('neuron index',pL+cw/2,H-4);
+  // ── Overlay legend and phase note ON TOP of bars with semi-transparent bg ──
+  // Legend — top-left over bars
+  ctx.font='9px IBM Plex Mono';ctx.textAlign='left';
+  const legItems=[
+    {col:COL_A, label:SIG_SHORT[typeA]},
+    {col:COL_B, label:SIG_SHORT[typeB]}
+  ];
+  let legY=pT+5;
+  for(const{col,label} of legItems){
+    const tw=ctx.measureText(label).width;
+    // semi-transparent background
+    ctx.fillStyle='rgba(250,248,242,.82)';ctx.fillRect(pL+3,legY-1,tw+18,13);
+    // color swatch + text
+    ctx.fillStyle=hex2rgba(col,0.9);ctx.fillRect(pL+4,legY+1,10,8);
+    ctx.fillStyle='rgba(30,20,5,.75)';ctx.fillText(label,pL+17,legY+9);
+    legY+=15;
+  }
+  // Phase-invariance note — top-right, orange, with bg
+  if(phaseB){
+    ctx.font='bold 8px IBM Plex Mono';ctx.textAlign='right';
+    const noteText='Signal B fingerprint unchanged despite phase shift \u2192 phase-invariant';
+    const ntw=ctx.measureText(noteText).width;
+    ctx.fillStyle='rgba(250,248,242,.82)';ctx.fillRect(pL+cw-ntw-7,pT+2,ntw+6,13);
+    ctx.fillStyle=hex2rgba(COL_B,0.85);
+    ctx.fillText(noteText,pL+cw-4,pT+12);
+  }
+}
+
+// ════════════════════════════════════════════════════
+// TAB 3 — Pattern Fingerprints (was Tab 2)
+// ════════════════════════════════════════════════════
+function renderTab2(){
+  const patA=document.getElementById('t2-pA').value,patB=document.getElementById('t2-pB').value;
+  const N=parseInt(document.getElementById('t2-N').value);
+  const noise=parseFloat(document.getElementById('t2-ns').value);
+  const nTr=parseInt(document.getElementById('t2-nt').value);
+  const T=100;
+  const rho=parseFloat(document.getElementById('t2-rho')?.value||'0.90');
+  const esn=new ESN(N,rho,42);
+  const rawA=[],rawB=[],esnA=[],esnB=[];
+  for(let i=0;i<nTr;i++){
+    // Random phase per trial: makes x(T=end) uninformative regardless of frequency
+    const rA=mkRng(i*997+1),rB=mkRng(i*997+501);
+    const phA=rA()*2*Math.PI,phB=rB()*2*Math.PI;
+    const sA=makeSig(patA,T,phA,noise,i*997+251),sB=makeSig(patB,T,phB,noise,i*997+751);
+    rawA.push([sA[T-1]]);rawB.push([sB[T-1]]);
+    esnA.push(esn.runRmsFinal(sA,50));esnB.push(esn.runRmsFinal(sB,50));  // same RMS fingerprint as Tab 3
+  }
+  const viz=document.getElementById('t2-viz')?.value||'lda';
+  const rng=mkRng(555);
+  const rawPA=rawA.map(r=>[r[0],(rng()-0.5)*0.6]),rawPB=rawB.map(r=>[r[0],(rng()-0.5)*0.6]);
+  drawFP(document.getElementById('c2-raw'),rawPA,rawPB,'x(T=end)','jitter',false,null,null);
+  // Update ESN panel label
+  const esnLbl=document.getElementById('t2-esn-lbl');
+  if(viz==='lda'){
+    const{proj:ldaPA,projB:ldaPB,threshold:ldaThresh}=lda2D(esnA,esnB);
+    if(esnLbl) esnLbl.textContent='LDA of ESN fingerprint';
+    drawFP(document.getElementById('c2-esn'),ldaPA,ldaPB,'LDA axis (Fisher discriminant)','jitter',true,null,ldaThresh);
+  } else {
+    const{proj,ve1,ve2}=pca2D([...esnA,...esnB]);
+    const prA=proj.slice(0,nTr),prB=proj.slice(nTr);
+    const pc1lbl='PC\u2081 ('+Math.round(ve1*100)+'% var.)';
+    const pc2lbl='PC\u2082 ('+Math.round(ve2*100)+'% var.)';
+    const combPct=Math.round((ve1+ve2)*100);
+    if(esnLbl) esnLbl.textContent='PCA of ESN fingerprint';
+    // Compute 2D LDA boundary on the PCA projections
+    const mA2=[0,0],mB2=[0,0];
+    for(const[x,y]of prA){mA2[0]+=x;mA2[1]+=y;}for(const[x,y]of prB){mB2[0]+=x;mB2[1]+=y;}
+    mA2[0]/=prA.length;mA2[1]/=prA.length;mB2[0]/=prB.length;mB2[1]/=prB.length;
+    let s00=0,s01=0,s11=0;
+    for(const[x,y]of prA){s00+=(x-mA2[0])**2;s01+=(x-mA2[0])*(y-mA2[1]);s11+=(y-mA2[1])**2;}
+    for(const[x,y]of prB){s00+=(x-mB2[0])**2;s01+=(x-mB2[0])*(y-mB2[1]);s11+=(y-mB2[1])**2;}
+    const np=prA.length+prB.length;s00/=np;s01/=np;s11/=np;
+    const det2=s00*s11-s01*s01||1e-10;
+    const dm0=mB2[0]-mA2[0],dm1=mB2[1]-mA2[1];
+    const wx2=(s11*dm0-s01*dm1)/det2,wy2=(s00*dm1-s01*dm0)/det2;
+    const wl2=Math.sqrt(wx2*wx2+wy2*wy2)||1;
+    const pcaBoundary={mx:(mA2[0]+mB2[0])/2,my:(mA2[1]+mB2[1])/2,perpX:-wy2/wl2,perpY:wx2/wl2};
+    drawFP(document.getElementById('c2-esn'),prA,prB,pc1lbl,pc2lbl,false,combPct,pcaBoundary);
+  }
+}
+function drawFP(cv,ptA,ptB,xlab,ylab,showBound,combPct,threshold){
+  const W=cssW(cv),H=265;
+  const ctx=setupCanvas(cv,W,H);
+  ctx.fillStyle='#faf8f2';ctx.fillRect(0,0,W,H);
+  const pad={l:36,r:10,t:12,b:30};
+  const cw=W-pad.l-pad.r,ch=H-pad.t-pad.b;
+  const all=[...ptA,...ptB];
+  let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity;
+  for(const[x,y]of all){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;}
+  const mx=(x1-x0)*.12||.1,my=(y1-y0)*.12||.1;
+  x0-=mx;x1+=mx;y0-=my;y1+=my;
+  const sx=x=>pad.l+(x-x0)*cw/(x1-x0),sy=y=>pad.t+ch-(y-y0)*ch/(y1-y0);
+  ctx.strokeStyle='rgba(200,184,154,.22)';ctx.lineWidth=.5;
+  for(let i=1;i<5;i++){
+    ctx.beginPath();ctx.moveTo(pad.l+i*cw/5,pad.t);ctx.lineTo(pad.l+i*cw/5,pad.t+ch);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(pad.l,pad.t+i*ch/5);ctx.lineTo(pad.l+cw,pad.t+i*ch/5);ctx.stroke();
+  }
+
+  function dots(pts,col){ctx.fillStyle=col;ctx.globalAlpha=.75;for(const[x,y]of pts){ctx.beginPath();ctx.arc(sx(x),sy(y),4.5,0,2*Math.PI);ctx.fill();}ctx.globalAlpha=1;}
+  dots(ptA,'#2d5016');dots(ptB,'#e87722');
+  ctx.strokeStyle='#c8b89a';ctx.lineWidth=1;ctx.strokeRect(pad.l,pad.t,cw,ch);
+  ctx.font='9px IBM Plex Mono';ctx.fillStyle='#5c4a1e';
+  ctx.textAlign='center';ctx.fillText(xlab,pad.l+cw/2,H-4);
+  ctx.save();ctx.translate(11,pad.t+ch/2);ctx.rotate(-Math.PI/2);ctx.textAlign='center';ctx.fillText(ylab,0,0);ctx.restore();
+  if(threshold!==null&&threshold!==undefined){
+    ctx.strokeStyle='rgba(90,45,130,.55)';ctx.lineWidth=2;ctx.setLineDash([5,4]);
+    if(typeof threshold==='number'){
+      // Vertical line (LDA 1D mode)
+      const xv=sx(threshold);
+      ctx.beginPath();ctx.moveTo(xv,pad.t);ctx.lineTo(xv,pad.t+ch);ctx.stroke();
+    } else {
+      // Diagonal line in 2D (PCA + LDA boundary)
+      const{mx,my,perpX,perpY}=threshold;
+      const sc=Math.max(x1-x0,y1-y0)*2;
+      ctx.beginPath();
+      ctx.moveTo(sx(mx+perpX*sc),sy(my+perpY*sc));
+      ctx.lineTo(sx(mx-perpX*sc),sy(my-perpY*sc));
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+  }
+  if(combPct!==null&&combPct!==undefined){
+    ctx.font='8px IBM Plex Mono';ctx.fillStyle='rgba(80,60,28,.5)';ctx.textAlign='right';
+    ctx.fillText('PC₁+PC₂: '+combPct+'% var.',pad.l+cw,pad.t+8);
+    // Note: classes may overlap in 2D even if separable in R^N
+    ctx.fillStyle='rgba(176,58,46,.6)';ctx.textAlign='left';
+    ctx.fillText('2D slice — separability is in full ℝᴺ',pad.l+2,pad.t+ch-4);
+  }
+}
+
+// ════════════════════════════════════════════════════
+// TAB 3
+// ════════════════════════════════════════════════════
+function compAccFreq(N,noise,patA,patB){
+  const T=101,nTr=200,nTe=100;
+  const esn=new ESN(N,0.9,42);
+  const Xe=[],Xr=[],ye=[],Xet=[],Xrt=[],yt=[];
+  for(let cls=0;cls<2;cls++){
+    const type=cls===0?patA:patB;
+    for(let i=0;i<nTr+nTe;i++){
+      // Random phase per trial — makes x(T=end) uniformly distributed (uninformative)
+      const rng=mkRng(cls*10007+i*997+1);
+      const phase=rng()*2*Math.PI;
+      const sig=makeSig(type,T,phase,noise,cls*10007+i*997+2);
+      // ESN feature: per-neuron response amplitude sqrt(mean(h_i^2)) — phase-invariant
+      const hf=esn.runRmsFinal(sig,50);
+      const xr=new Float64Array([sig[T-1]]);
+      if(i<nTr){Xe.push(hf);Xr.push(xr);ye.push(cls);}
+      else{Xet.push(hf);Xrt.push(xr);yt.push(cls);}
+    }
+  }
+  const we=ridge(Xe,ye),wr=ridge(Xr,ye);
+  function acc(X,w,y){let c=0;for(let i=0;i<X.length;i++){let s=0;for(let j=0;j<w.length;j++) s+=X[i][j]*w[j];if((s>=0.5?1:0)===y[i]) c++;}return c/X.length;}
+  return{esn:acc(Xet,we,yt),raw:acc(Xrt,wr,yt)};
+}
+function onT3Change(which){
+  const pA=document.getElementById('t3-pA').value;
+  const pB=document.getElementById('t3-pB').value;
+  if(pA===pB){
+    const opts=['sine_slow','sine_fast','square','chirp'];
+    if(which==='A') document.getElementById('t3-pB').value=opts.find(o=>o!==pA);
+    else            document.getElementById('t3-pA').value=opts.find(o=>o!==pB);
+  }
+  updateT3Task();
+}
+function updateT3Task(){
+  const pA=SIG_SHORT[document.getElementById('t3-pA').value];
+  const pB=SIG_SHORT[document.getElementById('t3-pB').value];
+  document.getElementById('t3-task').innerHTML=
+    `<strong style="color:var(--text)">Task:</strong> classify <strong>${pA}</strong> vs <strong>${pB}</strong> — each trial uses a random phase + noise σ. With random phases, the final value x(T=end) of any periodic signal is uniformly distributed, so the raw readout is no better than chance (50%). 200 train / 100 test per class, ridge regression (λ=10⁻³). <strong>Reservoir network was never trained.</strong>`;
+}
+function runTab3(){
+  const patA=document.getElementById('t3-pA').value;
+  const patB=document.getElementById('t3-pB').value;
+  const noise=parseFloat(document.getElementById('t3-ns').value);
+  document.getElementById('t3-raw').innerHTML='<span class="spin"></span>';
+  document.getElementById('t3-esn').innerHTML='<span class="spin"></span>';
+  updateT3Task();
+  setTimeout(()=>{
+    const Ns=[5,10,20,35,50,75,100];
+    const results=Ns.map(n=>({n,...compAccFreq(n,noise,patA,patB)}));
+    // Use median reservoir size for the summary cards
+    const mid=compAccFreq(35,noise,patA,patB);
+    document.getElementById('t3-raw').textContent=Math.round(mid.raw*100)+'%';
+    document.getElementById('t3-esn').textContent=Math.round(mid.esn*100)+'%';
+    drawCurve3(results);
+  },40);
+}
+function drawCurve3(results){
+  const cv=document.getElementById('c3-curve');
+  const W=cssW(cv),H=200;
+  const ctx=setupCanvas(cv,W,H);
+  ctx.fillStyle='#faf8f2';ctx.fillRect(0,0,W,H);
+  const pad={l:42,r:22,t:14,b:30};
+  const cw=W-pad.l-pad.r,ch=H-pad.t-pad.b;
+  const Ns=[5,10,20,35,50,75,100];
+  const nMin=Ns[0],nMax=Ns[Ns.length-1];
+  const sx=n=>pad.l+(n-nMin)*cw/(nMax-nMin),sy=v=>pad.t+ch*(1-v);
+  // Grid
+  ctx.strokeStyle='rgba(200,184,154,.35)';ctx.lineWidth=.5;
+  for(let v=0;v<=1;v+=0.25){ctx.beginPath();ctx.moveTo(pad.l,sy(v));ctx.lineTo(pad.l+cw,sy(v));ctx.stroke();}
+  // Chance line
+  ctx.strokeStyle='rgba(176,58,46,.25)';ctx.lineWidth=1;ctx.setLineDash([4,3]);
+  ctx.beginPath();ctx.moveTo(pad.l,sy(.5));ctx.lineTo(pad.l+cw,sy(.5));ctx.stroke();ctx.setLineDash([]);
+  // Data lines (only if results provided)
+  if(results&&results.length){
+    function line(key,col){
+      ctx.strokeStyle=col;ctx.lineWidth=2.2;
+      ctx.beginPath();for(let i=0;i<results.length;i++){const x=sx(results[i].n),y=sy(results[i][key]);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);}ctx.stroke();
+      for(const r of results){ctx.fillStyle=col;ctx.strokeStyle=col;ctx.lineWidth=1.8;ctx.beginPath();ctx.arc(sx(r.n),sy(r[key]),4,0,2*Math.PI);ctx.fill();ctx.stroke();}
+    }
+    line('raw','rgba(176,80,30,.75)');line('esn','#2d5016');
+  }
+  // Axes + x-tick labels
+  ctx.strokeStyle='#c8b89a';ctx.lineWidth=1;ctx.strokeRect(pad.l,pad.t,cw,ch);
+  ctx.font='9px IBM Plex Mono';ctx.fillStyle='#5c4a1e';
+  ctx.textAlign='center';for(const n of Ns) ctx.fillText(n,sx(n),H-4);
+  ctx.fillText('reservoir size N',pad.l+cw/2,H-16);
+  ctx.textAlign='right';for(let v=0;v<=1;v+=0.25) ctx.fillText(Math.round(v*100)+'%',pad.l-4,sy(v)+4);
+  // Legend
+  ctx.font='10px Outfit';ctx.textAlign='left';
+  ctx.fillStyle='rgba(176,80,30,.9)';ctx.fillRect(pad.l+6,pad.t+6,14,3);ctx.fillStyle='#5c4a1e';ctx.fillText('Raw: x(T=end)',pad.l+24,pad.t+13);
+  ctx.fillStyle='#2d5016';ctx.fillRect(pad.l+6,pad.t+18,14,3);ctx.fillStyle='#5c4a1e';ctx.fillText('ESN: response-amplitude fingerprint ∈ ℝᴺ',pad.l+24,pad.t+25);
+  ctx.font='bold 8px IBM Plex Mono';ctx.fillStyle='rgba(176,58,46,.75)';ctx.textAlign='right';
+  ctx.fillText('← 50% = chance (coin flip)',pad.l+cw-4,sy(.5)-4);
+  // Prompt if no data yet
+  if(!results||!results.length){
+    ctx.font='11px Outfit';ctx.fillStyle='rgba(92,74,30,.35)';ctx.textAlign='center';
+    ctx.fillText('Press ▶ Run experiment to compute',pad.l+cw/2,pad.t+ch/2);
+  }
+}
+
+// ════════════════════════════════════════════════════
+// Tab switching + init
+// ════════════════════════════════════════════════════
+function showTab(i){
+  document.querySelectorAll('.panel').forEach((p,j)=>p.classList.toggle('on',j===i));
+  document.querySelectorAll('.tab').forEach((t,j)=>t.classList.toggle('on',j===i));
+  const dd=document.getElementById('tab-dropdown');
+  if(dd&&parseInt(dd.value)!==i) dd.value=i;
+  if(i===0) renderTab1();
+  else if(i===1) renderRMSTab();
+  else if(i===2) renderTab2();
+  else if(i===3) drawCurve3(null);
+}
+window.addEventListener('load',()=>{renderTab1();updateT3Task();drawCurve3(null);renderRMSTab&&setTimeout(()=>{},0);});
+window.addEventListener('resize',()=>{
+  const i=[...document.querySelectorAll('.panel')].findIndex(p=>p.classList.contains('on'));
+  if(i===0) renderTab1();else if(i===1) renderRMSTab();else if(i===2) renderTab2();else if(i===3) drawCurve3(null);
+});
+</script>
+</body>
+</html>
