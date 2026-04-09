@@ -498,6 +498,15 @@ function gotoTab(id){
   document.getElementById('tab-'+id).classList.add('on');
   const sel=document.getElementById('tabSelect');
   if(sel)sel.value=id;
+  // Pause the network simulation when leaving Tab 2 — silent background
+  // running is confusing and students miss the convergence trajectory.
+  if(id!=='n'&&running){
+    clearTimeout(tmr);tmr=null;running=false;
+    document.getElementById('btnRun').textContent='▶ Start';
+    document.getElementById('chipSt').textContent='Paused';
+    document.getElementById('chipSt').className='chip';
+    document.getElementById('btnStep').disabled=false;
+  }
   if(id==='s')setTimeout(drawSTDP,15);
   if(id==='n')setTimeout(drawNet,15);
 }
