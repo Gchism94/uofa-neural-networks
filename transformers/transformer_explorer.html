@@ -721,7 +721,7 @@ input[type=range]{padding:4px 0;accent-color:var(--green);width:100%}
           <span><span class="ls" style="background:#D96F1A"></span>selected row</span>
         </div>
         <div style="display:flex;align-items:flex-start;gap:5px;margin-top:6px">
-          <div style="writing-mode:vertical-rl;transform:rotate(180deg);font-size:.82rem;font-weight:700;color:var(--orange);flex-shrink:0;align-self:center">Query</div>
+          <div style="writing-mode:vertical-rl;transform:rotate(180deg);font-size:.68rem;font-weight:700;color:var(--orange-hi);flex-shrink:0;align-self:center">Query</div>
           <div style="position:relative;flex:1">
             <canvas id="attn-map" style="border-radius:8px;cursor:crosshair;display:block;width:100%"></canvas>
             <div id="attn-tip" style="
@@ -845,7 +845,10 @@ Q<sub>cat</sub>·K<sub>sat</sub> / √d<sub>k</sub>  =  2.6 × 1.8 / √4  =  <s
     </div>
     <h3 class="sec" style="margin-top:18px">MLM Attention Mask</h3>
     <p class="sm">Every position can attend to every other position — there is no blocking. Columns for masked tokens are highlighted orange: every row attending to a <code>[M]</code> column is attending to a substituted token, not the real word. Green rows are the 15% of <em>selected</em> positions whose predictions contribute to the training loss — this includes all three substitution types (80% <code>[MASK]</code>, 10% random token, 10% unchanged). The remaining 85% of unselected positions pass through the forward pass but produce no training loss.</p>
-    <canvas id="mlm-canvas" style="border-radius:8px;display:block;max-width:100%;margin-top:8px"></canvas>
+    <div style="display:flex;align-items:center;gap:5px;margin-top:8px">
+      <div style="writing-mode:vertical-rl;transform:rotate(180deg);font-size:.68rem;font-weight:700;color:var(--orange-hi);flex-shrink:0">Query</div>
+      <canvas id="mlm-canvas" style="border-radius:8px;display:block;max-width:100%"></canvas>
+    </div>
     <div class="lgnd" style="margin-top:6px">
       <span><span class="ls" style="background:#EBE3CF;border:1px solid #CECA9A"></span>normal → normal</span>
       <span><span class="ls" style="background:#E5EFD8;border:1px solid #BBCFA0"></span>[M] row → normal col</span>
@@ -867,7 +870,10 @@ Q<sub>cat</sub>·K<sub>sat</sub> / √d<sub>k</sub>  =  2.6 × 1.8 / √4  =  <s
     </div>
     <h3 class="sec" style="margin-top:18px">Causal Attention Mask</h3>
     <p class="sm">For each (query, key) pair involving a future token, the raw attention score — Q·K<sup>T</sup>/√d<sub>k</sub> — is set to −∞ before softmax, so softmax(−∞) = 0 and those positions contribute nothing to the weighted sum. The tokens themselves and their K and V vectors are all computed normally; the blocking happens only at the scoring step. Note: this use of "mask" is different from MLM's token masking — here no tokens are substituted; they remain in the sequence but their attention scores are zeroed out. The column header "Key" refers to the K in Q/K/V — the columns represent which tokens are being attended <em>to</em>. The highlighted row (outlined in orange) is the selected prediction position. Switch to MLM mode above to compare.</p>
-    <canvas id="clm-canvas" style="border-radius:8px;display:block;max-width:100%"></canvas>
+    <div style="display:flex;align-items:center;gap:5px">
+      <div style="writing-mode:vertical-rl;transform:rotate(180deg);font-size:.68rem;font-weight:700;color:var(--orange-hi);flex-shrink:0">Query</div>
+      <canvas id="clm-canvas" style="border-radius:8px;display:block;max-width:100%"></canvas>
+    </div>
     <div class="lgnd" style="margin-top:6px">
       <span><span class="ls" style="background:#E8E2D0;border:1px solid #CECA9A"></span>blocked (✕)</span>
       <span><span class="ls" style="background:rgba(86,122,56,.15)"></span>allowed</span>
