@@ -77,6 +77,7 @@ as iframes.
 | [`recurrent_neural_networks/rnn_explorer.html`](recurrent_neural_networks/rnn_explorer.html) | Interactive explorer tracing TDNNs → output-feedback RNNs → autoregressive latent-state RNNs, with BPTT training and a visual guide to gated architectures (LSTM, GRU) |
 | [`reservoir_computing/esn_explorer.html`](reservoir_computing/esn_explorer.html) | Interactive reservoir computing explorer using Echo State Networks: adjust spectral radius, sparsity, and input scaling to watch a fixed random reservoir project inputs into separable high-dimensional dynamics |
 | [`transformers/transformer_explorer.html`](transformers/transformer_explorer.html) | Interactive explorer for the Transformer architecture: step through scaled dot-product self-attention, multi-head attention, positional encodings, and Vision Transformers (ViT) with live attention-map and patch-embedding visualizations |
+| [`transformers/toward_multimodal_AI.html`](transformers/toward_multimodal_AI.html) | Interactive explainer tracing the path from CNNs and patch embeddings to Vision Transformers (ViT), CLIP-style contrastive pretraining, and modern multimodal architectures |
 
 ### Cellular Automata
 

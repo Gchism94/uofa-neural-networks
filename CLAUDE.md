@@ -197,6 +197,7 @@ Add a row to the appropriate table under `## Contents`:
 - `reservoir_computing/esn_explorer.html`
 - `unsupervised_learning/autoencoder_explorer.html`
 - `transformers/transformer_explorer.html`
+- `transformers/toward_multimodal_AI.html`
 
 ### Cellular Automata
 
