@@ -234,9 +234,11 @@ hr{border:none;border-top:1px solid var(--border);margin:18px 0}
 <div class="tab-panel active" id="tab-0">
 
   <p style="margin-bottom:18px;">
-    Before any multimodal model can read and see simultaneously, it needs a way to encode images as <strong>tokens</strong> — the same currency text models already use.
-    CNNs, the dominant visual architecture for decades, produce local features bound to spatial positions; they cannot naturally produce the kind of compact, position-independent global summary that a language model can consume.
-    Vision Transformers (ViTs) solve this through <strong>attention-based patch processing</strong>, producing a special <strong>[CLS] token</strong> that aggregates the entire scene into a single embedding vector — the bridge to everything that follows.
+    Before any multimodal model can read and see simultaneously, it needs a way to encode images into a compact global embedding vector — the same currency text models already use.
+    In principle, any image encoder can serve this role: CLIP's original paper (Radford et al. 2021) shipped both ResNet and ViT variants.
+    But CNNs produce local features bound to spatial positions, with no single vector naturally representing "the whole image" — a global summary has to be forced out of pooling operations the architecture was not designed around.
+    Vision Transformers (ViTs) solve this more cleanly through <strong>attention-based patch processing</strong>, producing a special <strong>[CLS] token</strong> — a vector with no spatial assignment that is explicitly trained to aggregate the entire scene.
+    That clean global summary is why ViTs have become the preferred image encoder for CLIP and for the multimodal LLMs in Tab 3.
     Click any pixel or patch and use the controls to see how each architecture handles spatial information.
   </p>
 
@@ -270,7 +272,7 @@ hr{border:none;border-top:1px solid var(--border);margin:18px 0}
   <div class="two-col">
     <div class="bias-card">
       <h3>CNN Inductive Biases</h3>
-      <p><strong>Locality</strong> means every neuron connects only to a small spatial neighborhood; the receptive field grows only as depth increases through composition of local windows. Shared filter weights enforce <strong>translation invariance</strong>: a feature detector fires identically wherever the feature appears. These structural priors are enormously helpful when training data are scarce. But they also make CNNs awkward partners for language: their activations are spatially entangled and there is no obvious single vector representing "the whole image."</p>
+      <p><strong>Locality</strong> means every neuron connects only to a small spatial neighborhood; the receptive field grows only as depth increases through composition of local windows. Shared filter weights enforce <strong>translation invariance</strong>: a feature detector fires identically wherever the feature appears. These structural priors are enormously helpful when training data are scarce. A global image summary <em>can</em> be extracted from a CNN — typically by average-pooling the final feature map — but this is a workaround, not a designed output. The architecture was built to produce spatial feature maps, and collapsing them into one vector discards the structured reasoning that makes transformers powerful at aggregation.</p>
     </div>
     <div class="bias-card vit">
       <h3>ViT and the [CLS] Token</h3>
@@ -285,8 +287,8 @@ hr{border:none;border-top:1px solid var(--border);margin:18px 0}
   </div>
 
   <div class="bridge-box">
-    <h3>The [CLS] token is the bridge to Tab 2 →</h3>
-    <p>Everything in the next tab depends on having a single embedding vector that represents an entire image. The ViT's [CLS] token is that vector. CLIP takes the [CLS] outputs from a ViT image encoder and a text encoder and trains them to land at the same location in a joint embedding space when they describe the same concept. The angular geometry of that space — where cosine similarity measures semantic similarity — is what makes zero-shot classification and, ultimately, multimodal reasoning possible.</p>
+    <h3>A global image embedding is the bridge to Tab 2 →</h3>
+    <p>Everything in the next tab depends on having a single embedding vector that represents an entire image. Any encoder can produce one — CLIP was released with both ResNet and ViT variants — but the ViT's [CLS] token is architecturally the cleanest solution: it is a vector with no spatial assignment, explicitly trained by the attention mechanism to aggregate the whole scene. CNNs require average-pooling a spatial feature map instead, a step that discards structural information the architecture never intended to compress into one vector. In practice, ViT-based CLIP models substantially outperform their ResNet counterparts at the same compute budget, and ViT encoders have become the standard for all major multimodal LLMs. The [CLS] vector that results — where cosine similarity measures semantic similarity — is what makes zero-shot classification and, ultimately, multimodal reasoning possible.</p>
   </div>
 
   <div class="refs">
