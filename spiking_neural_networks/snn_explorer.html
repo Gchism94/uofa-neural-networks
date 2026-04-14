@@ -3,7 +3,25 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Spiking Neural Networks · Interactive Explorer</title>
+<title>Spiking Neural Networks — interactive explorer</title>
+<meta name="description" content="Interactive explorer for spiking neural networks: simulate leaky integrate-and-fire neurons, visualize spike trains and membrane potentials, and explore Spike-Timing-Dependent Plasticity (STDP) — the biologically plausible Hebbian learning rule linking neural firing timing to synaptic weight updates.">
+
+<!-- Open Graph (Facebook, LinkedIn, Slack, iMessage, etc.) -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Spiking Neural Networks — interactive explorer">
+<meta property="og:description" content="Interactive explorer for spiking neural networks: simulate leaky integrate-and-fire neurons, visualize spike trains and membrane potentials, and explore Spike-Timing-Dependent Plasticity (STDP) — the biologically plausible Hebbian learning rule linking neural firing timing to synaptic weight updates.">
+<meta property="og:image" content="https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/spiking_neural_networks/snn_explorer-preview.png">
+<meta property="og:image:width" content="1850">
+<meta property="og:image:height" content="898">
+<meta property="og:url" content="https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/spiking_neural_networks/snn_explorer.html">
+<meta property="fb:app_id" content="2385695445236853">
+
+<!-- Twitter/X card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Spiking Neural Networks — interactive explorer">
+<meta name="twitter:description" content="Interactive explorer for spiking neural networks: simulate leaky integrate-and-fire neurons, visualize spike trains and membrane potentials, and explore Spike-Timing-Dependent Plasticity (STDP) — the biologically plausible Hebbian learning rule linking neural firing timing to synaptic weight updates.">
+<meta name="twitter:image" content="https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/spiking_neural_networks/snn_explorer-preview.png">
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
 <style>
@@ -1612,6 +1630,12 @@ window.addEventListener('resize', () => {
 
 // ── INIT: start both simulations once fonts are ready ─────
 document.fonts.ready.then(() => { startLIF(); startCOD(); });
+</script>
+<footer id="course-nav-footer" style="margin-top:0;padding:0.75rem 0 0 1rem;border-top:1px solid #E0DAC0;font-size:0.8rem;color:#78786A;text-align:left;">
+  <a href="../" style="color:#2e7d32;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">&larr; All course visualizations</a>
+</footer>
+<script>
+if (window.self !== window.top) { var f = document.getElementById('course-nav-footer'); if (f) { f.style.display = 'none'; } }
 </script>
 </body>
 </html>
