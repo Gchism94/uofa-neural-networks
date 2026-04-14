@@ -76,7 +76,8 @@ input[type=range].bsld::-webkit-slider-thumb{background:var(--orange)}
 .svg-wrap-lever svg{width:100%;height:100%}
 .svg-wrap-bc{width:100%;aspect-ratio:10/3;overflow:hidden}
 .svg-wrap-bc svg{width:100%;height:100%}
-#soma-circle{transition:fill .4s,stroke .4s,stroke-width .4s}
+.svg-wrap svg,.svg-wrap-lever svg,.svg-wrap-bc svg,.svg-wrap svg{touch-action:none}
+#neuron-svg,#lever-svg,#bc-svg,#f2d-svg,#f2d-lv-svg{touch-action:none}
 #soma-glow{transition:stroke .4s,opacity .4s}
 #ap-terminal{transition:fill .4s,stroke .4s}
 footer{display:flex;justify-content:flex-end;font-size:.68rem;color:var(--text-muted)}
@@ -420,20 +421,21 @@ function addNeuronInteractions(){
 
   // Slider handles: vertical drag → xᵢ (up = more, down = less)
   for(let i=0;i<3;i++){
-    NR.sliderHandles[i].addEventListener('mousedown',e=>{
-      if(e.button!==0)return;e.preventDefault();
+    NR.sliderHandles[i].addEventListener('pointerdown',e=>{
+      if(e.button!==0&&e.pointerType==='mouse') return;
+      e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId);
       nDrag={idx:i,sy:toSVGY(e),startXi:S.x[i]};
     });
   }
-  svg.addEventListener('mousemove',e=>{
+  svg.addEventListener('pointermove',e=>{
     if(!nDrag)return;
     const dy=toSVGY(e)-nDrag.sy;
     // drag up (dy<0) = slider goes up = higher xᵢ; 40px = full range
     S.x[nDrag.idx]=clampX(nDrag.startXi-dy/40);
     syncSliders();
   });
-  svg.addEventListener('mouseup',()=>{nDrag=null;});
-  svg.addEventListener('mouseleave',()=>{nDrag=null;});
+  svg.addEventListener('pointerup',()=>{nDrag=null;});
+  svg.addEventListener('pointercancel',()=>{nDrag=null;});
 
   // Weight label hit zones: left-click +0.1, right-click -0.1
   NR.wHits.forEach(({el,idx})=>{
@@ -781,12 +783,14 @@ function addLeverInteractions(){
   }
 
   function startW(e,i){
-    if(e.button!==0)return;e.preventDefault();
+    if(e.button!==0&&e.pointerType==='mouse')return;
+    e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId);
     const p=toSVG(e);
     drag={type:'w',idx:i,sx:p.x,sy:p.y,startXi:S.x[i],startWi:S.w[i],dir:null};
   }
   function startB(e){
-    if(e.button!==0)return;e.preventDefault();
+    if(e.button!==0&&e.pointerType==='mouse')return;
+    e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId);
     const p=toSVG(e);
     drag={type:'b',sx:p.x,sy:p.y,startB:S.b,dir:'v'};
   }
@@ -796,17 +800,17 @@ function addLeverInteractions(){
   for(let i=0;i<3;i++){
     // All three targets for input i: ball, clip hit zone, big overlay hit
     [LR.wBalls[i], LR.wClipHits[i], LR.wBallHits[i]].forEach(el=>{
-      el.addEventListener('mousedown',e=>startW(e,i));
+      el.addEventListener('pointerdown',e=>startW(e,i));
       el.addEventListener('contextmenu',e=>decW(e,i));
     });
   }
 
   [LR.biasCyl, LR.biasCap, LR.biasHitZone].forEach(el=>{
-    el.addEventListener('mousedown',startB);
+    el.addEventListener('pointerdown',startB);
     el.addEventListener('contextmenu',decB);
   });
 
-  svg.addEventListener('mousemove',e=>{
+  svg.addEventListener('pointermove',e=>{
     if(!drag)return;
     const p=toSVG(e);
     const dx=p.x-drag.sx,dy=p.y-drag.sy;
@@ -822,7 +826,7 @@ function addLeverInteractions(){
     syncSliders();
   });
 
-  svg.addEventListener('mouseup',()=>{
+  svg.addEventListener('pointerup',()=>{
     if(!drag)return;
     if(drag.dir===null){
       if(drag.type==='w') S.w[drag.idx]=clampW(S.w[drag.idx]+0.1);
@@ -831,7 +835,7 @@ function addLeverInteractions(){
     }
     drag=null;
   });
-  svg.addEventListener('mouseleave',()=>{drag=null;});
+  svg.addEventListener('pointercancel',()=>{drag=null;});
 }
 
 /* ═════ FEATURE SPACE PANEL ═══════════════════════════════════════════
@@ -1110,33 +1114,37 @@ function addF2DInteractions(){
   function svgToMath(sx,sy){return{mx:(sx-F2G.ox)/F2G.sc,my:(F2G.oy-sy)/F2G.sc};}
 
   // x₁ ball: drag ↔ → x₁; click ±w₁
-  F2R.x1Ball.addEventListener('mousedown',e=>{
-    if(e.button!==0)return;e.preventDefault();
+  F2R.x1Ball.addEventListener('pointerdown',e=>{
+    if(e.button!==0&&e.pointerType==='mouse')return;
+    e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId);
     const p=toSVG4(e);drag={type:'x1',sx:p.x,sy:p.y,sv:F2.x1,moved:false};
   });
   F2R.x1Ball.addEventListener('contextmenu',e=>{e.preventDefault();F2.w1=f2cW(F2.w1-0.1);});
 
   // x₂ ball: drag ↕ → x₂; click ±w₂
-  F2R.x2Ball.addEventListener('mousedown',e=>{
-    if(e.button!==0)return;e.preventDefault();
+  F2R.x2Ball.addEventListener('pointerdown',e=>{
+    if(e.button!==0&&e.pointerType==='mouse')return;
+    e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId);
     const p=toSVG4(e);drag={type:'x2',sx:p.x,sy:p.y,sv:F2.x2,moved:false};
   });
   F2R.x2Ball.addEventListener('contextmenu',e=>{e.preventDefault();F2.w2=f2cW(F2.w2-0.1);});
 
   // Input point: free 2D drag
-  F2R.inputPt.addEventListener('mousedown',e=>{
-    if(e.button!==0)return;e.preventDefault();
+  F2R.inputPt.addEventListener('pointerdown',e=>{
+    if(e.button!==0&&e.pointerType==='mouse')return;
+    e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId);
     const p=toSVG4(e);drag={type:'xy',sx:p.x,sy:p.y,sv1:F2.x1,sv2:F2.x2,moved:false};
   });
 
   // Threshold dot: drag along torque direction → b; click ±b
-  F2R.threshDot.addEventListener('mousedown',e=>{
-    if(e.button!==0)return;e.preventDefault();
+  F2R.threshDot.addEventListener('pointerdown',e=>{
+    if(e.button!==0&&e.pointerType==='mouse')return;
+    e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId);
     const p=toSVG4(e);drag={type:'thresh',sx:p.x,sy:p.y,sv:F2.b,moved:false};
   });
   F2R.threshDot.addEventListener('contextmenu',e=>{e.preventDefault();F2.b=f2cB(F2.b-0.1);});
 
-  svg.addEventListener('mousemove',e=>{
+  svg.addEventListener('pointermove',e=>{
     if(!drag)return;
     const p=toSVG4(e);
     const dx=p.x-drag.sx, dy=p.y-drag.sy;
@@ -1157,7 +1165,7 @@ function addF2DInteractions(){
       F2.b=f2cB(drag.sv+proj*wLen);
     }
   });
-  svg.addEventListener('mouseup',()=>{
+  svg.addEventListener('pointerup',()=>{
     if(!drag)return;
     if(!drag.moved){
       if(drag.type==='x1') F2.w1=f2cW(F2.w1+0.1);
@@ -1166,7 +1174,7 @@ function addF2DInteractions(){
     }
     drag=null;
   });
-  svg.addEventListener('mouseleave',()=>{drag=null;});
+  svg.addEventListener('pointercancel',()=>{drag=null;});
 }
 
 /* ─ 2-input lever (feature space panel) ──────────────────────────── */
@@ -1356,26 +1364,28 @@ function addF2DLeverInteractions(){
     return{x:(e.clientX-r.left)*(400/r.width),y:(e.clientY-r.top)*(300/r.height)};
   }
   function startW5(e,i){
-    if(e.button!==0)return;e.preventDefault();
+    if(e.button!==0&&e.pointerType==='mouse')return;
+    e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId);
     const p=toSVG5(e);
     drag={type:'w',idx:i,sx:p.x,sy:p.y,startXi:F2[`x${i+1}`],startWi:F2[`w${i+1}`],dir:null};
   }
   function startB5(e){
-    if(e.button!==0)return;e.preventDefault();
+    if(e.button!==0&&e.pointerType==='mouse')return;
+    e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId);
     const p=toSVG5(e);
     drag={type:'b',sx:p.x,sy:p.y,startB:F2.b,dir:'v'};
   }
   for(let i=0;i<2;i++){
     [F2R.lvBalls[i],F2R.lvClipHits[i],F2R.lvBallHits[i]].forEach(el=>{
-      el.addEventListener('mousedown',e=>startW5(e,i));
+      el.addEventListener('pointerdown',e=>startW5(e,i));
       el.addEventListener('contextmenu',e=>{e.preventDefault();F2[`w${i+1}`]=f2cW(F2[`w${i+1}`]-0.1);});
     });
   }
   [F2R.lvBiasCyl,F2R.lvBiasCap,F2R.lvBiasHit].forEach(el=>{
-    el.addEventListener('mousedown',startB5);
+    el.addEventListener('pointerdown',startB5);
     el.addEventListener('contextmenu',e=>{e.preventDefault();F2.b=f2cB(F2.b-0.1);});
   });
-  svg.addEventListener('mousemove',e=>{
+  svg.addEventListener('pointermove',e=>{
     if(!drag)return;
     const p=toSVG5(e);
     const dx=p.x-drag.sx,dy=p.y-drag.sy;
@@ -1389,7 +1399,7 @@ function addF2DLeverInteractions(){
       F2.b=f2cB(drag.startB+dy/55);
     }
   });
-  svg.addEventListener('mouseup',()=>{
+  svg.addEventListener('pointerup',()=>{
     if(!drag)return;
     if(drag.dir===null){
       if(drag.type==='w') F2[`w${drag.idx+1}`]=f2cW(F2[`w${drag.idx+1}`]+0.1);
@@ -1397,7 +1407,7 @@ function addF2DLeverInteractions(){
     }
     drag=null;
   });
-  svg.addEventListener('mouseleave',()=>{drag=null;});
+  svg.addEventListener('pointercancel',()=>{drag=null;});
 }
 
 /* ═════ CONTROLS ══════════════════════════════════════════════════ */
@@ -1723,24 +1733,27 @@ function addBellCrankInteractions(){
   }
 
   // Upstream handle — sets y₁
-  BCR.handle.addEventListener('mousedown',e=>{
-    if(e.button!==0)return;e.preventDefault();
+  BCR.handle.addEventListener('pointerdown',e=>{
+    if(e.button!==0&&e.pointerType==='mouse')return;
+    e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId);
     bcDrag={type:'y1',startSY:toSVGY(e),startVal:BC.y1};
   });
 
   // Downstream input ball — sets w_down (drag ↕, up=heavier)
-  BCR.downWeightMarker.addEventListener('mousedown',e=>{
-    if(e.button!==0)return;e.preventDefault();
+  BCR.downWeightMarker.addEventListener('pointerdown',e=>{
+    if(e.button!==0&&e.pointerType==='mouse')return;
+    e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId);
     bcDrag={type:'w',startSY:toSVGY(e),startVal:BC.w_down};
   });
   BCR.downWeightMarker.addEventListener('contextmenu',e=>{
     e.preventDefault();BC.w_down=clampWD(BC.w_down-0.1);
   });
 
-  // Downstream bias cylinder — sets S.b (drag ↕, up=heavier, syncs sliders)
+  // Downstream bias cylinder — sets BC.b_down (drag ↕, down=heavier)
   [BCR.downBiasCyl, BCR.downBiasCap].forEach(el=>{
-    el.addEventListener('mousedown',e=>{
-      if(e.button!==0)return;e.preventDefault();
+    el.addEventListener('pointerdown',e=>{
+      if(e.button!==0&&e.pointerType==='mouse')return;
+      e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId);
       bcDrag={type:'b',startSY:toSVGY(e),startVal:BC.b_down};
     });
     el.addEventListener('contextmenu',e=>{
@@ -1748,7 +1761,7 @@ function addBellCrankInteractions(){
     });
   });
 
-  svg.addEventListener('mousemove',e=>{
+  svg.addEventListener('pointermove',e=>{
     if(!bcDrag)return;
     const dy=toSVGY(e)-bcDrag.startSY;
     if(bcDrag.type==='y1'){
@@ -1761,8 +1774,8 @@ function addBellCrankInteractions(){
       BC.b_down=clampBD(bcDrag.startVal+dy/55);
     }
   });
-  svg.addEventListener('mouseup',()=>{bcDrag=null;});
-  svg.addEventListener('mouseleave',()=>{bcDrag=null;});
+  svg.addEventListener('pointerup',()=>{bcDrag=null;});
+  svg.addEventListener('pointercancel',()=>{bcDrag=null;});
 }
 
 /* ═════ MAIN LOOP ═════════════════════════════════════════════════ */
