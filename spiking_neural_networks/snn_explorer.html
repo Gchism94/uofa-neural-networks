@@ -1,0 +1,1617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spiking Neural Networks · Interactive Explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+/* ── RESET ───────────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{color-scheme:light}
+body{font-family:'Outfit',system-ui,sans-serif;background:#faf8f2;color:#1e2a14;line-height:1.5}
+sub,sup{font-size:.78em}
+a{text-decoration:none}
+
+/* ── HEADER ──────────────────────────────────────────────── */
+.site-hdr{
+  background:#1a3a0d;color:#ddeece;
+  padding:12px 20px 10px;
+  display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 0;
+}
+.hdr-title{font-size:1.05rem;font-weight:600;letter-spacing:.01em;flex:1 1 auto}
+.hdr-copy{
+  font-family:'IBM Plex Mono',monospace;font-size:.62rem;color:#88aa72;
+  display:inline-flex;flex-wrap:wrap;align-items:baseline;justify-content:flex-end;
+  flex:0 0 auto;
+}
+.hdr-copy .cn{white-space:nowrap}
+.hdr-copy .cs{padding:0 4px}
+.hdr-copy .cl{white-space:nowrap;color:#88aa72}
+.hdr-copy .cl:hover{color:#c8ddb8}
+@media(max-width:380px){
+  .site-hdr{flex-direction:column;gap:3px}
+  .hdr-copy{flex-direction:column;align-items:flex-start;gap:1px}
+  .hdr-copy .cs{display:none}
+}
+
+/* ── TAB NAV ─────────────────────────────────────────────── */
+.tab-nav{
+  display:flex;background:#ede8d8;border-bottom:2px solid #c5bfa8;
+  overflow-x:auto;scrollbar-width:none;
+}
+.tab-nav::-webkit-scrollbar{display:none}
+.tab-btn{
+  font-family:'Outfit',sans-serif;font-size:.83rem;font-weight:500;
+  padding:9px 16px;border:none;background:transparent;color:#6a7a5a;
+  cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;
+  white-space:nowrap;transition:color .14s,border-color .14s;outline:none;
+}
+.tab-btn:hover{color:#1e2a14}
+.tab-btn.active{color:#2d5a1b;border-bottom-color:#c8580e;font-weight:600}
+.tab-sel{
+  display:none;font-family:'Outfit',sans-serif;font-size:.88rem;
+  padding:9px 14px;width:100%;background:#ede8d8;border:none;
+  border-bottom:2px solid #c5bfa8;color:#1e2a14;cursor:pointer;outline:none;
+}
+@media(max-width:520px){.tab-nav{display:none}.tab-sel{display:block}}
+
+/* ── PANELS ──────────────────────────────────────────────── */
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+.pbody{max-width:860px;margin:0 auto;padding:18px 18px 32px}
+
+/* ── TYPOGRAPHY ──────────────────────────────────────────── */
+.sec-title{font-size:1.0rem;font-weight:600;color:#1a3a0d;margin-bottom:3px}
+.sec-sub{font-size:.8rem;color:#5a6a4a;margin-bottom:14px;line-height:1.5}
+
+/* ── EQ BOX ──────────────────────────────────────────────── */
+.eq-box{
+  background:#eee9d8;border-left:3px solid #2d5a1b;border-radius:0 5px 5px 0;
+  padding:9px 14px;margin-bottom:14px;
+  font-family:'IBM Plex Mono',monospace;font-size:.88rem;color:#1a3a0d;
+  overflow-x:auto;line-height:1.75;
+}
+.eq-lbl{font-family:'Outfit',sans-serif;font-size:.68rem;text-transform:uppercase;
+  letter-spacing:.07em;color:#8a9a7a;margin-bottom:5px}
+
+/* ── CANVAS WRAPPERS ─────────────────────────────────────── */
+.cv-wrap{background:#fff;border:1px solid #c8c2b0;border-radius:5px;
+  margin-bottom:10px;overflow:hidden}
+.cv-lbl{font-family:'IBM Plex Mono',monospace;font-size:.67rem;color:#8a9a7a;
+  padding:3px 10px 2px;background:#f0ece0;border-bottom:1px solid #ddd8c5}
+canvas{display:block;width:100%}
+
+/* ── CONTROLS ────────────────────────────────────────────── */
+.ctrl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));
+  gap:10px 18px;margin-bottom:12px}
+@media(max-width:380px){.ctrl-grid{grid-template-columns:1fr}}
+.ctrl-item{display:flex;flex-direction:column;gap:3px}
+.ctrl-lbl{font-size:.76rem;font-weight:500;color:#3a4a2a;
+  display:flex;justify-content:space-between;align-items:baseline}
+.ctrl-val{font-family:'IBM Plex Mono',monospace;font-size:.73rem;color:#2d5a1b;
+  min-width:56px;text-align:right}
+input[type=range]{
+  -webkit-appearance:none;appearance:none;width:100%;height:4px;
+  background:#c8c2b0;border-radius:2px;outline:none;cursor:pointer;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:14px;height:14px;border-radius:50%;
+  background:#2d5a1b;border:2px solid #faf8f2;
+  box-shadow:0 1px 3px rgba(0,0,0,.22);transition:background .12s;
+}
+input[type=range]::-webkit-slider-thumb:hover{background:#c8580e}
+input[type=range]::-moz-range-thumb{
+  width:14px;height:14px;border-radius:50%;background:#2d5a1b;border:2px solid #faf8f2;
+}
+
+.ctrl-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin-bottom:10px}
+.ctrl-row label{font-size:.76rem;font-weight:500;color:#3a4a2a}
+.seg-btn{
+  font-family:'Outfit',sans-serif;font-size:.76rem;font-weight:500;
+  padding:4px 11px;border:1.5px solid #c8c2b0;border-radius:4px;
+  background:#faf8f2;color:#5a6a4a;cursor:pointer;transition:all .12s;
+}
+.seg-btn.active{background:#2d5a1b;color:#fff;border-color:#2d5a1b}
+.seg-btn:hover:not(.active){border-color:#2d5a1b;color:#2d5a1b}
+
+/* ── STAT BADGES ─────────────────────────────────────────── */
+.stat-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.stat-badge{background:#f0ece0;border:1px solid #ddd8c5;border-radius:4px;
+  padding:3px 9px;font-family:'IBM Plex Mono',monospace;font-size:.7rem;color:#1a3a0d}
+.stat-badge .sv{color:#c8580e;font-weight:500}
+
+/* ── INPUT TYPE CARD ─────────────────────────────────────── */
+.input-card{background:#f5f0e4;border:1px solid #c8c2b0;border-radius:5px;
+  padding:11px 14px 12px;margin-bottom:10px}
+.input-card-title{font-size:.68rem;font-weight:600;letter-spacing:.09em;
+  text-transform:uppercase;color:#6a7a5a;margin-bottom:8px}
+
+/* ── ZONE HEADERS (Tab 2) ────────────────────────────────── */
+.zone-hdr{
+  display:flex;align-items:center;
+  font-size:.68rem;font-weight:600;letter-spacing:.09em;text-transform:uppercase;
+  color:#6a7a5a;margin:16px 0 9px;gap:0;
+}
+.zone-hdr::after{content:'';flex:1;height:1px;background:#ddd8c5;margin-left:9px}
+.zone-stat{font-size:.73rem;color:#5a6a4a;margin:3px 0 8px}
+.zone-stat span{font-family:'IBM Plex Mono',monospace;color:#c8580e;font-weight:500}
+.spk-row{display:flex;gap:10px;align-items:flex-start;margin-bottom:10px}
+.spk-row .cv-wrap{margin-bottom:0}
+.spk-main{flex:2 1 0;min-width:0}
+.spk-isi {flex:1 1 0;min-width:0}
+@media(max-width:480px){.spk-row{flex-direction:column}.spk-main,.spk-isi{flex:none;width:100%}}
+
+/* ── WINDOW BAR (Tab 2 rate estimate) ────────────────────── */
+
+/* ── WINDOW CONTROL (above rate estimate) ───────────────── */
+.win-ctrl{padding:2px 0 3px;margin-bottom:2px}
+.win-ctrl-lbl{font-size:.74rem;font-weight:500;color:#3a4a2a;
+  display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px}
+.wc-hint{font-size:.67rem;font-weight:400;color:#8a9a7a}
+.wc-val{font-family:'IBM Plex Mono',monospace;font-size:.73rem;color:#c8580e}
+
+#s2-wn{direction:rtl;width:100%;display:block;margin:0}
+.win-axis{display:flex;justify-content:space-between;margin-top:1px;
+  font-family:'IBM Plex Mono',monospace;font-size:.63rem;color:#8a9a7a}
+
+.aside{margin-top:28px;padding:14px 0 0;border-top:1px solid #ddd8c5;
+  font-size:.77rem;color:#5a6a4a;line-height:1.6}
+.aside-title{font-size:.68rem;font-weight:600;letter-spacing:.07em;
+  text-transform:uppercase;color:#8a9a7a;margin-bottom:9px}
+.aside p{margin-bottom:8px}
+.aside p:last-child{margin-bottom:0}
+.aside strong{color:#3a4a2a}
+
+/* ── TAB 4 CARDS ─────────────────────────────────────────── */
+.info-card{background:#fff;border:1px solid #c8c2b0;border-radius:6px;
+  padding:15px 17px;margin-bottom:14px}
+.info-card h3{font-size:.88rem;font-weight:600;color:#1a3a0d;margin-bottom:7px}
+.info-card p{font-size:.8rem;color:#3a4a2a;line-height:1.55;margin-bottom:6px}
+.info-card p:last-child{margin-bottom:0}
+.cmp-table{width:100%;border-collapse:collapse;font-size:.78rem;margin-top:8px}
+.cmp-table th{background:#1a3a0d;color:#ddeece;padding:6px 10px;text-align:left;font-weight:500}
+.cmp-table td{padding:5px 10px;border-bottom:1px solid #eee8d8;color:#3a4a2a;vertical-align:top}
+.cmp-table tr:nth-child(even) td{background:#faf8f2}
+.sw-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));
+  gap:9px;margin-top:10px}
+.sw-card{background:#f0ece0;border:1px solid #ddd8c5;border-radius:5px;padding:9px 11px}
+.sw-card .sn{font-family:'IBM Plex Mono',monospace;font-size:.8rem;font-weight:500;
+  color:#2d5a1b;margin-bottom:4px}
+.sw-card .sd{font-size:.74rem;color:#3a4a2a;line-height:1.4}
+
+/* ── HARDWARE RADIO SELECTOR ─────────────────────────────── */
+.hw-radio-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.hw-radio-lbl{
+  display:flex;align-items:center;gap:6px;
+  font-size:.79rem;font-weight:500;color:#5a6a4a;
+  padding:5px 12px;border:1.5px solid #c8c2b0;border-radius:4px;
+  cursor:pointer;transition:all .13s;user-select:none;
+}
+.hw-radio-lbl input[type=radio]{display:none}
+.hw-radio-lbl:hover{border-color:#2d5a1b;color:#2d5a1b}
+.hw-radio-lbl.active{background:#2d5a1b;color:#fff;border-color:#2d5a1b}
+.hw-desc{font-size:.8rem;color:#3a4a2a;line-height:1.6}
+.hw-desc p{margin-bottom:7px}
+.hw-desc p:last-child{margin-bottom:0}
+.note-ref{font-size:.74rem!important;color:#8a9a7a!important;font-style:italic;
+  border-top:1px solid #e8e2d0;margin-top:10px!important;padding-top:8px}
+
+/* ── FOOTER ──────────────────────────────────────────────── */
+.site-ftr{background:#ede8d8;border-top:1px solid #c5bfa8;padding:9px 18px;text-align:center}
+.ftr-copy{font-family:'IBM Plex Mono',monospace;font-size:.63rem;color:#8a9a7a;
+  display:inline-flex;flex-wrap:wrap;justify-content:center;align-items:baseline}
+.ftr-copy .cn{white-space:nowrap}
+.ftr-copy .cs{padding:0 3px}
+.ftr-copy .cl{white-space:nowrap;color:#8a9a7a}
+.ftr-copy .cl:hover{color:#c8580e}
+@media(max-width:360px){
+  .ftr-copy{flex-direction:column;align-items:center}
+  .ftr-copy .cs{display:none}
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="site-hdr">
+  <span class="hdr-title">Spiking Neural Networks · Interactive Explorer</span>
+  <div class="hdr-copy">
+    <span class="cn">© 2026 Theodore&nbsp;P.&nbsp;Pavlic</span>
+    <span class="cs" aria-hidden="true">·</span>
+    <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener" class="cl">MIT&nbsp;License</a>
+  </div>
+</header>
+
+<!-- TAB NAV -->
+<nav class="tab-nav" role="tablist">
+  <button class="tab-btn active" data-tab="0">① LIF Dynamics</button>
+  <button class="tab-btn" data-tab="1">② Rate Coding</button>
+  <button class="tab-btn" data-tab="2">③ STDP</button>
+  <button class="tab-btn" data-tab="3">④ Hardware &amp; Software</button>
+  <button class="tab-btn" data-tab="4">⑤ Learning &amp; Applications</button>
+</nav>
+<select class="tab-sel" id="tabSel">
+  <option value="0">① LIF Dynamics</option>
+  <option value="1">② Rate Coding</option>
+  <option value="2">③ STDP</option>
+  <option value="3">④ Hardware &amp; Software</option>
+  <option value="4">⑤ Learning &amp; Applications</option>
+</select>
+
+<!-- ═══════════════════════════════════════════════════════════
+     TAB 1 — LIF MEMBRANE DYNAMICS
+════════════════════════════════════════════════════════════ -->
+<div class="tab-panel active" id="tab-0">
+<div class="pbody">
+  <p class="sec-title">Leaky Integrate-and-Fire (LIF) Neuron</p>
+  <p class="sec-sub">The LIF model treats the neuron membrane as an RC circuit: injected current charges the capacitance; the leak resistance continuously drains it toward V<sub>rest</sub>. When V reaches threshold V<sub>th</sub>, a spike is emitted, V resets to V<sub>reset</sub>, and the neuron enters a brief refractory period.</p>
+
+  <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;margin-bottom:14px">
+    <div class="eq-box" style="flex:1 1 220px;margin-bottom:0">
+      <div class="eq-lbl" style="text-transform:none;letter-spacing:.04em">GOVERNING EQUATION <span style="font-weight:400;font-size:.64rem;color:#aab0a0">(recall: C·dV/dt = I)</span></div>
+      τ<sub>m</sub> · dV/dt = −(V − V<sub>rest</sub>) + R·I(t)
+      <div style="margin-top:10px;padding-top:9px;border-top:1px solid #c5bfa8">
+        <div class="ctrl-lbl"><span>R — membrane resistance</span><span class="ctrl-val" id="vt-R">1.00</span></div>
+        <input type="range" id="sl-R" min="0.2" max="4" step="0.1" value="1" style="width:100%;display:block;margin:3px 0 1px" oninput="p1('R',this.value)">
+        <div style="display:flex;justify-content:space-between;font-size:.62rem;color:#8a9a7a;font-family:'IBM Plex Mono',monospace">
+          <span>0.2</span><span>2</span><span>4</span>
+        </div>
+      </div>
+    </div>
+    <div class="eq-box" style="flex:0 0 auto;margin-bottom:0">
+      <div class="eq-lbl">Equivalent RC circuit</div>
+      <svg viewBox="0 0 262 126" xmlns="http://www.w3.org/2000/svg" style="width:255px;max-width:100%;display:block">
+        <!-- Top rail — node V -->
+        <line x1="14" y1="15" x2="248" y2="15" stroke="#1a3a0d" stroke-width="1.8"/>
+        <!-- Bottom rail — V_rest -->
+        <line x1="14" y1="108" x2="248" y2="108" stroke="#8a9a7a" stroke-width="1.5"/>
+        <!-- "I(t)" label on top rail, between last source and C -->
+        <text x="168" y="11" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#c8580e" text-anchor="middle">I(t) →</text>
+        <!-- V label top-right -->
+        <text x="251" y="20" font-family="'IBM Plex Mono',monospace" font-size="10" fill="#1a3a0d" font-weight="600">V</text>
+        <!-- V_rest label bottom-right with subscript -->
+        <text x="248" y="121" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#8a9a7a" text-anchor="end">V<tspan font-size="7" dy="2">rest</tspan></text>
+
+        <!-- ── I₁ source at x=38 ── -->
+        <line x1="38" y1="15" x2="38" y2="44" stroke="#4a5a3a" stroke-width="1.2"/>
+        <circle cx="38" cy="57" r="13" fill="none" stroke="#c8580e" stroke-width="1.5"/>
+        <line x1="38" y1="64" x2="38" y2="53" stroke="#c8580e" stroke-width="1.3"/>
+        <polygon points="38,49 34.5,56 41.5,56" fill="#c8580e"/>
+        <line x1="38" y1="70" x2="38" y2="108" stroke="#4a5a3a" stroke-width="1.2"/>
+        <text x="38" y="122" font-family="'IBM Plex Mono',monospace" font-size="8.5" fill="#c8580e" text-anchor="middle">I<tspan dy="2" font-size="6.5">1</tspan></text>
+        <circle cx="38" cy="15" r="2.5" fill="#1a3a0d"/>
+        <circle cx="38" cy="108" r="2.5" fill="#8a9a7a"/>
+
+        <!-- ── I₂ source at x=76 ── -->
+        <line x1="76" y1="15" x2="76" y2="44" stroke="#4a5a3a" stroke-width="1.2"/>
+        <circle cx="76" cy="57" r="13" fill="none" stroke="#c8580e" stroke-width="1.5"/>
+        <line x1="76" y1="64" x2="76" y2="53" stroke="#c8580e" stroke-width="1.3"/>
+        <polygon points="76,49 72.5,56 79.5,56" fill="#c8580e"/>
+        <line x1="76" y1="70" x2="76" y2="108" stroke="#4a5a3a" stroke-width="1.2"/>
+        <text x="76" y="122" font-family="'IBM Plex Mono',monospace" font-size="8.5" fill="#c8580e" text-anchor="middle">I<tspan dy="2" font-size="6.5">2</tspan></text>
+        <circle cx="76" cy="15" r="2.5" fill="#1a3a0d"/>
+        <circle cx="76" cy="108" r="2.5" fill="#8a9a7a"/>
+
+        <!-- ── dots ── -->
+        <text x="109" y="62" font-family="'IBM Plex Mono',monospace" font-size="13" fill="#8a9a7a" text-anchor="middle" letter-spacing="3">···</text>
+
+        <!-- ── Iₙ source at x=140 ── -->
+        <line x1="140" y1="15" x2="140" y2="44" stroke="#4a5a3a" stroke-width="1.2"/>
+        <circle cx="140" cy="57" r="13" fill="none" stroke="#c8580e" stroke-width="1.5"/>
+        <line x1="140" y1="64" x2="140" y2="53" stroke="#c8580e" stroke-width="1.3"/>
+        <polygon points="140,49 136.5,56 143.5,56" fill="#c8580e"/>
+        <line x1="140" y1="70" x2="140" y2="108" stroke="#4a5a3a" stroke-width="1.2"/>
+        <text x="140" y="122" font-family="'IBM Plex Mono',monospace" font-size="8.5" fill="#c8580e" text-anchor="middle">I<tspan dy="2" font-size="6.5" font-style="italic">n</tspan></text>
+        <circle cx="140" cy="15" r="2.5" fill="#1a3a0d"/>
+        <circle cx="140" cy="108" r="2.5" fill="#8a9a7a"/>
+
+        <!-- ── Capacitor C at x=196 ── -->
+        <line x1="196" y1="15" x2="196" y2="46" stroke="#4a5a3a" stroke-width="1.2"/>
+        <line x1="180" y1="46" x2="212" y2="46" stroke="#2d5a1b" stroke-width="2.8"/>
+        <line x1="180" y1="58" x2="212" y2="58" stroke="#2d5a1b" stroke-width="2.8"/>
+        <line x1="196" y1="58" x2="196" y2="108" stroke="#4a5a3a" stroke-width="1.2"/>
+        <text x="215" y="56" font-family="'IBM Plex Mono',monospace" font-size="11" fill="#2d5a1b" font-weight="600">C</text>
+        <circle cx="196" cy="15" r="2.5" fill="#1a3a0d"/>
+        <circle cx="196" cy="108" r="2.5" fill="#8a9a7a"/>
+
+        <!-- ── Resistor R at x=238 ── -->
+        <line x1="238" y1="15" x2="238" y2="38" stroke="#4a5a3a" stroke-width="1.2"/>
+        <polyline points="238,38 232,44 244,50 232,56 244,62 232,68 244,74 238,80"
+                  fill="none" stroke="#3a4a2a" stroke-width="1.5" stroke-linejoin="round"/>
+        <line x1="238" y1="80" x2="238" y2="108" stroke="#4a5a3a" stroke-width="1.2"/>
+        <text x="248" y="62" font-family="'IBM Plex Mono',monospace" font-size="11" fill="#3a4a2a" font-weight="600">R</text>
+        <circle cx="238" cy="15" r="2.5" fill="#1a3a0d"/>
+        <circle cx="238" cy="108" r="2.5" fill="#8a9a7a"/>
+      </svg>
+      <div style="margin-top:5px;padding-top:5px;border-top:1px solid #c8c2b0;font-size:.75rem;line-height:1.65;color:#3a4a2a">
+        C·dV/dt = I(t) − (V−V<sub>rest</sub>)/R<br>
+        <span style="color:#8a9a7a;font-size:.68rem">I(t) = Σ inputs from presynaptic neurons</span>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ── INPUT TYPE CARD ───────────────────────────────── -->
+  <div class="input-card">
+    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;margin-bottom:10px">
+      <div class="input-card-title" style="margin-bottom:0;flex-shrink:0">INPUT TYPE – I(t):</div>
+      <button class="seg-btn active" id="btn-dc"    onclick="setInput('dc')">DC constant</button>
+      <button class="seg-btn"        id="btn-sine"  onclick="setInput('sine')">Sinusoid</button>
+      <button class="seg-btn"        id="btn-noise" onclick="setInput('noise')">Poisson noise</button>
+    </div>
+    <div class="ctrl-grid" style="grid-template-columns:1fr 1fr">
+      <div class="ctrl-item" id="ctrl-ri">
+        <div class="ctrl-lbl"><span id="lbl-ri">DC current</span><span class="ctrl-val" id="vt-ri">20 mV</span></div>
+        <input type="range" id="sl-ri" min="0" max="30" step="0.5" value="20" oninput="p1('ri',this.value)">
+      </div>
+      <div class="ctrl-item" id="ctrl-sf" style="display:none">
+        <div class="ctrl-lbl"><span>f<sub>in</sub> — sinusoid frequency</span><span class="ctrl-val" id="vt-sf">1.0 Hz</span></div>
+        <input type="range" id="sl-sf" min="0.2" max="6" step="0.1" value="1" oninput="p1('sf',this.value)">
+      </div>
+    </div>
+  </div>
+
+  <!-- Display speed — controls canvas scroll, sits just above the canvases -->
+  <div class="ctrl-grid" style="grid-template-columns:1fr;margin-bottom:6px">
+    <div class="ctrl-item">
+      <div class="ctrl-lbl"><span>Display scroll speed</span><span class="ctrl-val" id="vt-spd">1.5 ms/frame</span></div>
+      <input type="range" id="sl-spd" min="0.5" max="12" step="0.5" value="1.5" oninput="LADV=+this.value;document.getElementById('vt-spd').textContent=(+this.value).toFixed(1)+' ms/frame'">
+    </div>
+  </div>
+
+  <div class="cv-wrap">
+    <div class="cv-lbl" id="lbl-inp">Input current I(t) — DC drive</div>
+    <canvas id="cv-inp" data-h="46"></canvas>
+  </div>
+
+  <!-- LIF (RC) neuron parameters — between input and voltage output -->
+  <div class="ctrl-grid" style="margin-bottom:6px">
+    <div class="ctrl-item">
+      <div class="ctrl-lbl"><span>τ<sub>m</sub> — time constant <span style="font-weight:400;color:#8a9a7a;font-size:.72rem">(= RC)</span></span><span class="ctrl-val" id="vt-tau">20 ms</span></div>
+      <input type="range" id="sl-tau" min="5" max="50" step="1" value="20" oninput="p1('tau',this.value)">
+    </div>
+    <div class="ctrl-item">
+      <div class="ctrl-lbl"><span>V<sub>th</sub> — threshold potential</span><span class="ctrl-val" id="vt-vth">−55 mV</span></div>
+      <input type="range" id="sl-vth" min="-65" max="-45" step="1" value="-55" oninput="p1('vth',this.value)">
+    </div>
+    <div class="ctrl-item">
+      <div class="ctrl-lbl"><span>V<sub>reset</sub> — reset potential</span><span class="ctrl-val" id="vt-vrs">−80 mV</span></div>
+      <input type="range" id="sl-vrs" min="-85" max="-65" step="1" value="-80" oninput="p1('vrs',this.value)">
+    </div>
+    <div class="ctrl-item">
+      <div class="ctrl-lbl"><span>τ<sub>ref</sub> — refractory period</span><span class="ctrl-val" id="vt-ref">2.0 ms</span></div>
+      <input type="range" id="sl-ref" min="0" max="10" step="0.5" value="2" oninput="p1('ref',this.value)">
+    </div>
+  </div>
+
+  <div class="cv-wrap">
+    <div class="cv-lbl">Membrane potential V(t) — scrolling 500 ms window</div>
+    <canvas id="cv-volt" data-h="200"></canvas>
+  </div>
+  <div class="cv-wrap">
+    <div class="cv-lbl">Spike raster — <span style="font-size:.67rem;color:#8a9a7a">shaded region = rate-estimate counting window; drag its left edge to adjust</span></div>
+    <canvas id="cv-rast" data-h="44"></canvas>
+  </div>
+  <!-- Rate window slider (reversed, same style as Tab 2) -->
+  <div class="win-ctrl" style="margin-bottom:8px">
+    <div class="win-ctrl-lbl">
+      <span>← rate-estimate window <span class="wc-hint">(drag left = wider)</span></span>
+      <span class="wc-val" id="vt-rw">200 ms</span>
+    </div>
+    <input type="range" style="direction:rtl;width:100%;display:block;margin:0" id="sl-rw" min="0" max="500" step="10" value="200" oninput="p1('rw',this.value)">
+    <div class="win-axis"><span>500 ms</span><span>375</span><span>250</span><span>125</span><span>0 ms</span></div>
+  </div>
+  <div class="cv-wrap">
+    <div class="cv-lbl">Estimated firing rate r̂(t) = spikes in window ÷ window width</div>
+    <canvas id="cv-rate" data-h="74"></canvas>
+  </div>
+  <div class="stat-row" style="margin-top:6px">
+    <div class="stat-badge">Firing rate: <span class="sv" id="t1-rate">— Hz</span></div>
+    <div class="stat-badge">Mean ISI: <span class="sv" id="t1-isi">— ms</span></div>
+    <div class="stat-badge">Spike count: <span class="sv" id="t1-cnt">0</span></div>
+  </div>
+
+  <div class="aside">
+    <div class="aside-title">Connections to related frameworks</div>
+    <p><strong>RC circuit analogy.</strong> The LIF equation is exactly the nodal-voltage equation for a parallel RC circuit driven by a current source: the capacitance C&nbsp;=&nbsp;τ<sub>m</sub>/R integrates injected current while the conductance G&nbsp;=&nbsp;1/R leaks charge back to V<sub>rest</sub>. The threshold comparator and instantaneous reset together form the spike-generation mechanism. For students comfortable with analog electronics, this is a precision comparator with clamped feedback and a brief hold period.</p>
+    <p><strong>Σ-Δ modulation.</strong> The integrate-and-fire mechanism is structurally a first-order <em>Σ-Δ encoder</em>: the neuron continuously accumulates the error between input and an implicit reference, fires (dumping the accumulated charge) when the total reaches threshold, and repeats. At constant drive above threshold the output is a regular pulse train — the neural equivalent of fixed-duty-cycle PWM. Varying drive modulates rate, exactly as a 1-bit Σ-Δ ADC's output bit-density encodes an analog input.</p>
+    <p><strong>Threshold, reset, and refractory period.</strong> These three mechanisms — the hard threshold V<sub>th</sub>, the instantaneous reset to V<sub>reset</sub>, and the silent refractory interval τ<sub>ref</sub> — are <em>additions layered on top of</em> the passive RC dynamics, not properties of the RC circuit itself. The RC circuit alone would just charge and discharge continuously; spiking behavior requires an explicit comparator (threshold), a clamp (reset), and a timer (refractory). In a biophysically realistic Hodgkin-Huxley neuron, all three behaviors emerge naturally from the dynamics of voltage-gated Na⁺ and K⁺ channels — no separate mechanisms are needed. The LIF model trades that emergent complexity for analytical tractability: the hard-coded mechanisms are crude approximations, but they preserve the input-integration and firing-rate relationships that make the neuron computationally useful.</p>
+    <p><strong>Sliding-mode control.</strong> Near threshold with oscillating or noisy input, the neuron can enter high-frequency irregular firing that is structurally identical to <em>chattering</em> in sliding-mode controllers: the state trajectory repeatedly crosses the switching surface V&nbsp;=&nbsp;V<sub>th</sub> as the system alternates between integration and hard reset — a relay nonlinearity embedded in a continuous first-order plant.</p>
+  </div>
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     TAB 2 — RATE CODING
+════════════════════════════════════════════════════════════ -->
+<div class="tab-panel" id="tab-1">
+<div class="pbody">
+  <p class="sec-title">Rate Coding</p>
+  <p class="sec-sub">In rate coding, information is carried by how often a neuron fires within a time window. The signal amplitude modulates the instantaneous firing probability; a downstream neuron estimates the original signal by counting spikes over a recent window and dividing by the window width.</p>
+
+  <!-- Display speed -->
+  <div class="ctrl-grid" style="grid-template-columns:1fr;margin-bottom:6px">
+    <div class="ctrl-item">
+      <div class="ctrl-lbl"><span>Display scroll speed</span><span class="ctrl-val" id="v2-spd">1.5 ms/frame</span></div>
+      <input type="range" min="0.5" max="12" step="0.5" value="1.5" oninput="CADV=+this.value;document.getElementById('v2-spd').textContent=(+this.value).toFixed(1)+' ms/frame'">
+    </div>
+  </div>
+
+  <!-- ── ZONE 1: Input Signal ───────────────────────────── -->
+  <div class="zone-hdr">Input Signal</div>
+  <div class="ctrl-grid">
+    <div class="ctrl-item">
+      <div class="ctrl-lbl"><span>Signal frequency</span><span class="ctrl-val" id="v2-fr">1.0 Hz</span></div>
+      <input type="range" id="s2-fr" min="0.2" max="8" step="0.1" value="1" oninput="p2('fr',this.value)">
+    </div>
+    <div class="ctrl-item">
+      <div class="ctrl-lbl"><span>Signal amplitude</span><span class="ctrl-val" id="v2-am">0.70</span></div>
+      <input type="range" id="s2-am" min="0.1" max="1" step="0.05" value="0.7" oninput="p2('am',this.value)">
+    </div>
+  </div>
+  <div class="cv-wrap">
+    <div class="cv-lbl">Analog input signal s(t)</div>
+    <canvas id="cv-sig" data-h="88"></canvas>
+  </div>
+
+  <!-- ── ZONE 2: Rate Encoding ──────────────────────────── -->
+  <div class="zone-hdr">Rate Encoding</div>
+  <div class="ctrl-grid" style="grid-template-columns:1fr;margin-bottom:4px">
+    <div class="ctrl-item">
+      <div class="ctrl-lbl"><span>Max firing rate r<sub>max</sub></span><span class="ctrl-val" id="v2-mr">80 Hz</span></div>
+      <input type="range" id="s2-mr" min="10" max="200" step="5" value="80" oninput="p2('mr',this.value)">
+    </div>
+  </div>
+  <div class="zone-stat">Window-average spike rate: <span id="t2-rate">— Hz</span> &nbsp;<span style="font-family:inherit;color:#8a9a7a;font-weight:400">(spikes counted over the visible 600 ms window)</span></div>
+  <div class="cv-wrap">
+    <div class="cv-lbl">Encoded spike train — <span class="wc-hint">shaded region = counting window; drag its left edge to adjust</span></div>
+    <canvas id="cv-spk" data-h="50"></canvas>
+  </div>
+  <div class="cv-wrap">
+    <div class="cv-lbl">Inter-spike interval (ISI) histogram</div>
+    <canvas id="cv-isi" data-h="74"></canvas>
+  </div>
+
+  <!-- ── ZONE 3: Rate Estimate ──────────────────────────── -->
+  <div class="zone-hdr">Rate Estimate</div>
+  <!-- reversed slider: thumb position = window left edge on time axis above -->
+  <div class="win-ctrl">
+    <div class="win-ctrl-lbl">
+      <span>← counting window <span class="wc-hint">(drag left = wider)</span></span>
+      <span class="wc-val" id="v2-wn">100 ms</span>
+    </div>
+    <input type="range" id="s2-wn" min="0" max="600" step="10" value="100" oninput="p2('wn',this.value)">
+    <div class="win-axis"><span>600 ms</span><span>450</span><span>300</span><span>150</span><span>0 ms</span></div>
+  </div>
+  <div class="cv-wrap">
+    <div class="cv-lbl">Estimated firing rate r̂(t) = spikes in window ÷ window width — faint dashed = expected rate s(t)·r<sub>max</sub></div>
+    <canvas id="cv-rec" data-h="88"></canvas>
+  </div>
+
+  <div class="aside">
+    <div class="aside-title">Information in time vs. in space</div>
+    <p>In a classical ANN, each neuron's contribution is a single floating-point activation — information encoded <em>in space</em> (which neuron, what value, all at once). In an SNN, the same information is a binary event sequence — information encoded <em>in time</em> (when and how often did this neuron fire). This shift has consequences for hardware (only asynchronous, sparse communication is needed), for learning (timing-sensitive rules replace weight-gradient averaging), and for what computations are natural to represent.</p>
+    <p>The windowed spike counter demonstrated here is the most transparent rate decoder: count spikes in a sliding window of width W, divide by W to get an estimate in Hz. A narrow window tracks fast signal changes but the count of 0, 1, 2, … spikes is coarse and noisy. A wide window averages out the Poisson noise but lags behind signal changes and smears together distinct features. This is the fundamental bias–variance trade-off of rate coding — and it is why rate coding requires relatively high firing rates to transmit fast-changing signals reliably.</p>
+    <p><strong>Temporal coding.</strong> An alternative hypothesis holds that information is encoded not in firing rate but in the precise <em>timing</em> of each spike relative to a background reference oscillation (e.g., the hippocampal theta rhythm at 4–12 Hz). A neuron fires once per theta cycle, and the phase of that spike within the cycle encodes the instantaneous signal value — earlier in the cycle means higher value. The key advantage over rate coding is <strong>sparsity</strong>: where rate coding requires many spikes to estimate a mean rate reliably, temporal coding needs only one spike per cycle, regardless of signal amplitude. Fewer spikes means less synaptic activity, less dynamic power dissipation, and — on neuromorphic hardware — fewer spike routing events traversing the on-chip network. On a platform like Loihi 2, where energy consumption is directly proportional to spike event count, temporal coding can reduce inference energy by an order of magnitude compared to rate coding at equivalent signal fidelity. Temporal codes are also more robust to certain classes of noise: a jittered spike timing shifts the decoded value by a small amount, whereas in rate coding, missed spikes or spurious spikes directly corrupt the rate estimate in proportion to how sparse the train already is. The trade-off is that temporal decoding requires a shared reference oscillation between encoder and decoder — a synchronization constraint that rate coding does not impose — and that the information-theoretic advantage is most pronounced when the reference frequency is high relative to the signal bandwidth.</p>
+  </div>
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     TAB 3 — STDP
+════════════════════════════════════════════════════════════ -->
+<div class="tab-panel" id="tab-2">
+<div class="pbody">
+  <p class="sec-title">Spike-Timing-Dependent Plasticity (STDP)</p>
+  <p class="sec-sub">STDP is a temporally asymmetric Hebbian rule observed in cortical synapses. Synaptic weight changes depend on the relative timing Δt&nbsp;=&nbsp;t<sub>post</sub>&nbsp;−&nbsp;t<sub>pre</sub>: pre before post (Δt&nbsp;&gt;&nbsp;0) potentiates the synapse (LTP); post before pre (Δt&nbsp;&lt;&nbsp;0) depresses it (LTD).</p>
+
+  <div class="eq-box">
+    <div class="eq-lbl">STDP learning rule</div>
+    ΔW = +A<sub>+</sub> · exp(−Δt / τ<sub>+</sub>) &nbsp;&nbsp;if Δt &gt; 0 &nbsp;&nbsp;[LTP]<br>
+    ΔW = −A<sub>−</sub> · exp(+Δt / τ<sub>−</sub>) &nbsp;&nbsp;if Δt &lt; 0 &nbsp;&nbsp;[LTD]<br>
+    <span style="font-size:.8em;color:#8a9a7a;font-style:italic">where Δt = t<sub>post</sub> − t<sub>pre</sub></span>
+  </div>
+
+  <div class="cv-wrap">
+    <div class="cv-lbl">STDP learning window: ΔW vs. Δt = t<sub>post</sub> − t<sub>pre</sub></div>
+    <canvas id="cv-stdp" data-h="210"></canvas>
+  </div>
+
+  <!-- Δt slider sits between the two canvases it controls -->
+  <div class="ctrl-grid" style="grid-template-columns:1fr;margin:6px 0">
+    <div class="ctrl-item">
+      <div class="ctrl-lbl"><span>Δt = t<sub>post</sub> − t<sub>pre</sub> <span style="font-size:.68rem;font-weight:400;color:#8a9a7a">(or drag either graph)</span></span><span class="ctrl-val" id="v3-dt">+20 ms</span></div>
+      <div style="padding-left:50px;padding-right:16px">
+        <input type="range" id="s3-dt" min="-80" max="80" step="1" value="20" oninput="pS('dt',this.value)">
+      </div>
+    </div>
+  </div>
+
+  <div class="cv-wrap">
+    <div class="cv-lbl">Spike timing diagram</div>
+    <canvas id="cv-stim" data-h="90"></canvas>
+  </div>
+
+  <div class="stat-row">
+    <div class="stat-badge">Δt: <span class="sv" id="t3-dt">+20 ms</span></div>
+    <div class="stat-badge">ΔW: <span class="sv" id="t3-dw">+0.0000</span></div>
+    <div class="stat-badge">Outcome: <span class="sv" id="t3-out">LTP</span></div>
+  </div>
+
+  <!-- Model parameters: A / τ paired by arm -->
+  <div class="ctrl-grid" style="grid-template-columns:1fr 1fr">
+    <div class="ctrl-item">
+      <div class="ctrl-lbl"><span>A<sub>+</sub> — LTP amplitude</span><span class="ctrl-val" id="v3-ap">0.0100</span></div>
+      <input type="range" id="s3-ap" min="0.001" max="0.05" step="0.001" value="0.01" oninput="pS('ap',this.value)">
+    </div>
+    <div class="ctrl-item">
+      <div class="ctrl-lbl"><span>τ<sub>+</sub> — LTP time constant</span><span class="ctrl-val" id="v3-tp">20 ms</span></div>
+      <input type="range" id="s3-tp" min="5" max="60" step="1" value="20" oninput="pS('tp',this.value)">
+    </div>
+    <div class="ctrl-item">
+      <div class="ctrl-lbl"><span>A<sub>−</sub> — LTD amplitude</span><span class="ctrl-val" id="v3-am">0.0120</span></div>
+      <input type="range" id="s3-am" min="0.001" max="0.05" step="0.001" value="0.012" oninput="pS('am',this.value)">
+    </div>
+    <div class="ctrl-item">
+      <div class="ctrl-lbl"><span>τ<sub>−</sub> — LTD time constant</span><span class="ctrl-val" id="v3-tm">20 ms</span></div>
+      <input type="range" id="s3-tm" min="5" max="60" step="1" value="20" oninput="pS('tm',this.value)">
+    </div>
+  </div>
+
+  <div class="aside">
+    <div class="aside-title">Hebbian causality and network stability</div>
+    <p><strong>Causal structure.</strong> STDP makes Hebb's rule temporally explicit: "neurons that fire together wire together," but with the critical refinement that <em>causal order matters</em>. Pre → Post (Δt&nbsp;&gt;&nbsp;0) means the pre-synaptic neuron plausibly contributed to driving the post-synaptic spike — strengthen the synapse. Post → Pre (Δt&nbsp;&lt;&nbsp;0) is anticausal — the pre-synaptic neuron fired after the event it supposedly caused — weaken it.</p>
+    <p><strong>Asymmetry and stability.</strong> The typical biological default A<sub>−</sub>&nbsp;&gt;&nbsp;A<sub>+</sub> (as set here) provides a net depressive bias that counteracts runaway potentiation — analogous to weight decay or L2 regularization in supervised learning. This asymmetry, combined with homeostatic intrinsic plasticity (not shown here), is thought to drive the self-organized formation of stable receptive fields and temporal sequence representations in cortical circuits.</p>
+    <p><strong>Analogy to pheromone evaporation in ACO.</strong> The evaporation rate ρ in Ant Colony Optimization plays a structurally identical stabilizing role. Without evaporation, pheromone accumulates on every traversed path until all routes are indistinguishably saturated and the colony loses selectivity. With evaporation, only paths that receive <em>consistent, repeated</em> reinforcement maintain high pheromone levels — sporadic or poor-quality paths decay away. The A<sub>−</sub>&nbsp;&gt;&nbsp;A<sub>+</sub> bias in STDP works the same way: synapses that fire together only occasionally get net-depressed out, while synapses with strong, reliable causal relationships accumulate enough LTP to overcome the depressive tide. In both cases the "forgetting" mechanism is not a loss — it is precisely what allows the system to extract and hold onto consistent structure in the input.</p>
+  </div>
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     TAB 4 — HARDWARE & SOFTWARE
+════════════════════════════════════════════════════════════ -->
+<div class="tab-panel" id="tab-3">
+<div class="pbody">
+  <p class="sec-title">Neuromorphic Hardware &amp; Software</p>
+  <p class="sec-sub">Neuromorphic chips implement spiking neuron networks directly in silicon, exploiting the sparsity and asynchronous event-driven character of spike trains to achieve orders-of-magnitude better energy efficiency than clocked GPU inference on dense activations.</p>
+
+  <!-- Comparison table FIRST -->
+  <div class="info-card">
+    <h3>Classical vs. Neuromorphic: Key Contrasts</h3>
+    <div style="overflow-x:auto">
+    <table class="cmp-table">
+      <thead><tr><th>Property</th><th>GPU / CPU (classical ANN)</th><th>Neuromorphic (e.g., Loihi 2)</th></tr></thead>
+      <tbody>
+        <tr><td>Computation trigger</td><td>Clocked, synchronous</td><td>Asynchronous, event-driven spikes</td></tr>
+        <tr><td>Activity pattern</td><td>Dense — every neuron computed each step</td><td>Sparse — only spiking neurons active</td></tr>
+        <tr><td>Inference power</td><td>Tens to hundreds of watts</td><td>Milliwatts to microwatts</td></tr>
+        <tr><td>Latency model</td><td>Batch-optimized; high throughput</td><td>Ultra-low latency per spike event</td></tr>
+        <tr><td>On-device learning</td><td>Typically offline backpropagation</td><td>Local STDP; genuinely online</td></tr>
+        <tr><td>Temporal state</td><td>Absent (feedforward) or explicit (RNNs)</td><td>Intrinsic — neurons carry membrane state</td></tr>
+        <tr><td>Programmability</td><td>Fully general GPU / CPU</td><td>Constrained to neuromorphic core model</td></tr>
+        <tr><td>Scale-out</td><td>Data-parallelism on large homogeneous arrays</td><td>Many-core NoC; Pohoiki Springs = 768 chips</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <!-- Hardware platform selector -->
+  <div class="info-card" id="hw-card">
+    <h3>Notable Hardware Platforms for SNNs</h3>
+    <div class="hw-radio-row">
+      <label class="hw-radio-lbl active"><input type="radio" name="hwpick" value="loihi2"    checked onchange="showHW('loihi2')"   > Intel Loihi 2</label>
+      <label class="hw-radio-lbl"       ><input type="radio" name="hwpick" value="truenorth"        onchange="showHW('truenorth')"> IBM TrueNorth</label>
+      <label class="hw-radio-lbl"       ><input type="radio" name="hwpick" value="spinnaker"        onchange="showHW('spinnaker')"> SpiNNaker 2</label>
+      <label class="hw-radio-lbl"       ><input type="radio" name="hwpick" value="brainscales"      onchange="showHW('brainscales')"> BrainScaleS-2</label>
+    </div>
+    <div class="hw-desc" id="hw-loihi2">
+      <p>Intel's second-generation research neuromorphic processor (2021) integrates <strong>1 million programmable neurons</strong> across 128 neuromorphic cores, with up to 120 million synapses and three embedded Lakemont x86 management cores. Each neuromorphic core simulates approximately 1000 neurons running a configurable generalized-LIF model with multiple programmable state variables.</p>
+      <p>Communication is entirely <strong>event-driven and asynchronous</strong>: a neuron emits a spike packet only when it fires, routed over an on-chip mesh network-on-chip (NoC). Silent neurons consume almost no dynamic power — in sharp contrast to the dense synchronous multiply-accumulate operations executed for every neuron on every clock cycle of a GPU, regardless of whether the activations are zero.</p>
+      <p>Loihi 2 also supports <strong>on-chip learning</strong>: STDP-like plasticity rules are encoded in programmable learning microcode executing locally at each synapse after each spike event, without any off-chip gradient computation. This enables genuinely online, real-time synaptic adaptation at milliwatt-scale power budgets. Intel's Pohoiki Springs system scales to 768 Loihi chips, approaching 100 million neurons on a single board.</p>
+    </div>
+    <div class="hw-desc" id="hw-truenorth" style="display:none">
+      <p>IBM TrueNorth (2014) was among the first large-scale neuromorphic chips to demonstrate practical inference at milliwatt power. It packs <strong>4096 neurosynaptic cores</strong>, 1 million neurons, and 256 million binary synapses onto a single die, consuming approximately 70 mW at full activity — several orders of magnitude below a contemporary GPU running equivalent workloads.</p>
+      <p>Each neuron implements a fixed binary-threshold LIF model with no on-chip learning capability. TrueNorth is therefore primarily an <strong>inference accelerator</strong>, requiring weights to be computed offline and programmed in. Despite this limitation, it demonstrated real-time gesture recognition, audio classification, and optical-flow estimation at microcontroller-scale power, establishing that neuromorphic hardware could be competitive on practical pattern-recognition tasks.</p>
+      <p>TrueNorth's architectural legacy is significant: its strict <strong>tick-synchronous</strong> execution model (spikes propagate at discrete time steps) departs from fully asynchronous neuromorphic designs. This makes programming more tractable but sacrifices some of the latency and power advantages of pure event-driven computation.</p>
+    </div>
+    <div class="hw-desc" id="hw-spinnaker" style="display:none">
+      <p>SpiNNaker 2 (TU Dresden / University of Manchester) takes a fundamentally different approach from fixed-silicon neuromorphic chips: neurons run as <strong>software on a massively parallel array of ARM Cortex-M4 cores</strong>. This sacrifices some energy efficiency compared to dedicated analog or digital neuromorphic circuits, but gains full flexibility — any neuron model, any plasticity rule, any network topology can be expressed as software without hardware redesign.</p>
+      <p>The architecture is organized as a many-core mesh with a custom <strong>packet-switched spike-routing network</strong>. Each chip contains 152 ARM cores; large installations can comprise thousands of chips interconnected in a torus, supporting networks of millions of neurons in real time. SpiNNaker 2 was one of the core platforms of the EU Human Brain Project and remains a primary tool for large-scale biologically-realistic cortical simulation.</p>
+      <p>SpiNNaker 2 chips also include <strong>dedicated machine-learning accelerator units</strong> alongside the ARM cores, allowing conventional ANN inference to be mixed with spiking dynamics on the same substrate — a hybrid approach increasingly relevant as the field moves toward combining rate-coded and spike-coded computation.</p>
+    </div>
+    <div class="hw-desc" id="hw-brainscales" style="display:none">
+      <p>BrainScaleS-2 (Heidelberg University) is an <strong>analog neuromorphic</strong> system — membrane dynamics and synaptic integration run directly in analog VLSI circuitry rather than digital logic. Because the physics of the circuit is doing the computation rather than a clocked digital processor, the system runs at up to <strong>1000× biological real time</strong>: an experiment that would take a simulated biological neuron one second completes in one millisecond of wall time.</p>
+      <p>The analog substrate is paired with <strong>digital spike routing</strong>: spikes are detected by threshold comparators and transmitted as digital events across an on-chip network. Each chip contains 512 adaptive exponential integrate-and-fire (AdEx) neurons with 512 × 256 synapses per neuron, supporting local STDP plasticity in hardware.</p>
+      <p>The primary use case is <strong>accelerated research on plasticity and dynamical systems</strong>: the speedup makes it practical to run hours of simulated biological time in seconds, enabling systematic exploration of learning rules and network dynamics at scales that would be prohibitive in software simulation. BrainScaleS-2 also supports in-the-loop experiments where the chip interacts with external stimuli in physical real time despite running internal dynamics 1000× faster.</p>
+    </div>
+  </div>
+
+  <!-- Software frameworks -->
+  <div class="info-card">
+    <h3>Software Frameworks for SNNs</h3>
+    <p>Neuromorphic hardware is not required to study, simulate, or train SNNs. The following frameworks run on conventional CPUs and GPUs:</p>
+    <div class="sw-grid">
+      <div class="sw-card"><div class="sn">Brian2</div><div class="sd">Python-based SNN simulator. Neuron equations specified symbolically; generates optimized C++ simulation code. Best for flexible scientific exploration and custom models.</div></div>
+      <div class="sw-card"><div class="sn">snnTorch</div><div class="sd">PyTorch-based SNN library with surrogate-gradient training. Implements differentiable LIF layers for backpropagation-through-time. Strong GPU support.</div></div>
+      <div class="sw-card"><div class="sn">Norse</div><div class="sd">Functional PyTorch SNN API. Clean, composable design; integrates naturally into standard deep-learning pipelines. Supports several LIF variants and STDP.</div></div>
+      <div class="sw-card"><div class="sn">PyNN</div><div class="sd">Hardware-agnostic front-end: write one model, run it on NEURON, Brian2, NEST, SpiNNaker, or BrainScaleS backends. Useful for cross-platform reproducibility.</div></div>
+      <div class="sw-card"><div class="sn">NEST</div><div class="sd">Mature, HPC-scalable spiking network simulator. Efficient for millions of neurons on compute clusters. Less interactive than Brian2 but well-validated for large-scale cortical models.</div></div>
+      <div class="sw-card"><div class="sn">Lava (Intel)</div><div class="sd">Intel's open-source framework for Loihi 2. Hardware-abstraction layer lets the same model code run in simulation or on physical Loihi 2 chips without code changes.</div></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     TAB 5 — TRAINING & APPLICATIONS
+════════════════════════════════════════════════════════════ -->
+<div class="tab-panel" id="tab-4">
+<div class="pbody">
+  <p class="sec-title">What Can You Do with a Neuromorphic System?</p>
+  <p class="sec-sub">One of the less-appreciated features of neuromorphic systems is that the hardest problem in modern deep learning — how to train a network — is not always the right question to ask. The spike-based dynamics of SNNs and the local synaptic plasticity rules that emerge naturally from their hardware make them excellent candidates for tasks that require <em>no global supervision at all</em>. Only after covering those strengths does it make sense to ask what it costs to impose traditional supervised learning on a platform that wasn't designed for it.</p>
+
+  <!-- ── SECTION 1: Unsupervised learning ───────────────────── -->
+  <p class="sec-title" style="margin-top:6px">I. Unsupervised Learning — The Natural Home of Neuromorphics</p>
+
+  <div class="info-card" style="border-left:3px solid #2d5a1b">
+    <h3>STDP as a Built-in Unsupervised Learning Rule</h3>
+    <p>STDP (Tab ③) is a purely <strong>local, unsupervised</strong> synaptic update rule. No labels are required, no loss function is computed, and no gradient is propagated backward through the network. A synapse updates itself based solely on the relative timing of the two neurons it connects. The rule is implementable in silicon at the individual synapse — Loihi 2 encodes STDP variants directly in per-synapse learning microcode — so the full learning loop runs on-chip, asynchronously, in real time, at milliwatt power.</p>
+    <p>This is qualitatively different from unsupervised learning in conventional ANNs (autoencoders, contrastive self-supervised learning), which still require a global loss, a backward pass, and typically a GPU. Neuromorphic STDP-based learning is <em>physically local</em> in a way that conventional unsupervised learning is not. Exposing the network to structured inputs — visual patterns, acoustic features, spike sequences — gradually specializes neurons into feature detectors without any labeling burden. The selectivity emerges from the statistics of the input itself.</p>
+  </div>
+
+  <div class="info-card">
+    <h3>Memristor Crossbar Arrays: Unsupervised Classification in Hardware</h3>
+    <p>A compelling realization of STDP-based unsupervised learning is the <strong>memristor crossbar array</strong>. In this architecture, synaptic weights are stored as analog conductance values in non-volatile memristive devices arranged at crossbar intersections. Because a memristor's conductance changes in response to the voltage pulses it experiences — and those pulses are determined by the pre- and post-synaptic spike times — the device itself <em>is</em> the STDP learning rule. No explicit weight-update computation is needed; the physics of the device does the work.</p>
+    <p>In practice, such systems can be trained for classification tasks simply by presenting labeled-class inputs during an unsupervised exposure phase. Neurons that fire together in response to a class prototype wire together; neurons driven by distinct prototypes self-organize into separate, discriminative representations. After exposure, the network classifies novel inputs by the pattern of elicited spike activity — without ever having been told which inputs belong together. The energy cost of both training and inference remains orders of magnitude below a GPU running equivalent workloads.</p>
+  </div>
+
+  <!-- ── SECTION 2: Training-free applications ─────────────── -->
+  <p class="sec-title" style="margin-top:8px">II. No Training Required — Exploiting Intrinsic Dynamics</p>
+  <p class="sec-sub" style="margin-bottom:12px">Some of the most powerful applications of neuromorphic hardware require <em>no learning phase whatsoever</em>. Instead of training a network to approximate a function, these approaches directly encode a problem into the network's weight structure and let the physical dynamics of the chip find the answer.</p>
+
+  <div class="info-card" style="border-left:3px solid #2d5a1b">
+    <h3>Neuromorphic Annealers &amp; QUBO Optimization</h3>
+    <p>Many NP-hard combinatorial optimization problems can be cast as <strong>Quadratic Unconstrained Binary Optimization (QUBO)</strong>: find x ∈ {0,1}<sup>n</sup> that minimizes the energy E(x) = x<sup>T</sup>Qx. QUBO maps directly to an <strong>Ising model</strong> — a spin system whose Hamiltonian is exactly E(x) — and the Ising ground state is the solution. The connection is exact, not approximate.</p>
+    <p>A recurrent SNN with weights W = −Q is dynamically equivalent to a stochastic Ising machine. Membrane noise plays the role of temperature: at high noise the network explores freely; as effective temperature decreases, it settles toward lower-energy configurations. This is <strong>physically implemented simulated annealing</strong> — the chip's own spike noise drives the annealing schedule. No gradient, no training loop, no labeled data. The Q matrix is programmed directly into the synaptic weight memory, and the chip runs.</p>
+    <p>Loihi 2 implementations have solved graph coloring, maximum cut, and traveling salesman instances at sub-milliwatt power. Critically, recent benchmarks place neuromorphic annealers <strong>competitively with quantum annealers</strong> (D-Wave) on certain problem classes — at a fraction of the cost, at room temperature, and without the coherence maintenance overhead that constrains quantum hardware. This reframes neuromorphic hardware not as a neural network accelerator but as a <strong>physics-based combinatorial optimizer</strong>.</p>
+  </div>
+
+  <div class="info-card">
+    <h3>Event-Driven Sensing (DVS Cameras)</h3>
+    <p>Dynamic Vision Sensors (DVS) output a stream of asynchronous spike events — one per pixel per polarity change in brightness — rather than frame-synchronized images. This is retinal computation: only pixels that <em>change</em> fire, yielding microsecond temporal resolution with near-zero data rate for static scenes. No frame buffer, no synchronization overhead, no wasted computation on unchanged regions.</p>
+    <p>DVS output is natively spike-coded, making these sensors the natural front-end for neuromorphic processing pipelines. Downstream SNN layers can respond to the event stream with matched event-driven compute — the entire signal chain from photon to motor command can remain asynchronous and sparse. The N-MNIST and DVS-CIFAR10 benchmarks used to evaluate SNN classifiers were recorded with DVS cameras for exactly this reason: the benchmark <em>is</em> already in the native format of the hardware.</p>
+  </div>
+
+  <div class="info-card">
+    <h3>Robotics &amp; Always-On Edge Processing</h3>
+    <p>Robotic sensorimotor loops demand low latency and low power simultaneously — requirements that favor neuromorphic computation. Event-driven processing of DVS input, proprioceptive spike streams, and spiking motor commands can close a full sensorimotor loop in microseconds at microwatt steady-state power, with no clock cycle wasted on quiescent sensors. Research platforms including Intel's Kapoho Bay have demonstrated neuromorphic balance control and obstacle avoidance at power budgets orders of magnitude below conventional embedded processors.</p>
+    <p>The always-on, event-driven model is particularly compelling for <strong>keyword spotting and anomaly detection</strong>: the neuromorphic processor remains essentially dormant at near-zero power until an input spike pattern matches a stored template, then triggers a wakeup event. A conventional processor must run its detection algorithm on every clock cycle regardless of whether anything is happening — a fundamental architectural mismatch with the statistics of most real-world sensory streams.</p>
+  </div>
+
+  <!-- ── SECTION 3: Supervised learning ────────────────────── -->
+  <p class="sec-title" style="margin-top:8px">III. Supervised Learning — Possible, But Harder</p>
+  <p class="sec-sub" style="margin-bottom:12px">SNNs can also tackle the same classification, regression, and sequence-modeling tasks that conventional ANNs dominate — but this requires working against the grain of the spike mechanism. The extra engineering effort can be justified by inference-time energy savings, but the baseline accuracy gap with conventional deep networks is real and should not be understated.</p>
+
+  <div class="info-card" style="border-left:3px solid #c8580e">
+    <h3>The Surrogate Gradient Problem</h3>
+    <p>Backpropagation requires differentiating a loss through every nonlinearity in the network. In a conventional ANN, each neuron applies a smooth nonlinearity (sigmoid, ReLU) — differentiable everywhere. In an SNN, the activation is spike emission: a <strong>Heaviside step function</strong> that is zero almost everywhere and has an undefined (distributional) derivative at V<sub>th</sub>. Backpropagating through time across spike events yields gradients that are either identically zero or infinite. The standard deep-learning toolkit does not apply.</p>
+    <p>This is the fundamental barrier. It is not an implementation detail — it follows directly from what a spike is. The field's response has been a collection of workarounds, each sacrificing something different.</p>
+  </div>
+
+  <div class="info-card">
+    <h3>Surrogate Gradient Methods</h3>
+    <p><em>Used in: snnTorch, Norse, SpyTorch</em></p>
+    <p>Keep the true Heaviside in the forward pass. In the backward pass only, replace its derivative with a smooth approximation — a piecewise-linear bump or sigmoid centered at V<sub>th</sub>. The network trains as if the threshold were smooth while still producing genuine spikes at inference. Standard BPTT then applies across all time steps. This works, scales to deep architectures, and achieves competitive accuracy on DVS-based benchmarks. The cost is that BPTT must store the full spike history across time — memory-intensive and non-local, precluding on-chip learning on neuromorphic hardware in this form.</p>
+  </div>
+
+  <div class="info-card">
+    <h3>ANN-to-SNN Conversion</h3>
+    <p>Train a conventional ANN normally, then <strong>replace each ReLU with an integrate-and-fire neuron</strong> whose mean firing rate approximates the original activation magnitude. Gradient computation is entirely avoided — the SNN is constructed from a pre-trained ANN, not trained as one. The weakness is latency: rate coding requires many timesteps to represent a value accurately, so converted SNNs typically need 100–1000 inference timesteps where an ANN needs one forward pass. This erodes the latency advantage of neuromorphic hardware and discards the temporal dynamics that make SNNs distinctive. Best suited to deploying an existing vision classifier onto low-power neuromorphic inference hardware without retraining from scratch.</p>
+  </div>
+
+  <div class="info-card">
+    <h3>E-prop &amp; Contrastive Hebbian Methods</h3>
+    <p><strong>E-prop</strong> (Bellec et al., 2020) derives an online learning rule by constraining the BPTT gradient to only use locally available information. Each synapse maintains an <em>eligibility trace</em> — a real-time integral of correlated pre/post activity — and a global learning signal broadcast from a supervisor. Weight updates are their product. No backward pass, no stored history, compatible with on-chip STDP microcode on Loihi 2. Performance currently lags BPTT but the locality makes it deployable in hardware learning loops.</p>
+    <p><strong>Contrastive Hebbian / Equilibrium Propagation</strong> sidesteps differentiation entirely by running two phases: a free phase where the network settles to its own dynamics, and a nudged phase where outputs are weakly clamped toward a target. Synaptic updates are proportional to the difference in local Hebbian correlations between phases. Scellier &amp; Bengio (2017) showed this converges to the true gradient in the limit of infinitesimal nudging — so backpropagation is being computed implicitly by the network's own physics, without an explicit backward pass. Particularly natural for recurrent SNNs whose dynamics already settle into attractor-like states.</p>
+  </div>
+
+  <!-- ── SECTION 4: Open questions ─────────────────────────── -->
+  <p class="sec-title" style="margin-top:8px">IV. Open Questions</p>
+
+  <div class="info-card">
+    <p style="margin-bottom:10px">The narrative above — neuromorphics are best for unsupervised and training-free tasks, and merely competitive (with extra effort) for supervised tasks — reflects the current state of the field, not a settled conclusion. Several important questions remain open:</p>
+    <p><strong>When do SNNs outperform ANNs?</strong> At equal parameter counts and on tasks with dense, static inputs, conventional ANNs currently win on accuracy. The energy advantage of neuromorphic inference is real but only decisive for sparse, event-driven, or always-on workloads. The regime where the SNN's temporal dynamics genuinely outperform an ANN of equal capacity — not just match it more efficiently — has not been clearly established.</p>
+    <p><strong>Is the spike the right primitive?</strong> The LIF neuron is a simplification of biological neurons that discards dendritic computation, neuromodulation, astrocytic coupling, and many other mechanisms. It is not clear whether the spike itself, rather than the broader computational principles of biological circuits, is what confers the functional advantages neuromorphics seek to exploit.</p>
+    <p><strong>Can neuromorphic annealers close the gap with quantum hardware at scale?</strong> On small-to-medium QUBO instances, neuromorphic annealers are already competitive. Whether the scaling law holds as problem size grows — and whether the effective annealing schedule can be controlled precisely enough — is an active research question.</p>
+    <p><strong>What is the right theory?</strong> A unified theoretical framework explaining what SNNs can represent that ANNs cannot, and vice versa, does not yet exist. The field is engineering-led rather than theory-led, which produces empirical results but makes principled architectural design difficult.</p>
+  </div>
+</div>
+</div>
+
+<!-- FOOTER -->
+<footer class="site-ftr">
+  <div class="ftr-copy">
+    <span class="cn">© 2026 Theodore&nbsp;P.&nbsp;Pavlic</span>
+    <span class="cs" aria-hidden="true">&nbsp;·&nbsp;</span>
+    <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener" class="cl">MIT&nbsp;License</a>
+  </div>
+</footer>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// TAB SWITCHING
+// ═══════════════════════════════════════════════════════════
+const panels  = document.querySelectorAll('.tab-panel');
+const tabBtns = document.querySelectorAll('.tab-btn');
+const tabSel  = document.getElementById('tabSel');
+
+function switchTab(i) {
+  i = +i;
+  panels .forEach((p,j) => p.classList.toggle('active', i===j));
+  tabBtns.forEach((b,j) => b.classList.toggle('active', i===j));
+  tabSel.value = i;
+  if (i===0 && !lifGoing) startLIF();
+  if (i===1 && !codGoing) startCOD();
+  if (i===2) setTimeout(redrawSTDP, 50);
+}
+
+function showHW(key) {
+  ['loihi2','truenorth','spinnaker','brainscales'].forEach(k => {
+    const el = document.getElementById('hw-'+k);
+    if (el) el.style.display = k===key ? '' : 'none';
+  });
+  document.querySelectorAll('.hw-radio-lbl').forEach(lbl => {
+    lbl.classList.toggle('active', lbl.querySelector('input').value === key);
+  });
+}
+tabBtns.forEach(b => b.addEventListener('click', () => switchTab(+b.dataset.tab)));
+tabSel .addEventListener('change', () => switchTab(+tabSel.value));
+
+// ═══════════════════════════════════════════════════════════
+// CANVAS HELPER — HiDPI-safe; returns null if canvas invisible
+// ═══════════════════════════════════════════════════════════
+function prepCanvas(id) {
+  const c   = document.getElementById(id);
+  if (!c) return null;
+  const dpr  = window.devicePixelRatio || 1;
+  const rect = c.getBoundingClientRect();
+  if (rect.width < 1) return null;
+  const W  = rect.width;
+  const H  = +c.getAttribute('data-h');
+  const pw = Math.round(W * dpr), ph = Math.round(H * dpr);
+  if (c.width !== pw || c.height !== ph) { c.width = pw; c.height = ph; }
+  const ctx = c.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, W, H };
+}
+
+function randn() {
+  let u=0, v=0;
+  while (!u) u = Math.random();
+  while (!v) v = Math.random();
+  return Math.sqrt(-2*Math.log(u)) * Math.cos(2*Math.PI*v);
+}
+
+// ═══════════════════════════════════════════════════════════
+// TAB 1 — LIF SIMULATION
+// ═══════════════════════════════════════════════════════════
+const LIF = {
+  V:-70, t:0, tRef:0, noiseOU:0,
+  spikes:[], hist:[], inputH:[], poissonSpikes:[],
+  spikeCount:0,
+  // params
+  tau:20, vth:-55, vrs:-80, vrest:-70, ref:2, ri:20, sf:1, R:1.0, rateWin:200,
+  inputType:'dc'
+};
+const LDT=0.1, LWIN=500, VMIN=-90, VMAX=-30;
+let LADV=1.5;
+let lifRateMax=10;  // ratchets up-only; resets to floor on slider change
+let lifGoing=false;
+
+function lifI(t) {
+  switch(LIF.inputType){
+    case 'dc':    return LIF.R * LIF.ri;
+    case 'sine':  return LIF.R * LIF.ri*(0.35 + 0.65*(0.5+0.5*Math.sin(2*Math.PI*LIF.sf*t/1000)));
+    case 'noise': {
+      // ri is in Hz (0-100); scale to mV: 100 Hz → 20 mV mean, then multiply by R
+      const riMV = LIF.ri * 0.20;
+      const tN=8;
+      LIF.noiseOU += (-LIF.noiseOU/tN + Math.sqrt(2/tN)*randn())*LDT;
+      return LIF.R * Math.max(0, riMV + LIF.noiseOU*riMV*0.38);
+    }
+  }
+}
+
+function stepLIF() {
+  const steps = Math.round(LADV/LDT);
+  for (let i=0; i<steps; i++) {
+    const currentI = lifI(LIF.t);
+    // track Poisson spike events for input display
+    if (LIF.inputType==='noise') {
+      const pEvent = (LIF.ri/100) * 0.10 * LDT;  // ri in Hz; 100Hz → ~10 events/s visible
+      if (Math.random() < pEvent) LIF.poissonSpikes.push(LIF.t);
+    }
+    LIF.inputH.push({t:LIF.t, I:currentI});
+    if (LIF.tRef > 0) {
+      LIF.V = LIF.vrs;
+      LIF.tRef = Math.max(0, LIF.tRef - LDT);
+    } else {
+      LIF.V += (-(LIF.V-LIF.vrest) + currentI) / LIF.tau * LDT;
+      if (LIF.V >= LIF.vth) {
+        LIF.spikes.push(LIF.t);
+        LIF.spikeCount++;
+        LIF.V = LIF.vrs;
+        LIF.tRef = LIF.ref;
+      }
+    }
+    LIF.hist.push({t:LIF.t, V:LIF.V});
+    LIF.t += LDT;
+  }
+  const cut = LIF.t - LWIN - LIF.rateWin - 20;
+  LIF.hist         = LIF.hist        .filter(p => p.t > cut);
+  LIF.inputH       = LIF.inputH      .filter(p => p.t > cut);
+  LIF.spikes       = LIF.spikes      .filter(s => s > cut);
+  LIF.poissonSpikes= LIF.poissonSpikes.filter(s => s > cut);
+}
+
+function drawLIF() {
+  const pi = prepCanvas('cv-inp');
+  const pv = prepCanvas('cv-volt');
+  const pr = prepCanvas('cv-rast');
+  if (!pv || !pr) return;
+  const {ctx,W,H}=pv, {ctx:rc,W:rW,H:rH}=pr;
+
+  const tE=LIF.t, tS=tE-LWIN;
+  const tx = t  => (t-tS)/LWIN*W;
+  const vy = v  => H*(1-(v-VMIN)/(VMAX-VMIN));
+
+  // — input canvas —
+  if (pi) {
+    const {ctx:ic,W:iW,H:iH}=pi;
+    ic.fillStyle='#fff'; ic.fillRect(0,0,iW,iH);
+    if (LIF.inputType==='noise') {
+      // show Poisson spike events as orange ticks
+      ic.strokeStyle='#c8580e'; ic.lineWidth=1.3;
+      for (const ts of LIF.poissonSpikes) {
+        if (ts<tS) continue;
+        const x=(ts-tS)/LWIN*iW;
+        ic.beginPath(); ic.moveTo(x,iH*.08); ic.lineTo(x,iH*.92); ic.stroke();
+      }
+      ic.fillStyle='rgba(200,88,14,.45)'; ic.font='8.5px "IBM Plex Mono",monospace'; ic.textAlign='left';
+      ic.fillText('presynaptic events',4,iH-3);
+    } else {
+      // show continuous I(t) waveform
+      ic.strokeStyle='rgba(200,88,14,.75)'; ic.lineWidth=1.6;
+      ic.beginPath(); let fi=true;
+      for (const pt of LIF.inputH) {
+        if (pt.t<tS) continue;
+        const x=(pt.t-tS)/LWIN*iW;
+        const y=iH - (pt.I/(30*LIF.R+0.001))*(iH-6)-3;
+        fi?(ic.moveTo(x,y),fi=false):ic.lineTo(x,y);
+      }
+      ic.stroke();
+      ic.fillStyle='rgba(200,88,14,.45)'; ic.font='8.5px "IBM Plex Mono",monospace'; ic.textAlign='left';
+      ic.fillText('I(t)', 4, iH-3);
+      ic.textAlign='right'; ic.fillStyle='#aab0a0';
+      ic.fillText('30 mV', iW-3, 10);
+      ic.fillText('0', iW-3, iH-3);
+    }
+  }
+
+  // — voltage canvas —
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
+
+  // grid
+  ctx.strokeStyle='#ede9db'; ctx.lineWidth=0.75;
+  for (let v=-80; v<=-40; v+=10){
+    ctx.beginPath(); ctx.moveTo(0,vy(v)); ctx.lineTo(W,vy(v)); ctx.stroke();
+  }
+
+  // V_rest dashed gray
+  ctx.save(); ctx.setLineDash([5,4]);
+  ctx.strokeStyle='#b8b0a0'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(0,vy(LIF.vrest)); ctx.lineTo(W,vy(LIF.vrest)); ctx.stroke();
+  // V_th dashed gold
+  ctx.strokeStyle='#c89820'; ctx.lineWidth=1.3;
+  ctx.beginPath(); ctx.moveTo(0,vy(LIF.vth)); ctx.lineTo(W,vy(LIF.vth)); ctx.stroke();
+  ctx.restore();
+
+  // spike verticals
+  ctx.strokeStyle='rgba(200,88,14,.45)'; ctx.lineWidth=1.2;
+  for (const ts of LIF.spikes) {
+    if (ts<tS) continue;
+    const x=tx(ts);
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+  }
+
+  // voltage trace
+  ctx.strokeStyle='#2d5a1b'; ctx.lineWidth=1.75;
+  ctx.beginPath(); let first=true;
+  for (const p of LIF.hist) {
+    if (p.t < tS) continue;
+    const x=tx(p.t), y=vy(p.V);
+    first ? (ctx.moveTo(x,y), first=false) : ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+
+  // axis labels
+  ctx.font='9.5px "IBM Plex Mono",monospace'; ctx.fillStyle='#8a9a7a'; ctx.textAlign='left';
+  for (let v=-80; v<=-40; v+=10) ctx.fillText(v+' mV', 3, vy(v)-2);
+  ctx.fillStyle='#c89820'; ctx.textAlign='right';
+  ctx.fillText('V_th', W-3, vy(LIF.vth)-4);
+  ctx.fillStyle='#b8b0a0';
+  ctx.fillText('V_rest', W-3, vy(LIF.vrest)+10);
+
+  // — raster canvas —
+  rc.fillStyle='#fff'; rc.fillRect(0,0,rW,rH);
+  // counting window overlay (same blue-gray style as Tab 2)
+  const rwPx = LIF.rateWin/LWIN*rW;
+  rc.fillStyle='rgba(80,110,150,.09)';
+  rc.fillRect(rW-rwPx, 0, rwPx, rH);
+  rc.save(); rc.setLineDash([3,3]);
+  rc.strokeStyle='rgba(80,110,150,.50)'; rc.lineWidth=1.2;
+  rc.beginPath(); rc.moveTo(rW-rwPx,0); rc.lineTo(rW-rwPx,rH); rc.stroke();
+  rc.restore();
+  if (rwPx > 30) {
+    rc.fillStyle='rgba(80,110,150,.55)';
+    rc.font='8px "IBM Plex Mono",monospace'; rc.textAlign='center';
+    rc.fillText(LIF.rateWin+' ms', rW-rwPx/2, rH-2);
+  }
+  rc.strokeStyle='#c8580e'; rc.lineWidth=1.5;
+  for (const ts of LIF.spikes) {
+    if (ts<tS) continue;
+    const x=(ts-tS)/LWIN*rW;
+    rc.beginPath(); rc.moveTo(x,rH*.12); rc.lineTo(x,rH*.88); rc.stroke();
+  }
+
+  // — rate estimate canvas —
+  { const pr2 = prepCanvas('cv-rate');
+    if (pr2) {
+      const {ctx:rc2, W:rW2, H:rH2} = pr2;
+      rc2.fillStyle='#fff'; rc2.fillRect(0,0,rW2,rH2);
+      const rateMax = (() => {
+        // ratchet up only — find peak windowed rate in visible window
+        for (let t=tS; t<=tE; t+=20) {
+          const r = LIF.spikes.filter(s=>s>=t-LIF.rateWin&&s<=t).length/(LIF.rateWin/1000);
+          if (r > lifRateMax) lifRateMax = Math.ceil(r/10)*10;
+        }
+        return Math.max(10, lifRateMax);
+      })();
+      // grid: compute a nice step size giving ~3–5 ticks across rateMax
+      const rawStep = rateMax / 4;
+      const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
+      const tickStep = Math.ceil(rawStep / mag) * mag;
+      rc2.strokeStyle='#ede9db'; rc2.lineWidth=0.75;
+      rc2.font='8px "IBM Plex Mono",monospace';
+      // intermediate ticks
+      for (let r=tickStep; r<rateMax; r+=tickStep) {
+        const y=rH2*(1-r/rateMax);
+        rc2.beginPath(); rc2.moveTo(0,y); rc2.lineTo(rW2,y); rc2.stroke();
+        rc2.fillStyle='#c8c2b0'; rc2.textAlign='left';
+        rc2.fillText(r+' Hz',3,y-2);
+      }
+      // ceiling tick label
+      rc2.fillStyle='#8a9a7a'; rc2.textAlign='left';
+      rc2.fillText(rateMax+' Hz',3,10);
+      rc2.strokeStyle='#c8580e'; rc2.lineWidth=1.75;
+      rc2.beginPath(); let rfirst=true;
+      for (let t=tS; t<=tE; t+=2) {
+        const count = LIF.spikes.filter(s => s>=t-LIF.rateWin && s<=t).length;
+        const rate  = count/(LIF.rateWin/1000);
+        const x=(t-tS)/LWIN*rW2, y=rH2*(1-rate/rateMax);
+        rfirst?(rc2.moveTo(x,y),rfirst=false):rc2.lineTo(x,y);
+      }
+      rc2.stroke();
+      rc2.fillStyle='#c8580e'; rc2.font='9px "IBM Plex Mono",monospace'; rc2.textAlign='left';
+      rc2.fillText('r̂(t)',3,rH2-4);
+      rc2.fillStyle='#8a9a7a'; rc2.textAlign='right';
+      rc2.fillText('0',rW2-3,rH2-3);
+    }
+  }
+
+  // stats — uses rateWin for the badge too
+  const rec = LIF.spikes.filter(s => s > LIF.t - LIF.rateWin);
+  document.getElementById('t1-rate').textContent = (rec.length / (LIF.rateWin/1000)).toFixed(1)+' Hz';
+  document.getElementById('t1-cnt') .textContent = LIF.spikeCount;
+  if (rec.length>=2) {
+    const isis=[]; for(let i=1;i<rec.length;i++) isis.push(rec[i]-rec[i-1]);
+    document.getElementById('t1-isi').textContent = (isis.reduce((a,b)=>a+b)/isis.length).toFixed(1)+' ms';
+  } else document.getElementById('t1-isi').textContent='— ms';
+}
+
+function lifLoop() { stepLIF(); drawLIF(); requestAnimationFrame(lifLoop); }
+function startLIF() { lifGoing=true; requestAnimationFrame(lifLoop); }
+
+function setInput(type) {
+  LIF.inputType=type; LIF.noiseOU=0;
+  LIF.inputH=[]; LIF.poissonSpikes=[];
+  lifRateMax=10;
+  ['dc','sine','noise'].forEach(t => document.getElementById('btn-'+t).classList.toggle('active',t===type));
+  document.getElementById('ctrl-sf').style.display = (type==='sine')?'flex':'none';
+
+  const riSlider = document.getElementById('sl-ri');
+  if (type==='noise') {
+    riSlider.min=0; riSlider.max=100; riSlider.step=5;
+    if (+riSlider.value > 100) riSlider.value=60;
+    LIF.ri = +riSlider.value;
+    document.getElementById('vt-ri').textContent = LIF.ri.toFixed(0)+' Hz';
+    document.getElementById('lbl-ri').innerHTML = 'Mean presynaptic spike rate';
+  } else {
+    riSlider.min=0; riSlider.max=30; riSlider.step=0.5;
+    if (+riSlider.value > 30) riSlider.value=20;
+    LIF.ri = +riSlider.value;
+    document.getElementById('vt-ri').textContent = LIF.ri.toFixed(1)+' mV';
+    document.getElementById('lbl-ri').innerHTML = type==='sine' ? 'Sinusoid amplitude' : 'DC current';
+  }
+
+  const inpMap = {
+    dc:    'Input current I(t) — DC drive',
+    sine:  'Input current I(t) — sinusoidal drive',
+    noise: 'Presynaptic spike events → summed synaptic current I(t)'
+  };
+  document.getElementById('lbl-inp').textContent = inpMap[type];
+}
+
+function p1(key,val) {
+  const v=parseFloat(val);
+  const fmt = x => Number.isInteger(x) ? x : x.toFixed(1);
+  // any param that can change firing rate → reset scale to floor so it ratchets up fresh
+  if (['tau','vth','vrs','ref','ri','sf','R'].includes(key)) lifRateMax=10;
+  switch(key){
+    case 'tau': LIF.tau=v; document.getElementById('vt-tau').textContent=fmt(v)+' ms'; break;
+    case 'vth': LIF.vth=v; document.getElementById('vt-vth').textContent=v+' mV'; break;
+    case 'vrs': LIF.vrs=v; document.getElementById('vt-vrs').textContent=v+' mV'; break;
+    case 'ref': LIF.ref=v; document.getElementById('vt-ref').textContent=fmt(v)+' ms'; break;
+    case 'ri':  LIF.ri =v;
+      document.getElementById('vt-ri').textContent =
+        LIF.inputType==='noise' ? v.toFixed(0)+' Hz' : fmt(v)+' mV'; break;
+    case 'rw': LIF.rateWin=Math.max(10,+v); document.getElementById('vt-rw').textContent=LIF.rateWin+' ms';
+               document.getElementById('sl-rw').value=LIF.rateWin; break;
+    case 'sf':  LIF.sf =v; document.getElementById('vt-sf') .textContent=fmt(v)+' Hz'; break;
+    case 'R':   LIF.R  =v; document.getElementById('vt-R')  .textContent=v.toFixed(2); break;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// TAB 2 — SPIKE CODING
+// ═══════════════════════════════════════════════════════════
+const COD = {
+  t:0, spikes:[], sigH:[], isiH:[],
+  mode:'rate', freq:1, amp:0.7, maxR:80, winMs:100
+};
+const CDT=0.5, CWIN=600;
+let CADV=1.5;
+let codGoing=false;
+
+function codSig(t) { return COD.amp*(0.5+0.5*Math.sin(2*Math.PI*COD.freq*t/1000)); }
+
+function stepCOD() {
+  const steps = Math.round(CADV/CDT);
+  for (let i=0; i<steps; i++) {
+    const s = codSig(COD.t);
+    const last = COD.spikes[COD.spikes.length-1];
+    let spikedThisStep = false;
+
+    if (COD.mode==='rate') {
+      const prob = s*COD.maxR*CDT/1000;
+      if (Math.random()<prob && (!last || COD.t-last>2)) {
+        COD.spikes.push(COD.t);
+        spikedThisStep = true;
+        if (COD.spikes.length>=2){
+          COD.isiH.push(COD.spikes[COD.spikes.length-1]-COD.spikes[COD.spikes.length-2]);
+          if (COD.isiH.length>300) COD.isiH.shift();
+        }
+      }
+    }
+
+    COD.sigH.push({t:COD.t, v:s});
+    COD.t += CDT;
+  }
+  const cut=COD.t-CWIN-COD.winMs-10;
+  COD.sigH   = COD.sigH  .filter(p=>p.t>cut);
+  COD.spikes = COD.spikes.filter(s=>s>cut);
+}
+
+function drawCOD() {
+  const tE=COD.t, tS=tE-CWIN;
+  const tx=(t,W)=>(t-tS)/CWIN*W;
+  // fixed scale: signal lives in [0, 1] regardless of current amplitude setting
+  const sy=(v,H)=> H - v*(H-8) - 4;
+
+  // — signal —
+  { const p=prepCanvas('cv-sig'); if(p){
+    const {ctx,W,H}=p;
+    ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
+    // faint 0 and 1 guide lines
+    ctx.strokeStyle='#ede9db'; ctx.lineWidth=0.75;
+    ctx.beginPath(); ctx.moveTo(0,sy(1,H)); ctx.lineTo(W,sy(1,H)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,sy(0,H)); ctx.lineTo(W,sy(0,H)); ctx.stroke();
+    ctx.strokeStyle='#2d5a1b'; ctx.lineWidth=1.75;
+    ctx.beginPath(); let f=true;
+    for (const pt of COD.sigH){
+      if(pt.t<tS) continue;
+      const x=tx(pt.t,W), y=sy(pt.v,H);
+      f?(ctx.moveTo(x,y),f=false):ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+    ctx.fillStyle='#7a8a6a'; ctx.font='9.5px "IBM Plex Mono",monospace'; ctx.textAlign='left';
+    ctx.fillText('s(t)',4,13);
+  }}
+
+  // — spikes — with counting window highlight at right edge
+  { const p=prepCanvas('cv-spk'); if(p){
+    const {ctx,W,H}=p;
+    ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
+
+    // counting window: neutral tinted fill + dashed edge (clearly distinct from orange spikes)
+    const winPx = COD.winMs/CWIN*W;
+    ctx.fillStyle='rgba(80,110,150,.09)';
+    ctx.fillRect(W-winPx, 0, winPx, H);
+    ctx.save(); ctx.setLineDash([3,3]);
+    ctx.strokeStyle='rgba(80,110,150,.50)';
+    ctx.lineWidth=1.2;
+    ctx.beginPath(); ctx.moveTo(W-winPx,0); ctx.lineTo(W-winPx,H); ctx.stroke();
+    ctx.restore();
+    if (winPx > 36) {
+      ctx.fillStyle='rgba(80,110,150,.55)';
+      ctx.font='8.5px "IBM Plex Mono",monospace'; ctx.textAlign='center';
+      ctx.fillText(COD.winMs+' ms', W-winPx/2, H-3);
+    }
+
+    ctx.strokeStyle='#c8580e'; ctx.lineWidth=1.4;
+    for (const ts of COD.spikes){
+      if(ts<tS) continue;
+      const x=tx(ts,W);
+      ctx.beginPath(); ctx.moveTo(x,H*.1); ctx.lineTo(x,H*.9); ctx.stroke();
+    }
+  }}
+
+  // — rate estimate (windowed spike counter) —
+  { const p=prepCanvas('cv-rec'); if(p){
+    const {ctx,W,H}=p;
+    ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
+    const fixedMax=COD.maxR;   // y-axis in Hz, full scale = maxR
+
+    // faint dashed: expected rate = s(t) * maxR
+    ctx.save(); ctx.setLineDash([4,3]);
+    ctx.strokeStyle='rgba(45,90,27,.28)'; ctx.lineWidth=1.5;
+    ctx.beginPath(); let f=true;
+    for (const pt of COD.sigH){
+      if(pt.t<tS) continue;
+      const x=tx(pt.t,W), y=H-(pt.v/COD.amp * fixedMax/fixedMax)*(H-8)-4;
+      // expected rate = pt.v * maxR / amp  (since prob ∝ s, and s = amp*(0.5+0.5sin))
+      const expectedRate = (pt.v/COD.amp)*COD.maxR;
+      const yy=H-(expectedRate/fixedMax)*(H-8)-4;
+      f?(ctx.moveTo(x,yy),f=false):ctx.lineTo(x,yy);
+    }
+    ctx.stroke(); ctx.restore();
+
+    // windowed spike count — sample every 2ms across visible window
+    // start from tS (not tS+winMs) — early samples count whatever spikes exist in history
+    ctx.strokeStyle='#c8580e'; ctx.lineWidth=1.75;
+    ctx.beginPath(); f=true;
+    const sampleStep=2;
+    for (let t=tS; t<=tE; t+=sampleStep){
+      const count=COD.spikes.filter(ts=>ts>=t-COD.winMs && ts<=t).length;
+      const rate=count/(COD.winMs/1000);   // Hz
+      const x=tx(t,W), y=H-(rate/fixedMax)*(H-8)-4;
+      f?(ctx.moveTo(x,y),f=false):ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+
+    // y-axis label
+    ctx.fillStyle='#c8580e'; ctx.font='9.5px "IBM Plex Mono",monospace'; ctx.textAlign='left';
+    ctx.fillText('r̂(t) Hz',4,13);
+    ctx.fillStyle='#8a9a7a'; ctx.textAlign='right';
+    ctx.fillText(fixedMax.toFixed(0)+' Hz',W-3,13);
+    ctx.fillText('0',W-3,H-5);
+  }}
+
+  // — ISI histogram —
+  { const p=prepCanvas('cv-isi'); if(p){
+    const {ctx,W,H}=p;
+    ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
+    if (COD.isiH.length>4){
+      const NB=24, maxISI=300, bw=W/NB;
+      const bins=new Array(NB).fill(0);
+      for (const isi of COD.isiH) bins[Math.min(NB-1,Math.floor(isi/maxISI*NB))]++;
+      const maxB=Math.max(1,...bins);
+      ctx.fillStyle='#4a7a35';
+      for (let i=0;i<NB;i++){
+        const bh=(bins[i]/maxB)*(H-18);
+        if(bh>0) ctx.fillRect(i*bw+.5, H-18-bh, bw-1, bh);
+      }
+      ctx.fillStyle='#7a8a6a'; ctx.font='9px "IBM Plex Mono",monospace'; ctx.textAlign='center';
+      ctx.fillText('0',0,H-3); ctx.fillText('150 ms',W/2,H-3); ctx.fillText('300 ms',W,H-3);
+      ctx.textAlign='left';
+    } else {
+      ctx.fillStyle='#b0a890'; ctx.font='11px Outfit,sans-serif'; ctx.textAlign='center';
+      ctx.fillText('Accumulating spike history…', W/2, H/2+4);
+    }
+  }}
+
+  // stats
+  const rec2=COD.spikes.filter(s=>s>COD.t-500);
+  document.getElementById('t2-rate').textContent=(rec2.length/0.5).toFixed(1)+' Hz';
+}
+
+function codLoop() { stepCOD(); drawCOD(); requestAnimationFrame(codLoop); }
+function startCOD() {
+  codGoing=true;
+  // pre-warm: run 700ms of simulation silently so spike history fills the visible window
+  const warmSteps = Math.ceil(700/CADV);
+  for(let i=0; i<warmSteps; i++) stepCOD();
+  requestAnimationFrame(codLoop);
+}
+
+function p2(key,val) {
+  const v=parseFloat(val);
+  switch(key){
+    case 'fr': COD.freq=v;  document.getElementById('v2-fr').textContent=v.toFixed(1)+' Hz';
+               COD.spikes=[]; COD.isiH=[]; break;
+    case 'am': COD.amp=v;   document.getElementById('v2-am').textContent=v.toFixed(2);
+               COD.sigH=[]; COD.spikes=[]; COD.isiH=[]; break;
+    case 'mr': COD.maxR=v;  document.getElementById('v2-mr').textContent=v.toFixed(0)+' Hz';
+               COD.spikes=[]; COD.isiH=[]; break;
+    case 'wn': COD.winMs=Math.max(10,Math.min(600,+v)); document.getElementById('v2-wn').textContent=COD.winMs+' ms';
+               document.getElementById('s2-wn').value=COD.winMs; break;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// TAB 3 — STDP  (static redraw on each slider change)
+// ═══════════════════════════════════════════════════════════
+const ST={dt:20, Ap:.01, Am:.012, tp:20, tm:20};
+
+function dW(dt) {
+  if (dt>0) return  ST.Ap*Math.exp(-dt/ST.tp);
+  if (dt<0) return -ST.Am*Math.exp( dt/ST.tm);
+  return 0;
+}
+
+function redrawSTDP() {
+
+  // — STDP window plot —
+  { const p=prepCanvas('cv-stdp'); if(!p) return;
+    const {ctx,W,H}=p;
+    ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
+
+    const PL=50,PR=16,PT=16,PB=28;
+    const pw=W-PL-PR, ph=H-PT-PB;
+    const maxDt=80;
+    const amp=0.05;   // fixed scale = slider max; matches bar normalization
+    const tx  = dt => PL+(dt+maxDt)/(2*maxDt)*pw;
+    const wy  = dw => PT+ph/2 - dw/amp*(ph/2);
+
+    // shaded LTP / LTD regions
+    ctx.fillStyle='rgba(45,90,27,.07)';
+    ctx.fillRect(tx(0),PT, pw/2, ph/2);
+    ctx.fillStyle='rgba(200,88,14,.07)';
+    ctx.fillRect(PL, PT+ph/2, pw/2, ph/2);
+
+    // axes
+    ctx.strokeStyle='#ddd8c5'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(PL,PT+ph/2); ctx.lineTo(PL+pw,PT+ph/2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(tx(0),PT);   ctx.lineTo(tx(0),PT+ph);   ctx.stroke();
+    // y-axis line
+    ctx.beginPath(); ctx.moveTo(PL,PT); ctx.lineTo(PL,PT+ph); ctx.stroke();
+
+    // STDP curve with green–orange gradient
+    const grad=ctx.createLinearGradient(PL,0,PL+pw,0);
+    grad.addColorStop(0,'#c8580e');
+    grad.addColorStop(.48,'#c8a060');
+    grad.addColorStop(.52,'#4a9a20');
+    grad.addColorStop(1,'#4a9a20');
+    ctx.strokeStyle=grad; ctx.lineWidth=2.2;
+    ctx.beginPath(); let first=true;
+    for (let dt=-maxDt; dt<=maxDt; dt+=0.5){
+      const x=tx(dt), y=wy(dW(dt));
+      first?(ctx.moveTo(x,y),first=false):ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+
+    // y-axis tick marks + labels
+    const yTicks=[{v:0.05,l:'+.05'},{v:0.025,l:'+.025'},{v:0,l:'0'},{v:-0.025,l:'−.025'},{v:-0.05,l:'−.05'}];
+    ctx.font='8.5px "IBM Plex Mono",monospace'; ctx.textAlign='right'; ctx.fillStyle='#8a9a7a';
+    for (const {v,l} of yTicks) {
+      const ty=wy(v);
+      ctx.strokeStyle='#c8c2b0'; ctx.lineWidth=0.8;
+      ctx.beginPath(); ctx.moveTo(PL-4,ty); ctx.lineTo(PL+3,ty); ctx.stroke();
+      ctx.fillText(l, PL-6, ty+3);
+    }
+
+    // current Δt vertical guide + gold dot
+    const cx=tx(ST.dt), cy=wy(dW(ST.dt));
+    ctx.save(); ctx.setLineDash([4,3]);
+    ctx.strokeStyle='rgba(100,100,80,.5)'; ctx.lineWidth=.9;
+    ctx.beginPath(); ctx.moveTo(cx,PT+ph/2); ctx.lineTo(cx,cy); ctx.stroke();
+    ctx.restore();
+    const regionColor = ST.dt>0 ? '#4a9a20' : (ST.dt<0 ? '#c8580e' : '#c89820');
+    ctx.fillStyle=regionColor;
+    ctx.beginPath(); ctx.arc(cx,cy,5.5,0,2*Math.PI); ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=1.6;
+    ctx.beginPath(); ctx.arc(cx,cy,5.5,0,2*Math.PI); ctx.stroke();
+
+    // y-axis projection: dashed line from dot to y-axis + tick dot
+    const dotColor = dW(ST.dt)>=0 ? 'rgba(45,90,27,.55)' : 'rgba(200,88,14,.55)';
+    const tickColor = dW(ST.dt)>=0 ? '#4a9a20' : '#c8580e';
+    ctx.save(); ctx.setLineDash([3,3]);
+    ctx.strokeStyle=dotColor; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(PL,cy); ctx.lineTo(cx-7,cy); ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle=tickColor;
+    ctx.beginPath(); ctx.arc(PL,cy,3.5,0,2*Math.PI); ctx.fill();
+
+    // axis labels
+    ctx.fillStyle='#5a6a4a'; ctx.font='9.5px "IBM Plex Mono",monospace';
+    ctx.textAlign='center';
+    ctx.fillText('-80 ms',PL,         PT+ph+PB-4);
+    ctx.fillText('0',     tx(0),      PT+ph+PB-4);
+    ctx.fillText('+80 ms',PL+pw,      PT+ph+PB-4);
+    ctx.textAlign='right'; ctx.fillText('Δt →', PL+pw+2, PT+ph/2-5);
+
+    ctx.save(); ctx.translate(12,PT+ph/2); ctx.rotate(-Math.PI/2);
+    ctx.textAlign='center'; ctx.fillText('ΔW', 0, 0); ctx.restore();
+
+    // LTP / LTD region labels
+    ctx.font='9px Outfit,sans-serif';
+    ctx.fillStyle='rgba(45,90,27,.55)';  ctx.textAlign='left';  ctx.fillText('LTP',tx(2), PT+12);
+    ctx.fillStyle='rgba(200,88,14,.6)';  ctx.textAlign='right'; ctx.fillText('LTD',tx(-2),PT+ph-4);
+  }
+
+  // — timing diagram —
+  { const p=prepCanvas('cv-stim'); if(!p) return;
+    const {ctx,W,H}=p;
+    ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
+
+    // Use IDENTICAL coordinate system as STDP window so pre spike ≡ Δt=0
+    const PL=50, PR=16, pw=W-PL-PR;
+    const tScale = pw/160;          // px per ms — same as STDP window
+    const midX   = PL + pw/2;      // = tx(0) in STDP window
+    const preY=H*.28, postY=H*.68;
+
+    // timelines
+    ctx.strokeStyle='#d8d0c0'; ctx.lineWidth=1;
+    [preY,postY].forEach(y=>{
+      ctx.beginPath(); ctx.moveTo(PL,y); ctx.lineTo(PL+pw,y); ctx.stroke();
+      // arrowhead
+      ctx.fillStyle='#d8d0c0'; ctx.beginPath();
+      ctx.moveTo(PL+pw+6,y); ctx.lineTo(PL+pw-2,y-4); ctx.lineTo(PL+pw-2,y+4);
+      ctx.closePath(); ctx.fill();
+    });
+
+    // row labels — pre is always green; post is drawn after spike (color-coded)
+    ctx.font='11px Outfit,sans-serif'; ctx.textAlign='right';
+    ctx.fillStyle='#2d5a1b'; ctx.fillText('pre', PL-8, preY+4);
+
+    // pre spike (fixed at midX = Δt 0)
+    function drawSpike(x,y,color){
+      ctx.strokeStyle=color; ctx.lineWidth=2.2;
+      ctx.beginPath(); ctx.moveTo(x,y-20); ctx.lineTo(x,y+20); ctx.stroke();
+      ctx.fillStyle=color; ctx.beginPath();
+      ctx.moveTo(x,y-20); ctx.lineTo(x-4,y-10); ctx.lineTo(x+4,y-10);
+      ctx.closePath(); ctx.fill();
+    }
+    drawSpike(midX,preY,'#2d5a1b');
+
+    // post spike — color encodes LTP (green) vs LTD (orange)
+    const postSpikeColor = ST.dt>0 ? '#4a9a20' : (ST.dt<0 ? '#c8580e' : '#c89820');
+    const postX=midX+ST.dt*tScale;
+    const vis=postX>=PL && postX<=PL+pw;
+    if (vis){
+      drawSpike(postX,postY,postSpikeColor);
+    } else {
+      const dir=ST.dt>0?1:-1;
+      const ex=dir>0?PL+pw-6:PL+6;
+      ctx.fillStyle=postSpikeColor; ctx.font='10px Outfit,sans-serif';
+      ctx.textAlign=dir>0?'right':'left';
+      ctx.fillText(dir>0?'→ (off-screen)':'← (off-screen)', ex, postY+4);
+    }
+
+    // color "post" row label to match outcome
+    ctx.font='11px Outfit,sans-serif'; ctx.textAlign='right';
+    ctx.fillStyle=postSpikeColor; ctx.fillText('post',PL-8, postY+4);
+
+    // Δt arrow between spikes
+    if (Math.abs(ST.dt)>2 && vis){
+      const arrY=(preY+postY)/2, dir=ST.dt>0?1:-1;
+      ctx.strokeStyle='#c89820'; ctx.lineWidth=1.8;
+      ctx.beginPath(); ctx.moveTo(midX,arrY); ctx.lineTo(postX,arrY); ctx.stroke();
+      ctx.fillStyle='#c89820'; ctx.beginPath();
+      ctx.moveTo(postX,arrY); ctx.lineTo(postX-dir*9,arrY-5); ctx.lineTo(postX-dir*9,arrY+5);
+      ctx.closePath(); ctx.fill();
+      ctx.font='9.5px "IBM Plex Mono",monospace'; ctx.textAlign='center'; ctx.fillStyle='#c89820';
+      ctx.fillText('Δt='+(ST.dt>0?'+':'')+ST.dt+' ms', (midX+postX)/2, arrY-7);
+    }
+
+    // drag hint when not dragging
+    if (!stdpDragging && vis) {
+      ctx.font='9px Outfit,sans-serif'; ctx.fillStyle='rgba(200,88,14,.45)';
+      ctx.textAlign='center';
+      ctx.fillText('drag', postX, postY+H*.24);
+    }
+  }
+
+  // stats
+  const dw=dW(ST.dt);
+  const regionColor = ST.dt>0 ? '#4a9a20' : (ST.dt<0 ? '#c8580e' : '#c89820');
+  document.getElementById('t3-dt') .textContent=(ST.dt>0?'+':'')+ST.dt+' ms';
+  document.getElementById('t3-dw') .textContent=(dw>=0?'+':'')+dw.toFixed(4);
+  document.getElementById('t3-out').textContent=ST.dt>0?'LTP':(ST.dt<0?'LTD':'no change');
+  // slider thumb color matches region
+  let ts=document.getElementById('_dt_thumb_style');
+  if(!ts){ts=document.createElement('style');ts.id='_dt_thumb_style';document.head.appendChild(ts);}
+  ts.textContent=`#s3-dt::-webkit-slider-thumb{background:${regionColor}!important}
+                  #s3-dt::-moz-range-thumb{background:${regionColor}!important}`;
+}
+
+function pS(key,val) {
+  const v=parseFloat(val);
+  switch(key){
+    case 'dt': ST.dt=v; document.getElementById('v3-dt').textContent=(v>0?'+':'')+v+' ms'; break;
+    case 'ap': ST.Ap=v; document.getElementById('v3-ap').textContent=v.toFixed(4);          break;
+    case 'am': ST.Am=v; document.getElementById('v3-am').textContent=v.toFixed(4);          break;
+    case 'tp': ST.tp=v; document.getElementById('v3-tp').textContent=v.toFixed(0)+' ms';    break;
+    case 'tm': ST.tm=v; document.getElementById('v3-tm').textContent=v.toFixed(0)+' ms';    break;
+  }
+  redrawSTDP();
+}
+
+// ─── STDP drag: drag the post spike in the timing diagram ───
+let stdpDragging = false;
+
+function _stimPostX(W) {
+  const PL=50, PR=16, pw=W-PL-PR;
+  return PL + pw/2 + ST.dt * pw/160;
+}
+function _stimApplyX(clientX, canvas) {
+  const rect = canvas.getBoundingClientRect();
+  const W    = rect.width;
+  const PL=50, PR=16, pw=W-PL-PR;
+  const midX = PL + pw/2;
+  const newDt = Math.round(Math.max(-80, Math.min(80, (clientX - rect.left - midX) / (pw/160))));
+  if (newDt === ST.dt) return;
+  ST.dt = newDt;
+  document.getElementById('s3-dt').value  = newDt;
+  document.getElementById('v3-dt').textContent = (newDt>0?'+':'')+newDt+' ms';
+  redrawSTDP();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  // ── cv-rast: drag left edge of rate-estimate counting window ─
+  const cvRast = document.getElementById('cv-rast');
+  let rastDragging = false;
+
+  function rastEdgeX() {
+    return cvRast.getBoundingClientRect().width * (1 - LIF.rateWin/LWIN);
+  }
+  function applyRastDrag(clientX) {
+    const rect = cvRast.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const newWin = Math.max(10, Math.min(500, Math.round((1 - x/rect.width)*LWIN/10)*10));
+    if (newWin === LIF.rateWin) return;
+    LIF.rateWin = newWin;
+    document.getElementById('sl-rw').value = newWin;
+    document.getElementById('vt-rw').textContent = newWin + ' ms';
+  }
+  cvRast.addEventListener('mousedown', e => {
+    if (Math.abs(e.offsetX - rastEdgeX()) < 12) { rastDragging=true; e.preventDefault(); }
+  });
+  cvRast.addEventListener('mousemove', e => {
+    cvRast.style.cursor = (rastDragging || Math.abs(e.offsetX - rastEdgeX()) < 12) ? 'ew-resize' : '';
+    if (rastDragging) { applyRastDrag(e.clientX); e.preventDefault(); }
+  });
+  document.addEventListener('mouseup', () => { rastDragging=false; });
+  cvRast.addEventListener('touchstart', e => {
+    const ox = e.touches[0].clientX - cvRast.getBoundingClientRect().left;
+    if (Math.abs(ox - rastEdgeX()) < 18) { rastDragging=true; e.preventDefault(); }
+  }, {passive:false});
+  cvRast.addEventListener('touchmove', e => {
+    if (rastDragging) { applyRastDrag(e.touches[0].clientX); e.preventDefault(); }
+  }, {passive:false});
+  document.addEventListener('touchend', () => { rastDragging=false; });
+
+  // ── cv-spk: drag left edge of counting window ─────────────
+  const cvSpk = document.getElementById('cv-spk');
+  let spkDragging = false;
+
+  function spkEdgeX() {
+    return cvSpk.getBoundingClientRect().width * (1 - COD.winMs/CWIN);
+  }
+  function applySpkDrag(clientX) {
+    const rect = cvSpk.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const newWin = Math.max(10, Math.min(600, Math.round((1 - x/rect.width)*CWIN/10)*10));
+    p2('wn', newWin);
+  }
+  cvSpk.addEventListener('mousedown', e => {
+    if (Math.abs(e.offsetX - spkEdgeX()) < 12) { spkDragging=true; e.preventDefault(); }
+  });
+  cvSpk.addEventListener('mousemove', e => {
+    cvSpk.style.cursor = (spkDragging || Math.abs(e.offsetX - spkEdgeX()) < 12) ? 'ew-resize' : '';
+    if (spkDragging) { applySpkDrag(e.clientX); e.preventDefault(); }
+  });
+  document.addEventListener('mouseup', () => { spkDragging=false; });
+  cvSpk.addEventListener('touchstart', e => {
+    const ox = e.touches[0].clientX - cvSpk.getBoundingClientRect().left;
+    if (Math.abs(ox - spkEdgeX()) < 18) { spkDragging=true; e.preventDefault(); }
+  }, {passive:false});
+  cvSpk.addEventListener('touchmove', e => {
+    if (spkDragging) { applySpkDrag(e.touches[0].clientX); e.preventDefault(); }
+  }, {passive:false});
+  document.addEventListener('touchend', () => { spkDragging=false; });
+
+  // ── drag on timing diagram (post spike) ──────────────────
+  const cv = document.getElementById('cv-stim');
+
+  cv.addEventListener('mousedown', e => {
+    const W = cv.getBoundingClientRect().width;
+    if (Math.abs(e.offsetX - _stimPostX(W)) < 18) { stdpDragging=true; e.preventDefault(); }
+  });
+  cv.addEventListener('mousemove', e => {
+    const W = cv.getBoundingClientRect().width;
+    cv.style.cursor = (stdpDragging || Math.abs(e.offsetX - _stimPostX(W)) < 18) ? 'ew-resize' : '';
+    if (stdpDragging) { _stimApplyX(e.clientX, cv); e.preventDefault(); }
+  });
+  document.addEventListener('mouseup', () => { stdpDragging=false; cvStdpDragging=false; });
+
+  cv.addEventListener('touchstart', e => {
+    const W = cv.getBoundingClientRect().width;
+    if (Math.abs(e.touches[0].clientX - cv.getBoundingClientRect().left - _stimPostX(W)) < 24)
+      { stdpDragging=true; e.preventDefault(); }
+  }, {passive:false});
+  cv.addEventListener('touchmove', e => {
+    if (stdpDragging) { _stimApplyX(e.touches[0].clientX, cv); e.preventDefault(); }
+  }, {passive:false});
+  document.addEventListener('touchend', () => { stdpDragging=false; cvStdpDragging=false; });
+
+  // ── drag on STDP window (click/drag anywhere in plot area) ─
+  const cvs = document.getElementById('cv-stdp');
+  let cvStdpDragging = false;
+
+  function _stdpApplyX(clientX) {
+    const rect = cvs.getBoundingClientRect();
+    const PL=50, PR=16, pw=rect.width-PL-PR;
+    const newDt = Math.round(Math.max(-80, Math.min(80,
+      (clientX - rect.left - PL) / pw * 160 - 80)));
+    if (newDt === ST.dt) return;
+    ST.dt = newDt;
+    document.getElementById('s3-dt').value  = newDt;
+    document.getElementById('v3-dt').textContent = (newDt>0?'+':'')+newDt+' ms';
+    redrawSTDP();
+  }
+  function _inPlot(offsetX) {
+    const rect = cvs.getBoundingClientRect();
+    const PL=50, PR=16;
+    return offsetX >= PL && offsetX <= rect.width-PR;
+  }
+
+  cvs.addEventListener('mousedown', e => {
+    if (_inPlot(e.offsetX)) { cvStdpDragging=true; _stdpApplyX(e.clientX); e.preventDefault(); }
+  });
+  cvs.addEventListener('mousemove', e => {
+    cvs.style.cursor = _inPlot(e.offsetX) ? 'ew-resize' : '';
+    if (cvStdpDragging) { _stdpApplyX(e.clientX); e.preventDefault(); }
+  });
+
+  cvs.addEventListener('touchstart', e => {
+    const ox = e.touches[0].clientX - cvs.getBoundingClientRect().left;
+    if (_inPlot(ox)) { cvStdpDragging=true; _stdpApplyX(e.touches[0].clientX); e.preventDefault(); }
+  }, {passive:false});
+  cvs.addEventListener('touchmove', e => {
+    if (cvStdpDragging) { _stdpApplyX(e.touches[0].clientX); e.preventDefault(); }
+  }, {passive:false});
+});
+
+// resize: redraw STDP if active
+window.addEventListener('resize', () => {
+  if (document.getElementById('tab-2').classList.contains('active')) redrawSTDP();
+});
+
+// ── INIT: start both simulations once fonts are ready ─────
+document.fonts.ready.then(() => { startLIF(); startCOD(); });
+</script>
+</body>
+</html>
