@@ -382,6 +382,12 @@ input[type=range]{padding:4px 0;accent-color:var(--green);width:100%}
     <strong>Why "transformer"?</strong> Unlike an RNN, which passes context through a fixed-size hidden state sequentially, a transformer directly connects every token to every other token in a single step. Each encoder layer <em>transforms</em> the entire set of token representations in parallel, enabling rich, long-range contextual mixing from the very first layer — hence the name. The transformation at each layer is what's distinctive: global, parallel, and context-mixing, rather than sequential (RNN) or local (CNN).
   </div>
 
+  <div class="note" style="margin-top:14px;font-size:.84rem">
+    <p style="margin-bottom:8px"><strong>Hybrid transformers: when recurrence meets attention.</strong> Although this explainer portrays transformers as purely feedforward networks, some architectures incorporate recurrent components — GRUs, LSTMs, or other RNN variants — inside or alongside the transformer layers. Examples include <strong>Transformer-XL</strong>, which adds a recurrent memory segment so context can flow across multiple consecutive chunks of text (extending the effective context window), and the <strong>Universal Transformer</strong>, which applies the same transformer layer recurrently across depth rather than stacking separate fixed layers.</p>
+    <p style="margin-bottom:8px">An important clarification: the "time" axis in these models is <em>token position within a single input sequence</em>, not real time across separate inferences. When an RNN processes a sequence inside a transformer, it sees token 1, then token 2, then token 3 — coupling positions within one forward pass. The state is reset between inferences; there is no persistent memory that carries over from one user prompt to the next (unless the model is explicitly given prior conversation history as part of its input, as is done in chat applications by concatenating the conversation into the context window).</p>
+    <p>The <strong>inductive bias</strong> of a hybrid is a blend: the transformer's global attention can attend to any position in a single step, while the recurrent component adds an explicit preference for sequential order and local continuity. On tasks where token order has strong short-range dependencies — certain time-series tasks, music, or fine-grained syntactic parsing — this added inductive bias can be an advantage. On tasks that benefit from purely global, order-agnostic mixing, the added recurrence may be redundant or harmful. As with CNNs vs. ViTs, the right architecture depends on whether the task's structure matches the architecture's assumptions.</p>
+  </div>
+
   <div class="arch-layout">
 
     <!-- Diagram -->
@@ -641,7 +647,99 @@ input[type=range]{padding:4px 0;accent-color:var(--green);width:100%}
     </div>
 
   </div>
-  <div style="margin-top:28px;padding-top:14px;border-top:1px solid var(--border-lt)">
+
+  <h3 class="sec" style="margin-top:24px">Transformer Forward Pass: Pseudocode</h3>
+  <p style="font-size:.82rem;color:var(--text-mid);margin-bottom:12px">Toggle between the three topologies. All share the same core layer — what differs is the attention mask, the optional cross-attention sub-block, and how the output is used. The encoder-decoder variant makes the cross-attention mechanism from the Architecture tab concrete.</p>
+  <div class="btn-row" style="margin-bottom:12px">
+    <button class="btn btn-g"  id="pcode-enc-btn"    onclick="setPseudo('enc')">Encoder Only</button>
+    <button class="btn btn-ol" id="pcode-dec-btn"    onclick="setPseudo('dec')">Decoder Only</button>
+    <button class="btn btn-ol" id="pcode-encdec-btn" onclick="setPseudo('encdec')">Encoder–Decoder</button>
+  </div>
+  <div id="pcode-enc">
+<pre style="background:#1C2B12;color:#D4E8C2;border-radius:10px;padding:16px;font-size:.76rem;line-height:1.7;overflow-x:auto;font-family:'IBM Plex Mono',monospace"><span style="color:#7FBB5A"># Encoder-only forward pass (BERT-style)</span>
+<span style="color:#7FBB5A"># Input: token indices [N]   Output: N contextual vectors in R^d</span>
+
+def encoder_forward(tokens, E, W_pos, layers):
+    x = E[tokens] + W_pos[:len(tokens)]   <span style="color:#7FBB5A"># embed + positional encoding  (N, d)</span>
+
+    for (W_Q, W_K, W_V, W_O, W_1, W_2, b_1, b_2) in layers:
+
+        <span style="color:#7FBB5A"># — Multi-Head Self-Attention (all tokens attend to all tokens) —</span>
+        Q, K, V  = x@W_Q, x@W_K, x@W_V          <span style="color:#7FBB5A"># (N,d_k), (N,d_k), (N,d_v)</span>
+        attn_out = softmax(Q@K.T/sqrt(d_k)) @ V  <span style="color:#7FBB5A"># (N,d_v) — no mask</span>
+        x = layer_norm(x + attn_out @ W_O)        <span style="color:#7FBB5A"># Add & Norm (1)</span>
+
+        <span style="color:#7FBB5A"># — Feed-Forward Network (per token) —</span>
+        x = layer_norm(x + relu(x@W_1+b_1)@W_2+b_2)  <span style="color:#7FBB5A"># Add & Norm (2)</span>
+
+    return x   <span style="color:#7FBB5A"># (N, d) — one contextual vector per input token</span>
+
+<span style="color:#7FBB5A"># Task heads:  classification → linear(x[0])   token labels → linear(x)</span></pre>
+  </div>
+  <div id="pcode-dec" style="display:none">
+<pre style="background:#1C2B12;color:#D4E8C2;border-radius:10px;padding:16px;font-size:.76rem;line-height:1.7;overflow-x:auto;font-family:'IBM Plex Mono',monospace"><span style="color:#7FBB5A"># Decoder-only forward pass (GPT-style)</span>
+<span style="color:#7FBB5A"># Input: token indices [N]   Output: probability distribution over vocab</span>
+
+def decoder_forward(tokens, E, W_pos, layers):
+    x    = E[tokens] + W_pos[:len(tokens)]        <span style="color:#7FBB5A"># (N, d)</span>
+    mask = upper_triangular(-inf, size=len(tokens)) <span style="color:#7FBB5A"># causal mask (N, N)</span>
+
+    for (W_Q, W_K, W_V, W_O, W_1, W_2, b_1, b_2) in layers:
+
+        <span style="color:#7FBB5A"># — Causal Self-Attention (each token sees only its past) —</span>
+        Q, K, V  = x@W_Q, x@W_K, x@W_V
+        attn_out = softmax(Q@K.T/sqrt(d_k) + mask) @ V  <span style="color:#7FBB5A"># future → -inf → 0</span>
+        x = layer_norm(x + attn_out @ W_O)
+
+        <span style="color:#7FBB5A"># — Feed-Forward Network —</span>
+        x = layer_norm(x + relu(x@W_1+b_1)@W_2+b_2)
+
+    logits = x[-1] @ E.T      <span style="color:#7FBB5A"># project last token only (weight tying)</span>
+    return softmax(logits)    <span style="color:#7FBB5A"># probability over next token</span>
+
+<span style="color:#7FBB5A"># Inference: sample(decoder_forward(tokens)) → append → repeat until [EOS]</span>
+<span style="color:#7FBB5A"># KV cache:  store K,V for prior tokens; recompute only for the new token</span></pre>
+  </div>
+  <div id="pcode-encdec" style="display:none">
+<pre style="background:#1C2B12;color:#D4E8C2;border-radius:10px;padding:16px;font-size:.76rem;line-height:1.7;overflow-x:auto;font-family:'IBM Plex Mono',monospace"><span style="color:#7FBB5A"># Encoder-Decoder forward pass (T5/BART-style)</span>
+<span style="color:#7FBB5A"># source_tokens: source sequence [N]   target_tokens: target so far [M]</span>
+
+def enc_dec_forward(source_tokens, target_tokens, E, W_pos, enc_layers, dec_layers,
+                    W_Q_x, W_K_x, W_V_x, W_O_x):  <span style="color:#7FBB5A"># cross-attn weights (part of decoder)</span>
+
+    <span style="color:#7FBB5A"># ── Step 1: Encode source (run once; output held fixed during decoding) ──</span>
+    enc = E[source_tokens] + W_pos[:len(source_tokens)]   <span style="color:#7FBB5A"># (N, d)</span>
+    for (W_Q, W_K, W_V, W_O, W_1, W_2, b_1, b_2) in enc_layers:
+        Q, K, V  = enc@W_Q, enc@W_K, enc@W_V
+        enc = layer_norm(enc + softmax(Q@K.T/sqrt(d_k))@V @ W_O)
+        enc = layer_norm(enc + relu(enc@W_1+b_1)@W_2+b_2)
+    <span style="color:#7FBB5A"># enc is now (N, d) — precomputed source representations</span>
+
+    <span style="color:#7FBB5A"># ── Step 2: Decode target token by token ──</span>
+    x    = E[target_tokens] + W_pos[:len(target_tokens)]  <span style="color:#7FBB5A"># (M, d)</span>
+    mask = upper_triangular(-inf, size=len(target_tokens)) <span style="color:#7FBB5A"># causal mask (M, M)</span>
+
+    for (W_Q, W_K, W_V, W_O, W_1, W_2, b_1, b_2) in dec_layers:
+
+        <span style="color:#7FBB5A"># — Causal Self-Attention over target tokens —</span>
+        Q, K, V  = x@W_Q, x@W_K, x@W_V
+        x = layer_norm(x + softmax(Q@K.T/sqrt(d_k)+mask)@V @ W_O)
+
+        <span style="color:#7FBB5A"># — Cross-Attention: Q from decoder, K and V from encoder output —</span>
+        Q_x = x   @ W_Q_x   <span style="color:#7FBB5A"># (M, d_k)  — queries from target side</span>
+        K_x = enc @ W_K_x   <span style="color:#7FBB5A"># (N, d_k)  — keys from source (precomputed)</span>
+        V_x = enc @ W_V_x   <span style="color:#7FBB5A"># (N, d_v)  — values from source (precomputed)</span>
+        x = layer_norm(x + softmax(Q_x@K_x.T/sqrt(d_k))@V_x @ W_O_x)
+        <span style="color:#7FBB5A"># Q·K^T is (M×N): every target token queries every source token</span>
+
+        <span style="color:#7FBB5A"># — Feed-Forward Network —</span>
+        x = layer_norm(x + relu(x@W_1+b_1)@W_2+b_2)
+
+    logits = x[-1] @ E.T    <span style="color:#7FBB5A"># project last target vector to vocab</span>
+    return softmax(logits)  <span style="color:#7FBB5A"># sample next target token → append → repeat until [EOS]</span></pre>
+  </div>
+
+  <div style="margin-top:24px;padding-top:14px;border-top:1px solid var(--border-lt)">
     <p style="font-size:.76rem;font-weight:700;color:var(--text-mid);margin-bottom:6px">Key References</p>
     <p style="font-size:.74rem;color:var(--text-light);line-height:1.6">
       Vaswani, A. et al. (2017). <em>Attention Is All You Need.</em> Advances in Neural Information Processing Systems 30 (NIPS 2017), pp. 5998–6008. <a href="https://proceedings.neurips.cc/paper/2017/hash/3f5ee243547dee91fbd053c1c4a845aa-Abstract.html" target="_blank" style="color:var(--green)">NeurIPS proceedings</a><br>
@@ -670,7 +768,7 @@ input[type=range]{padding:4px 0;accent-color:var(--green);width:100%}
     <strong>How to use the controls below:</strong>
     The <em>sentence</em> is the full input to the transformer — all tokens are processed simultaneously, not one at a time. The attention weights reveal how the model internally relates each token to every other token <em>in the context of that sentence</em>. Select a head, then click a token in the sentence to see, from that token's perspective, which other tokens it attends to most strongly under the concept that head has learned. Switching heads shows how different learned subspaces pick out different relationships within the same sentence.
     <br><br>
-    <em>Note: the four heads here are hand-crafted illustrations of the kinds of relationships that <strong>might</strong> emerge from training — not a guarantee of what will. Real trained transformers may carve up the space quite differently, and individual heads often don't correspond cleanly to a single human-interpretable concept.</em>
+    <em>Note: the four heads here are hand-crafted illustrations of the kinds of relationships that <strong>might</strong> emerge from training — not a guarantee of what will. Real trained transformers may carve up the space quite differently, and individual heads often don't correspond cleanly to a single human-interpretable concept. For a complete pseudocode implementation of the attention mechanism in context, see the <strong>Transformer Forward Pass: Pseudocode</strong> section on Tab ①.</em>
   </div>
 
   <div class="card" style="padding:16px;margin-top:14px">
@@ -904,6 +1002,68 @@ Q<sub>cat</sub>·K<sub>sat</sub> / √d<sub>k</sub>  =  2.6 × 1.8 / √4  =  <s
     <p>The honest conclusion, much like in the associative vs. latent learning debate: the line is real but blurry. Self-supervised is a genuinely different <em>paradigm</em> — annotation-free, scale-unlimited, general-purpose, and driven by environmental structure rather than an external agent — even if the gradient math is not fundamentally different from supervised learning.</p>
     <p style="margin-top:10px"><strong>Contrastive learning</strong> (SimCLR, MoCo, CLIP, DINO) takes this further by making the representational goal explicit: <em>similar inputs should produce similar [CLS] vectors; dissimilar inputs should not.</em> CLIP trains two encoders — one for images, one for text — so that matching image-caption pairs are close in the joint embedding space and mismatched pairs are far apart. The supervision signal comes entirely from naturally occurring image-caption pairs on the internet, with no human labels. This is self-supervised learning in its purest form: the structure of the world (images tend to co-occur with descriptive captions) provides the signal.</p>
   </div>
+
+  <h3 class="sec" style="margin-top:24px">Self-Supervised Training: Pseudocode</h3>
+    <p style="font-size:.82rem;color:var(--text-mid);margin-bottom:12px">Toggle between MLM (BERT-style) and CLM (GPT-style) training loops. Both use the same transformer forward pass — what differs is how the input is corrupted and where the loss is applied.</p>
+    <div class="btn-row" style="margin-bottom:12px">
+      <button class="btn btn-g" id="sscode-mlm-btn" onclick="setSSTrain('mlm')">MLM — BERT-style</button>
+      <button class="btn btn-ol" id="sscode-clm-btn" onclick="setSSTrain('clm')">CLM — GPT-style</button>
+    </div>
+    <div id="sscode-mlm">
+<pre style="background:#1C2B12;color:#D4E8C2;border-radius:10px;padding:16px;font-size:.76rem;line-height:1.7;overflow-x:auto;font-family:'IBM Plex Mono',monospace"><span style="color:#7FBB5A"># MLM pre-training loop (BERT-style)</span>
+<span style="color:#7FBB5A"># For each batch of sequences:</span>
+
+for sequence in corpus:
+    tokens = tokenize(sequence)         <span style="color:#7FBB5A"># e.g. ["the","cat","sat",...]</span>
+    tokens = prepend([CLS], tokens)     <span style="color:#7FBB5A"># add [CLS] at position 0</span>
+
+    <span style="color:#7FBB5A"># Select 15% of token positions for prediction</span>
+    selected = random_sample(positions, p=0.15)
+    labels   = tokens[selected]         <span style="color:#7FBB5A"># save original tokens as targets</span>
+
+    <span style="color:#7FBB5A"># Apply 3-way substitution to selected positions:</span>
+    for i in selected:
+        r = uniform(0, 1)
+        if   r < 0.80: tokens[i] = [MASK]               <span style="color:#7FBB5A"># 80% → [MASK]</span>
+        elif r < 0.90: tokens[i] = random_vocab_token()  <span style="color:#7FBB5A"># 10% → random token</span>
+        <span style="color:#7FBB5A"># else:          leave unchanged                       # 10% → unchanged</span>
+
+    <span style="color:#7FBB5A"># Forward pass — all N tokens processed simultaneously</span>
+    representations = encoder_forward(tokens)   <span style="color:#7FBB5A"># (N, d)</span>
+
+    <span style="color:#7FBB5A"># Compute loss only at selected positions</span>
+    logits = representations[selected] @ E.T    <span style="color:#7FBB5A"># (|selected|, vocab_size)</span>
+    loss   = cross_entropy(logits, labels)       <span style="color:#7FBB5A"># unselected positions contribute nothing</span>
+
+    loss.backward()
+    optimizer.step()</pre>
+    </div>
+    <div id="sscode-clm" style="display:none">
+<pre style="background:#1C2B12;color:#D4E8C2;border-radius:10px;padding:16px;font-size:.76rem;line-height:1.7;overflow-x:auto;font-family:'IBM Plex Mono',monospace"><span style="color:#7FBB5A"># CLM pre-training loop (GPT-style)</span>
+<span style="color:#7FBB5A"># For each batch of sequences:</span>
+
+for sequence in corpus:
+    tokens = tokenize(sequence)          <span style="color:#7FBB5A"># e.g. ["the","cat","sat",...]</span>
+
+    <span style="color:#7FBB5A"># Inputs and targets are the same sequence, shifted by one position</span>
+    inputs  = tokens[:-1]                <span style="color:#7FBB5A"># ["the","cat","sat","on","the","warm"]</span>
+    targets = tokens[1:]                 <span style="color:#7FBB5A"># ["cat","sat","on","the","warm","mat"]</span>
+
+    <span style="color:#7FBB5A"># Forward pass with causal mask — all positions processed in parallel</span>
+    <span style="color:#7FBB5A"># but position i can only attend to positions 0..i (no peeking right)</span>
+    representations = decoder_forward(inputs)    <span style="color:#7FBB5A"># (N-1, d)</span>
+
+    <span style="color:#7FBB5A"># Every position predicts its next token — N-1 training signals per sequence</span>
+    logits = representations @ E.T              <span style="color:#7FBB5A"># (N-1, vocab_size)</span>
+    loss   = cross_entropy(logits, targets)      <span style="color:#7FBB5A"># all positions contribute to loss</span>
+
+    loss.backward()
+    optimizer.step()
+
+<span style="color:#7FBB5A"># Note: no human labels anywhere — the sequence is its own supervision signal.</span>
+<span style="color:#7FBB5A"># Any corpus of text yields training pairs automatically by this sliding-window logic.</span></pre>
+    </div>
+
   <div style="margin-top:28px;padding-top:14px;border-top:1px solid var(--border-lt)">
     <p style="font-size:.76rem;font-weight:700;color:var(--text-mid);margin-bottom:6px">Key References</p>
     <p style="font-size:.74rem;color:var(--text-light);line-height:1.6">
@@ -966,6 +1126,7 @@ Q<sub>cat</sub>·K<sub>sat</sub> / √d<sub>k</sub>  =  2.6 × 1.8 / √4  =  <s
   </div>
 
   <h3 class="sec" style="margin-top:20px">Token Sequence Input to the Transformer</h3>
+  <p class="sm" style="margin-bottom:6px">ViT uses the same encoder forward pass as BERT — the only difference is that patch embeddings replace token embeddings as input. The pseudocode on <strong>Tab ①</strong> (Encoder Only) applies directly; just substitute patch projections for the embedding matrix lookup.</p>
   <p class="sm">Patches are numbered in <em>raster scan order</em> — left to right, row by row (like reading text). Without positional encodings, self-attention is permutation-invariant and the model would have no way of knowing that patch 3 is to the right of patch 2. A learned positional encoding vector is added to each patch token before the transformer so the model knows where each patch came from spatially. The original ViT paper (Dosovitskiy et al., 2020) found that these learned encodings spontaneously develop a 2D grid structure — nearby patches end up with similar positional embeddings.</p>
   <p class="sm" style="margin-top:8px">A <strong>[CLS]</strong> token is prepended; its output is used for classification. In supervised ViT training, [CLS]'s output feeds a linear classifier trained on labeled images. In self-supervised ViT training (DINO), no labels are used — instead, two differently augmented views of the same image are passed through the network and their [CLS] outputs are trained to be similar, while [CLS] outputs from different images are pushed apart. This is <em>contrastive learning</em> applied to vision — the same principle as CLIP (Tab ③), but within a single modality.</p>
   <canvas id="vit-seq" style="border-radius:8px;display:block;max-width:100%"></canvas>
@@ -1886,6 +2047,19 @@ function initVitCanvas(){
 }
 
 // ════════════════════════════════════════════════════════
+// ── Pseudocode toggles ───────────────────────────────────
+function setPseudo(mode){
+  ['enc','dec','encdec'].forEach(m=>{
+    document.getElementById('pcode-'+m).style.display=m===mode?'block':'none';
+    document.getElementById('pcode-'+m+'-btn').className='btn '+(m===mode?'btn-g':'btn-ol');
+  });
+}
+function setSSTrain(mode){
+  document.getElementById('sscode-mlm').style.display=mode==='mlm'?'block':'none';
+  document.getElementById('sscode-clm').style.display=mode==='clm'?'block':'none';
+  document.getElementById('sscode-mlm-btn').className='btn '+(mode==='mlm'?'btn-g':'btn-ol');
+  document.getElementById('sscode-clm-btn').className='btn '+(mode==='clm'?'btn-g':'btn-ol');
+}
 // ── Tooltip click toggle ─────────────────────────────────
 document.addEventListener('click', e => {
   const t = e.target.closest('.tip');
