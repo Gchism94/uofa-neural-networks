@@ -112,6 +112,11 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
   .wh{flex-wrap:wrap}.wh-copy{text-align:left}
 }
 @media(max-width:420px){.wh h1{font-size:1rem}.tb{padding:8px 10px;font-size:.78rem}}
+/* Narrow-bar: slot right under plot, visible only when JS moves controls there */
+.narrow-bar{display:none;flex-direction:column;gap:12px;padding:12px 14px;
+            background:var(--srf2);border-top:1px solid var(--bdr)}
+/* penv: flex wrapper for search+encounter; direction set by JS */
+#cp2-penv{display:flex;flex-direction:column;gap:12px}
 </style>
 </head>
 <body>
@@ -209,6 +214,20 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
         <div class="sc"><div class="sn">Rise Time τ</div><div class="sv2" id="st-tau">6.0</div></div>
       </div>
     </div>
+    <div class="fcard" style="padding:9px 12px">
+      <div class="ftitle" style="margin-bottom:6px">Patch Return Model</div>
+      <div style="text-align:center;font-family:var(--mono);font-size:.88rem;color:var(--gdp);font-style:italic;letter-spacing:.01em">
+        g(h) = G<sub>max</sub>&thinsp;(1 &minus; e<sup>&minus;h/τ</sup>)
+      </div>
+      <div style="font-size:.67rem;color:var(--muted);text-align:center;margin-top:4px;line-height:1.5">
+        G<sub>max</sub> = asymptotic gain &nbsp;·&nbsp; τ = depletion time constant<br>
+        small τ → step-like &nbsp;·&nbsp; large τ → ramp-like
+      </div>
+      <div style="border-top:1px solid var(--bdr);margin:7px 8px 0"></div>
+      <div style="font-size:.67rem;color:var(--muted);text-align:center;margin-top:6px;line-height:1.5">
+        <em>Any concave increasing g(h) satisfies the MVT — this exponential is one tractable choice.</em>
+      </div>
+    </div>
   </div>
 </div>
 </div>
@@ -216,9 +235,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 <!-- ═══ TAB 2 ═══ -->
 <div id="pane-portfolio" class="tc">
 <div class="layout">
-  <div class="cv-col">
+  <div class="cv-col" id="tab2-cvcol">
     <div class="cv-wrap"><canvas id="cvp"></canvas></div>
-    <div class="fsec">
+    <div id="tab2-narrow-bar" class="narrow-bar"></div>
+    <div class="fsec" id="tab2-fsec">
       <div class="fcard">
         <div class="ftitle">Multi-Patch Equimarginal Condition</div>
         <div class="fexpr">
@@ -305,21 +325,41 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
       </svg>
     </div>
   </div>
-  <div class="cpanel">
-    <div class="dhint">
+  <div class="cpanel" id="tab2-panel">
+    <div class="dhint" id="cp2-hint">
       <b>↕</b> drag any <b>curve</b> &middot; adjust G<sub>max</sub><br>
       <b>↔</b> drag any <b>curve</b> &middot; adjust rise time τ
     </div>
-    <div>
-      <div class="cl">Inter-patch Search Time</div>
-      <div class="srow">
-        <label>s =</label>
-        <input type="range" id="slS2" min="0.5" max="14" step="0.1" value="5">
-        <span class="sv" id="slS2v">5.0</span>
+    <div id="cp2-patchtypes">
+      <div class="cl">Patch Types</div>
+      <div class="lgd">
+        <div class="li"><div class="lsw" style="background:#1d6fa4"></div>
+          <span>Patch 1 &ensp;G<sub>max</sub>=<span id="lgm0">14.5</span>&ensp;τ=<span id="ltau0">8.0</span></span></div>
+        <div class="li"><div class="lsw" style="background:#2a8c5e"></div>
+          <span>Patch 2 &ensp;G<sub>max</sub>=<span id="lgm1">11.0</span>&ensp;τ=<span id="ltau1">5.0</span></span></div>
+        <div class="li"><div class="lsw" style="background:#8c6e2a"></div>
+          <span>Patch 3 &ensp;G<sub>max</sub>=<span id="lgm2">8.5</span>&ensp;τ=<span id="ltau2">3.0</span></span></div>
+        <div class="li" style="margin-top:2px">
+          <div class="lsw" style="background:#6e3ea8"></div>
+          <span style="color:#6e3ea8;font-style:italic;font-size:.74rem">Tangent slope = R<sup>*</sup> (all equal)</span>
+        </div>
       </div>
-      <div style="font-size:.71rem;color:var(--muted)">Common search time across all patches</div>
     </div>
-    <div>
+    <div id="cp2-retmodel" class="fcard" style="padding:9px 12px">
+      <div class="ftitle" style="margin-bottom:6px">Patch Return Model</div>
+      <div style="text-align:center;font-family:var(--mono);font-size:.88rem;color:var(--gdp);font-style:italic;letter-spacing:.01em">
+        g<sub>i</sub>(h) = G<sub>max,i</sub>&thinsp;(1 &minus; e<sup>&minus;h/τ<sub>i</sub></sup>)
+      </div>
+      <div style="font-size:.67rem;color:var(--muted);text-align:center;margin-top:4px;line-height:1.5">
+        G<sub>max</sub> = asymptotic gain &nbsp;·&nbsp; τ = depletion time constant<br>
+        small τ → step-like (fast reward) &nbsp;·&nbsp; large τ → ramp-like (slow depletion)
+      </div>
+      <div style="border-top:1px solid var(--bdr);margin:7px 8px 0"></div>
+      <div style="font-size:.67rem;color:var(--muted);text-align:center;margin-top:6px;line-height:1.5">
+        <em>Any concave increasing g<sub>i</sub>(h) satisfies the MVT — this exponential is one tractable choice.</em>
+      </div>
+    </div>
+    <div id="cp2-stats">
       <div class="cl">Portfolio Statistics</div>
       <div class="sgrid">
         <div class="sc full"><div class="sn">Habitat Rate R<sup>*</sup> (equimarginal)</div><div class="sv2" id="pt-R">—</div></div>
@@ -341,7 +381,18 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
         <div class="sc"><div class="sn">Spread h<sub>1</sub><sup>*</sup>&minus;h<sub>3</sub><sup>*</sup></div><div class="sv2" id="pt-spr">—</div></div>
       </div>
     </div>
-    <div>
+    <div id="cp2-penv">
+      <div id="cp2-search">
+        <div class="cl">Inter-patch Search Time</div>
+        <div class="srow">
+          <label>s =</label>
+          <input type="range" id="slS2" min="0.5" max="14" step="0.1" value="5">
+          <span class="sv" id="slS2v">5.0</span>
+        </div>
+        <div style="font-size:.71rem;color:var(--muted)">Common search time across all patches</div>
+      </div>
+    </div>
+    <div id="cp2-enc">
       <div class="cl">Encounter Proportions</div>
       <div class="triWrap">
         <div class="triBox"><canvas id="triCvs"></canvas></div>
@@ -353,24 +404,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
         <div style="font-size:.67rem;color:var(--muted);text-align:center">drag to adjust relative encounter rates</div>
       </div>
     </div>
-    <div>
-      <div class="cl">Patch Types</div>
-      <div class="lgd">
-        <div class="li"><div class="lsw" style="background:#1d6fa4"></div>
-          <span>Patch 1 &ensp;G<sub>max</sub>=<span id="lgm0">14.5</span>&ensp;τ=<span id="ltau0">8.0</span></span></div>
-        <div class="li"><div class="lsw" style="background:#2a8c5e"></div>
-          <span>Patch 2 &ensp;G<sub>max</sub>=<span id="lgm1">11.0</span>&ensp;τ=<span id="ltau1">5.0</span></span></div>
-        <div class="li"><div class="lsw" style="background:#8c6e2a"></div>
-          <span>Patch 3 &ensp;G<sub>max</sub>=<span id="lgm2">8.5</span>&ensp;τ=<span id="ltau2">3.0</span></span></div>
-        <div class="li" style="margin-top:2px">
-          <div class="lsw" style="background:#6e3ea8"></div>
-          <span style="color:#6e3ea8;font-style:italic;font-size:.74rem">Tangent slope = R<sup>*</sup> (all equal)</span>
-        </div>
-      </div>
-      <div style="font-size:.67rem;color:var(--muted);margin-top:5px;line-height:1.5">
-        τ = depletion time constant &nbsp;·&nbsp; small τ → step-like (fast reward); large τ → ramp-like (slow depletion)
-      </div>
-    </div>
+    <!-- Persistent row-wrapper used only in narrow mode for enc+patchtypes -->
+    <div id="cp2-enc-row" style="display:none"></div>
   </div>
 </div>
 </div>
@@ -1077,6 +1112,48 @@ window.addEventListener('mouseup',()=>{
 // ══════════════════════════════════════════
 
 let activeTab='single';
+
+// ── Narrow-reflow for Tab 2 ──────────────
+// Wide  (>700px): right panel column — hint · patchtypes · retmodel · stats · penv(search) · enc
+// Narrow (≤700px): narrow-bar under canvas — hint · penv(search) · [ptypes | enc] row · retmodel
+function reflowTab2(){
+  const narrow  = window.innerWidth <= 700;
+  const nbar    = document.getElementById('tab2-narrow-bar');
+  const panel   = document.getElementById('tab2-panel');
+  const stats   = document.getElementById('cp2-stats');
+  const hint    = document.getElementById('cp2-hint');
+  const penv    = document.getElementById('cp2-penv');     // search only
+  const enc     = document.getElementById('cp2-enc');
+  const ptypes  = document.getElementById('cp2-patchtypes');
+  const retmod  = document.getElementById('cp2-retmodel');
+  const encRow  = document.getElementById('cp2-enc-row');
+  if (!nbar||!panel||!stats||!hint||!penv||!enc||!ptypes||!retmod||!encRow) return;
+
+  penv.style.cssText = 'display:flex;flex-direction:column;gap:12px';
+
+  if (narrow) {
+    nbar.style.display = 'flex';
+    nbar.appendChild(hint);
+    nbar.appendChild(penv);              // search slider full-width
+    // Patch Types legend (left) + Encounter triangle (right)
+    encRow.style.cssText = 'display:flex;flex-direction:row;flex-wrap:wrap;gap:12px;align-items:flex-start;justify-content:center';
+    encRow.appendChild(ptypes);
+    encRow.appendChild(enc);
+    nbar.appendChild(encRow);
+    nbar.appendChild(retmod);            // Return Model below the pair
+  } else {
+    nbar.style.display = 'none';
+    encRow.style.display = 'none';
+    // Rebuild panel: hint · ptypes · retmod · stats · penv · enc
+    panel.insertBefore(enc,    stats.nextSibling);  // enc after stats
+    panel.insertBefore(penv,   enc);                // penv before enc
+    panel.insertBefore(retmod, penv);               // retmod before penv
+    panel.insertBefore(ptypes, retmod);             // ptypes before retmod
+    panel.insertBefore(hint,   panel.firstChild);   // hint always first
+  }
+  drawTri();
+}
+
 function switchTab(tab,btn){
   activeTab=tab;
   document.querySelectorAll('.tb').forEach(b=>b.classList.remove('active'));
@@ -1085,7 +1162,7 @@ function switchTab(tab,btn){
   document.getElementById('pane-'+tab).classList.add('active');
   requestAnimationFrame(()=>{
     if(tab==='single')renderSingle();
-    else{ensureTri();drawTri();renderPortfolio();}
+    else{reflowTab2();ensureTri();drawTri();renderPortfolio();}
   });
 }
 
@@ -1106,6 +1183,7 @@ document.getElementById('slS2').addEventListener('input',()=>{
 
 const ro=new ResizeObserver(()=>{
   requestAnimationFrame(()=>{
+    reflowTab2();
     if(activeTab==='single')renderSingle();
     else renderPortfolio();
   });
@@ -1114,6 +1192,7 @@ document.querySelectorAll('.cv-wrap').forEach(el=>ro.observe(el));
 
 requestAnimationFrame(()=>{
   renderSingle();
+  reflowTab2();
   ensureTri();drawTri();
 });
 </script>
