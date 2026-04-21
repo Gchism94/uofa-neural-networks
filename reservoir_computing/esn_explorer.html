@@ -128,11 +128,11 @@ canvas{display:block;}
   <div class="ml" id="t1-inp-lbl">input x(t) — driven for t = 0 … 149, then silenced</div>
   <div class="cw" style="margin-bottom:5px"><canvas id="c1-inp"></canvas></div>
 
-  <div class="ml" id="t1-lbl">6 reservoir neuron traces h<sub>i</sub>(t) — drag bar to select snapshot</div>
+  <div class="ml" id="t1-lbl">6 (out of N=40) reservoir neuron traces h<sub>i</sub>(t) — drag bar to select snapshot</div>
   <div class="cw" style="margin-bottom:5px"><canvas id="c1-tr"></canvas></div>
 
   <div class="ml">
-    Spatial fingerprint at selected t &nbsp;·&nbsp; colored dots = the 6 traced neurons &nbsp;·&nbsp; gallery: all 4 signal families × 10 time slices &nbsp;·&nbsp; <strong style="color:var(--green)">highlight = single best L² match</strong>
+    <span style="display:block"><strong>Center</strong> — Spatial fingerprint at selected t &nbsp;·&nbsp; gray dots: N=40 neurons &nbsp;·&nbsp; colored dots: 6 traced neurons from above</span><span style="display:block"><strong>Corners</strong> — Gallery of all 4 signal families sampled at 10 time slices &nbsp;·&nbsp; <strong style="color:var(--green)">highlight: single best L² match to fingerprint</strong></span>
   </div>
   <div class="cw"><canvas id="c1-snap"></canvas></div>
 
@@ -688,7 +688,7 @@ function upRho1(){document.getElementById('t1-rhov').textContent=parseFloat(docu
 function updateT1Labels(){
   document.getElementById('t1-inp-lbl').innerHTML='input x(t) — driven for t = 0 … '+(T1_ON-1)+', then silenced';
   const lbl=document.getElementById('t1-lbl');
-  if(!t1ShowIC) lbl.innerHTML='6 reservoir neuron traces h<sub>i</sub>(t) — drag bar to select snapshot';
+  if(!t1ShowIC) lbl.innerHTML='6 (out of N=40) reservoir neuron traces h<sub>i</sub>(t) — drag bar to select snapshot';
   else lbl.innerHTML='IC comparison: solid = zero initial state · dashed = random initial state (same input)';
   const ins=document.getElementById('t1-ins');
   if(t1ShowIC)
