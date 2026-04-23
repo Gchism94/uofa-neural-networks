@@ -1,26 +1,28 @@
 <!DOCTYPE html>
+<!-- Copyright © 2026 Theodore P. Pavlic. Arizona State University. MIT License.
+     Adapted for INFO 557: Neural Networks by Greg Chism, University of Arizona. -->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bio-Inspired AI &amp; Optimization — Course Visualizations</title>
-  <meta name="description" content="Helpful visualizations and interactive web demonstrations for IEE/CSE 598: Bio-Inspired AI and Optimization at Arizona State University.">
+  <title>INFO 557: Neural Networks – Course Visualizations</title>
+  <meta name="description" content="Interactive visualizations for INFO 557: Neural Networks at the University of Arizona, College of Information Science — covering neural network architectures, deep learning theory, and optimization.">
 
   <!-- Open Graph (Facebook, LinkedIn, Slack, iMessage, etc.) -->
   <meta property="og:type" content="website">
-  <meta property="og:title" content="Bio-Inspired AI &amp; Optimization — Course Visualizations">
-  <meta property="og:description" content="Helpful visualizations and interactive web demonstrations for IEE/CSE 598: Bio-Inspired AI and Optimization at Arizona State University.">
-  <meta property="og:image" content="https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/simulated_annealing/simulated_annealing_demo-preview.png">
-  <meta property="og:image:width" content="1550">
-  <meta property="og:image:height" content="1456">
-  <meta property="og:url" content="https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/">
+  <meta property="og:title" content="INFO 557: Neural Networks – Course Visualizations">
+  <meta property="og:description" content="Interactive visualizations for INFO 557: Neural Networks at the University of Arizona, College of Information Science — covering neural network architectures, deep learning theory, and optimization.">
+  <meta property="og:image" content="https://gchism94.github.io/uofa-neural-networks/multi_layer_perceptron/mlp_explorer-preview.png">
+  <meta property="og:image:width" content="2364">
+  <meta property="og:image:height" content="1178">
+  <meta property="og:url" content="https://gchism94.github.io/uofa-neural-networks/">
   <meta property="fb:app_id" content="2385695445236853">
 
   <!-- Twitter/X card -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Bio-Inspired AI &amp; Optimization — Course Visualizations">
-  <meta name="twitter:description" content="Helpful visualizations and interactive web demonstrations for IEE/CSE 598: Bio-Inspired AI and Optimization at Arizona State University.">
-  <meta name="twitter:image" content="https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/simulated_annealing/simulated_annealing_demo-preview.png">
+  <meta name="twitter:title" content="INFO 557: Neural Networks – Course Visualizations">
+  <meta name="twitter:description" content="Interactive visualizations for INFO 557: Neural Networks at the University of Arizona, College of Information Science — covering neural network architectures, deep learning theory, and optimization.">
+  <meta name="twitter:image" content="https://gchism94.github.io/uofa-neural-networks/multi_layer_perceptron/mlp_explorer-preview.png">
 
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -288,217 +290,30 @@
     <nav class="side-nav" aria-label="Section navigation">
       <span class="side-nav-label">Sections</span>
       <ul>
-        <li><a href="#genetic-algorithms">Genetic Algorithms</a></li>
-        <li><a href="#evolution-strategies">Evolution Strategies</a></li>
-        <li><a href="#evol-prog-ais">Evol. Prog. &amp; AIS</a></li>
-        <li><a href="#physics-inspired">Physics-Inspired</a></li>
-        <li><a href="#swarm-intelligence">Swarm Intelligence</a></li>
+        <li><a href="#probabilistic-foundations">Probabilistic Foundations</a></li>
         <li><a href="#neural-networks">Neural Networks</a></li>
-        <li><a href="#cellular-automata">Cellular Automata</a></li>
       </ul>
     </nav>
 
     <main class="main-content">
 
   <header>
-    <h1>Bio-Inspired AI &amp; Optimization — Course Visualizations</h1>
+    <h1>INFO 557: Neural Networks – Course Visualizations</h1>
     <p>
       Supplemental visualizations for
-      <a href="https://search.asu.edu/profile/1995237" target="_blank" rel="noopener">Theodore Pavlic</a>'s
-      <em>IEE/CSE 598: Bio-Inspired AI and Optimization</em> at
-      <a href="https://www.asu.edu/" target="_blank" rel="noopener">Arizona State University</a>.
-    </p>
-    <p style="margin-top:0.4rem;">
-      Lectures and other helpful short video tutorials can be found at
-      <a href="https://www.youtube.com/@TedPavlic" target="_blank" rel="noopener">TedPavlic's YouTube channel</a>.
+      <a href="https://infosci.arizona.edu/person/greg-chism" target="_blank" rel="noopener">Greg Chism</a>,
+      Assistant Professor of Practice at the
+      <a href="https://infosci.arizona.edu/" target="_blank" rel="noopener">University of Arizona, College of Information Science</a>.
+      Course: <em>INFO 557: Neural Networks</em> — covering neural network architectures, deep learning theory, and optimization.
     </p>
   </header>
 
   <!-- ══════════════════════════════════════════════════════
-       Genetic Algorithms
+       Probabilistic Foundations
   ═══════════════════════════════════════════════════════ -->
-  <section id="genetic-algorithms" class="demo-section">
-    <h2>Genetic Algorithms</h2>
+  <section id="probabilistic-foundations" class="demo-section">
+    <h2>Probabilistic Foundations</h2>
     <ul class="demo-list">
-
-      <li>
-        <a class="demo-row" href="shifting_balance_theory/sbt_four_peaks.html">
-          <img class="demo-thumb"
-               src="shifting_balance_theory/sbt_four_peaks-preview.png"
-               alt="Shifting Balance Theory demo preview"
-               width="120" height="90">
-          <div class="demo-text">
-            <h3>Shifting Balance Theory — interactive explainer</h3>
-            <p>Walk through Sewall Wright's three-phase Shifting Balance Theory: how genetic drift, selection, and interdemic migration help a metapopulation escape local fitness peaks.</p>
-          </div>
-        </a>
-      </li>
-
-      <li>
-        <a class="demo-row" href="ideal_free_distribution/ifd_on_pond.html">
-          <img class="demo-thumb"
-               src="ideal_free_distribution/ifd_on_pond-preview.png"
-               alt="Ideal Free Distribution demo preview"
-               width="120" height="90">
-          <div class="demo-text">
-            <h3>Ideal Free Distribution — interactive explainer</h3>
-            <p>Watch animals distribute across resource patches to equalize individual fitness — a behavioral ecology result that motivates fitness sharing in multi-modal genetic algorithms.</p>
-          </div>
-        </a>
-      </li>
-
-      <li>
-        <a class="demo-row" href="evolution_as_movement_in_drift_field/evolution_as_movement_in_drift_field.html">
-          <img class="demo-thumb"
-               src="evolution_as_movement_in_drift_field/evolution_as_movement_in_drift_field.png"
-               alt="Evolution as Movement in a Drift Field preview"
-               width="120" height="90">
-          <div class="demo-text">
-            <h3>Evolution as Movement in a Drift Field — graphical explainer</h3>
-            <p>Selection and drift purge diversity; mutation replenishes it. This figure frames the four forces of evolution as a field pushing populations toward fixation, motivating how to tune GA hyperparameters for a gradual shift from exploration to exploitation.</p>
-          </div>
-        </a>
-      </li>
-
-      <li>
-        <a class="demo-row" href="genetic_algorithms/ga_explorer.html">
-          <img class="demo-thumb"
-               src="genetic_algorithms/ga_explorer-preview.png"
-               alt="Genetic Algorithm Explorer preview"
-               width="120" height="90">
-          <div class="demo-text">
-            <h3>Genetic Algorithm Explorer — interactive explainer</h3>
-            <p>Run a canonical GA on a 1-D multimodal landscape with niching, experiment with an island model / distributed GA, explore a 2-D optimization zoo, and watch a two-objective MOEA build a Pareto front in real time.</p>
-          </div>
-        </a>
-      </li>
-
-      <!-- Add more genetic algorithm demos here -->
-
-    </ul>
-  </section>
-
-  <!-- ══════════════════════════════════════════════════════
-       Evolution Strategies
-  ═══════════════════════════════════════════════════════ -->
-  <section id="evolution-strategies" class="demo-section">
-    <h2>Evolution Strategies</h2>
-    <ul class="demo-list">
-
-      <li>
-        <a class="demo-row" href="evolution_strategies/es_explorer.html">
-          <img class="demo-thumb"
-               src="evolution_strategies/es_explorer-preview.png"
-               alt="ES Explorer preview"
-               width="120" height="90">
-          <div class="demo-text">
-            <h3>ES Explorer — interactive explainer</h3>
-            <p>Run a (μ,λ)- or (μ+λ)-Evolution Strategy on a 1-D multimodal landscape and watch per-individual step sizes self-adapt through selection — no global update rule required.</p>
-          </div>
-        </a>
-      </li>
-
-      <li>
-        <a class="demo-row" href="evolution_strategies/cmaes_explorer.html">
-          <img class="demo-thumb"
-               src="evolution_strategies/cmaes_explorer-preview.png"
-               alt="CMA-ES Explorer preview"
-               width="120" height="90">
-          <div class="demo-text">
-            <h3>CMA-ES Explorer — interactive explainer</h3>
-            <p>Watch CMA-ES adapt its mean, step size, and full covariance matrix each generation — cumulative step-size adaptation and rank-1/rank-μ covariance updates visualized in real time on a 2-D landscape.</p>
-          </div>
-        </a>
-      </li>
-
-      <!-- Add more evolution strategies demos here -->
-
-    </ul>
-  </section>
-
-  <!-- ══════════════════════════════════════════════════════
-       Evolutionary Programming & Artificial Immune Systems
-  ═══════════════════════════════════════════════════════ -->
-  <section id="evol-prog-ais" class="demo-section">
-    <h2>Evolutionary Programming &amp; Artificial Immune Systems</h2>
-    <ul class="demo-list">
-
-      <li>
-        <a class="demo-row" href="evolutionary_programming/evolprog_representations.html">
-          <img class="demo-thumb"
-               src="evolutionary_programming/evolprog_representations-preview.png"
-               alt="Evolutionary Programming Representations preview"
-               width="120" height="90">
-          <div class="demo-text">
-            <h3>Evolutionary Programming Representations — interactive explainer</h3>
-            <p>Explore Abstract Syntax Trees, Linear Genetic Programs, and Finite-State Machines side by side — interact with each representation, apply variation operators, and compare their expressiveness and typical applications.</p>
-          </div>
-        </a>
-      </li>
-
-      <li>
-        <a class="demo-row" href="artificial_immune_systems/ais_explorer.html">
-          <img class="demo-thumb"
-               src="artificial_immune_systems/ais_explorer-preview.png"
-               alt="Artificial Immune Systems Explorer preview"
-               width="120" height="90">
-          <div class="demo-text">
-            <h3>Artificial Immune Systems Explorer — interactive explainer</h3>
-            <p>Explore Negative Selection (NSA) and CLONALG side by side — watch detectors train on self-data to flag anomalies, and see how clonal selection and affinity maturation build a pattern-recognition repertoire.</p>
-          </div>
-        </a>
-      </li>
-
-      <!-- Add more evolutionary programming and AIS demos here -->
-
-    </ul>
-  </section>
-
-  <!-- ══════════════════════════════════════════════════════
-       Physics-Inspired Methods
-  ═══════════════════════════════════════════════════════ -->
-  <section id="physics-inspired" class="demo-section">
-    <h2>Physics-Inspired Methods</h2>
-    <ul class="demo-list">
-
-      <li>
-        <a class="demo-row" href="monte_carlo/mc_explorer.html">
-          <img class="demo-thumb"
-               src="monte_carlo/mc_explorer-preview.png"
-               alt="Monte Carlo Explorer preview"
-               width="120" height="90">
-          <div class="demo-text">
-            <h3>Monte Carlo Explorer — interactive explainer</h3>
-            <p>Visualize rejection sampling, Monte Carlo integration, and MCMC to build intuition for how randomized algorithms estimate integrals and sample from complex distributions.</p>
-          </div>
-        </a>
-      </li>
-
-      <li>
-        <a class="demo-row" href="simulated_annealing/simulated_annealing_demo.html">
-          <img class="demo-thumb"
-               src="simulated_annealing/simulated_annealing_demo-preview.png"
-               alt="Simulated Annealing demo preview"
-               width="120" height="90">
-          <div class="demo-text">
-            <h3>Simulated Annealing — interactive explainer</h3>
-            <p>Step through the annealing process: temperature schedules, neighbor selection, and probabilistic acceptance criteria on an energy landscape.</p>
-          </div>
-        </a>
-      </li>
-
-      <li>
-        <a class="demo-row" href="parallel_tempering/parallel_tempering.html">
-          <img class="demo-thumb"
-               src="parallel_tempering/parallel_tempering-preview.png"
-               alt="Parallel Tempering demo preview"
-               width="120" height="90">
-          <div class="demo-text">
-            <h3>Parallel Tempering / REMC — interactive explainer</h3>
-            <p>Run parallel fixed-temperature SA replicas at different temperatures and periodically swap configurations between them — high-temperature replicas explore globally while low-temperature ones refine solutions.</p>
-          </div>
-        </a>
-      </li>
 
       <li>
         <a class="demo-row" href="softmax/softmax_temperature_explorer.html">
@@ -539,117 +354,13 @@
         </a>
       </li>
 
-      <li>
-        <a class="demo-row" href="boltzmann_maxent/beta_spacings.html">
-          <img class="demo-thumb"
-               src="boltzmann_maxent/beta_spacings-preview.png"
-               alt="Beta Distribution Explorer preview"
-               width="120" height="90">
-          <div class="demo-text">
-            <h3>Beta Distribution Explorer — interactive explainer</h3>
-            <p>Adjust α and β to reshape the Beta(α,β) distribution, draw N samples, and watch how their order statistics and spacings reveal the deep connection between uniform random variables and the Beta distribution.</p>
-          </div>
-        </a>
-      </li>
-
-      <!-- Add more physics-inspired demos here -->
-
-    </ul>
-  </section>
-
-  <!-- ══════════════════════════════════════════════════════
-       Swarm Intelligence
-  ═══════════════════════════════════════════════════════ -->
-  <section id="swarm-intelligence" class="demo-section">
-    <h2>Swarm Intelligence</h2>
-    <ul class="demo-list">
-
-      <li>
-        <a class="demo-row" href="collective_motion/boids_explorer.html">
-          <img class="demo-thumb"
-               src="collective_motion/boids_explorer-preview.png"
-               alt="Boids Explorer preview"
-               width="120" height="90">
-          <div class="demo-text">
-            <h3>Boids Explorer — interactive explainer</h3>
-            <p>Tune separation, alignment, and cohesion weights in Reynolds' Boids model to watch emergent flocking arise from three simple local rules — a classic model of collective motion that inspired swarm intelligence algorithms like PSO.</p>
-          </div>
-        </a>
-      </li>
-
-      <li>
-        <a class="demo-row" href="collective_motion/vicsek_explorer.html">
-          <img class="demo-thumb"
-               src="collective_motion/vicsek_explorer-preview.png"
-               alt="Vicsek Model Explorer preview"
-               width="120" height="90">
-          <div class="demo-text">
-            <h3>Vicsek Model Explorer — interactive explainer</h3>
-            <p>Adjust noise and interaction radius in the Vicsek model to watch self-propelled particles transition between disordered flocking and coherent swarm behavior — a minimal model of collective motion in biological and robotic swarms.</p>
-          </div>
-        </a>
-      </li>
-
-      <li>
-        <a class="demo-row" href="particle_swarm_optimization/pso_explorer.html">
-          <img class="demo-thumb"
-               src="particle_swarm_optimization/pso_explorer-preview.png"
-               alt="Particle Swarm Optimization Explorer preview"
-               width="120" height="90">
-          <div class="demo-text">
-            <h3>Particle Swarm Optimization (PSO) Explorer — interactive explainer</h3>
-            <p>Step through the PSO velocity-update rule — inertia, cognitive, and social components — then run a live swarm on a 2-D landscape and watch particles collectively converge on optima.</p>
-          </div>
-        </a>
-      </li>
-
-      <li>
-        <a class="demo-row" href="bacterial_foraging_optimization/bfo_explorer.html">
-          <img class="demo-thumb"
-               src="bacterial_foraging_optimization/bfo_explorer-preview.png"
-               alt="Bacterial Foraging Optimization Explorer preview"
-               width="120" height="90">
-          <div class="demo-text">
-            <h3>Bacterial Foraging Optimization (BFO) Explorer — interactive explainer</h3>
-            <p>Run the complete Bacterial Foraging Optimization algorithm (Passino 2002): experiment with cell-to-cell attractant/repellent signaling and tumble-swim chemotaxis in 1-D and 2-D, then step through the full nested loop — chemotaxis, reproduction, and elimination-dispersal — to watch a swarm collectively locate optima.</p>
-          </div>
-        </a>
-      </li>
-
-      <li>
-        <a class="demo-row" href="ant_colony_optimization/aco_explorer.html">
-          <img class="demo-thumb"
-               src="ant_colony_optimization/aco_explorer-preview.png"
-               alt="ACO / Ant System Explorer preview"
-               width="120" height="90">
-          <div class="demo-text">
-            <h3>ACO / Ant System Explorer — interactive explainer</h3>
-            <p>Watch a pheromone-guided ant colony tackle a layered combinatorial problem and a Travelling Salesman Problem — adjust evaporation rate, deposit scale, and exploitation bias to see how stigmergic reinforcement drives collective search.</p>
-          </div>
-        </a>
-      </li>
-
-      <li>
-        <a class="demo-row" href="collective_behavior/ant_foraging_explorer.html">
-          <img class="demo-thumb"
-               src="collective_behavior/ant_foraging_explorer-preview.png"
-               alt="Ant Foraging Dynamics Explorer preview"
-               width="120" height="90">
-          <div class="demo-text">
-            <h3>Ant Foraging Dynamics Explorer — interactive explainer</h3>
-            <p>Explore how ants collectively select foraging trails through pheromone stigmergy: experiment with trail noise and Y-maze decision-making, then see how recruitment linearity shapes collective path selection.</p>
-          </div>
-        </a>
-      </li>
-
-      <!-- Add more swarm intelligence demos here -->
+      <!-- Add more probabilistic foundations demos here -->
 
     </ul>
   </section>
 
   <!-- ══════════════════════════════════════════════════════
        Neural Networks
-       Add demos: backprop, etc.
   ═══════════════════════════════════════════════════════ -->
   <section id="neural-networks" class="demo-section">
     <h2>Neural Networks</h2>
@@ -811,55 +522,46 @@
         </a>
       </li>
 
+      <li>
+        <a class="demo-row" href="activation_functions/af_explorer.html">
+          <img class="demo-thumb"
+               src="activation_functions/af_explorer-preview.png"
+               alt="Activation Functions Explorer preview"
+               width="120" height="90">
+          <div class="demo-text">
+            <h3>Activation Functions — Interactive Explorer</h3>
+            <p>Adjust parameters for ReLU, Leaky ReLU, ELU, Swish, Sigmoid, Tanh, Maxout, and Linear units — see the function and derivative plots side by side with annotations on saturation, vanishing gradients, and when to use each.</p>
+          </div>
+        </a>
+      </li>
+
+      <li>
+        <a class="demo-row" href="gradient_descent/gd_explorer.html">
+          <img class="demo-thumb"
+               src="gradient_descent/gd_explorer-preview.png"
+               alt="Gradient Descent Explorer preview"
+               width="120" height="90">
+          <div class="demo-text">
+            <h3>Gradient Descent &amp; Cost Functions — Interactive Explorer</h3>
+            <p>Animate gradient descent on 2D loss landscapes for MSE, MAE, Cross-Entropy, and Hinge Loss — tune learning rate, compare Batch GD, SGD, and Mini-Batch, and discover saddle points, flat regions, and vanishing gradients live.</p>
+          </div>
+        </a>
+      </li>
+
       <!-- Add more neural network demos here -->
 
     </ul>
   </section>
 
-  <!-- ══════════════════════════════════════════════════════
-       Cellular Automata
-       Add demos: other CA models, etc.
-  ═══════════════════════════════════════════════════════ -->
-  <section id="cellular-automata" class="demo-section">
-    <h2>Cellular Automata</h2>
-    <ul class="demo-list">
-
-      <li>
-        <a class="demo-row" href="cellular_automata/eca_explorer.html">
-          <img class="demo-thumb"
-               src="cellular_automata/eca_explorer-preview.png"
-               alt="ECA Explorer preview"
-               width="120" height="90">
-          <div class="demo-text">
-            <h3>ECA Explorer — Elementary Cellular Automata</h3>
-            <p>Explore all 256 of Wolfram's elementary cellular automaton rules: pick a rule, seed the first row, and watch how simple local update logic generates everything from simple repetition to complex, seemingly random patterns.</p>
-          </div>
-        </a>
-      </li>
-
-      <li>
-        <a class="demo-row" href="cellular_automata/voter_model.html">
-          <img class="demo-thumb"
-               src="cellular_automata/voter_model-preview.png"
-               alt="Voter Model &amp; Consensus Dynamics preview"
-               width="120" height="90">
-          <div class="demo-text">
-            <h3>Voter Model &amp; Consensus Dynamics — interactive explainer</h3>
-            <p>Watch cells adopt their neighbors' opinions through local copying rules — and see how a simple stochastic CA reaches consensus, coexistence, or fragmentation depending on network structure and update rules.</p>
-          </div>
-        </a>
-      </li>
-
-      <!-- Add more cellular automata demos here -->
-
-    </ul>
-  </section>
-
   <footer>
+    <p>&copy; 2026 Greg Chism</p>
     <p>
       &copy; 2026 Theodore P. Pavlic &mdash;
       <a href="https://github.com/tpavlic/asu-bioinspired-ai-and-optimization" target="_blank" rel="noopener">Source on GitHub</a>
       &mdash; Released under the <a href="LICENSE" target="_blank">MIT License</a>.
+    </p>
+    <p style="margin-top:0.4rem;font-size:0.85em;">
+      Some visualizations adapted from Theodore P. Pavlic, ASU (MIT License).
     </p>
   </footer>
 
@@ -870,13 +572,8 @@
   <button id="nav-fab" aria-label="Jump to section" aria-expanded="false">&#9776; Sections</button>
   <nav id="nav-drawer" aria-label="Section navigation">
     <ul>
-      <li><a href="#genetic-algorithms">Genetic Algorithms</a></li>
-      <li><a href="#evolution-strategies">Evolution Strategies</a></li>
-      <li><a href="#evol-prog-ais">Evol. Prog. &amp; AIS</a></li>
-      <li><a href="#physics-inspired">Physics-Inspired</a></li>
-      <li><a href="#swarm-intelligence">Swarm Intelligence</a></li>
+      <li><a href="#probabilistic-foundations">Probabilistic Foundations</a></li>
       <li><a href="#neural-networks">Neural Networks</a></li>
-      <li><a href="#cellular-automata">Cellular Automata</a></li>
     </ul>
   </nav>
 

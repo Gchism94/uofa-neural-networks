@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<!-- Copyright © 2026 Greg Chism. University of Arizona, College of Information Science.
+     INFO 557: Neural Networks. MIT License. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gradient Descent &amp; Cost Functions — Interactive Explorer | INFO 557: Neural Networks</title>
+<meta name="description" content="Animate gradient descent on 2D loss landscapes for MSE, MAE, Cross-Entropy, and Hinge Loss — adjust learning rate, compare Batch GD, SGD, and Mini-Batch, and discover saddle points, local minima, and flat regions.">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Gradient Descent &amp; Cost Functions — Interactive Explorer">
+<meta property="og:description" content="Animate gradient descent on 2D loss landscapes for MSE, MAE, Cross-Entropy, and Hinge Loss — adjust learning rate, compare Batch GD, SGD, and Mini-Batch, and discover saddle points, local minima, and flat regions.">
+<meta property="og:image" content="https://gchism94.github.io/uofa-neural-networks/gradient_descent/gd_explorer-preview.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="600">
+<meta property="og:url" content="https://gchism94.github.io/uofa-neural-networks/gradient_descent/gd_explorer.html">
+<meta property="fb:app_id" content="2385695445236853">
+
+<!-- Twitter/X card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Gradient Descent &amp; Cost Functions — Interactive Explorer">
+<meta name="twitter:description" content="Animate gradient descent on 2D loss landscapes for MSE, MAE, Cross-Entropy, and Hinge Loss — adjust learning rate, compare Batch GD, SGD, and Mini-Batch, and discover saddle points, local minima, and flat regions.">
+<meta name="twitter:image" content="https://gchism94.github.io/uofa-neural-networks/gradient_descent/gd_explorer-preview.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --cream:#FAF7F0;--cream-mid:#F0EBE0;--cream-dk:#E2D9C5;
+  --g-dk:#1C3A0E;--g-mid:#2D5A1B;--g-lt:#4A8C2F;--g-pale:#C8E6A8;
+  --orange:#E8630A;--orange-lt:#F08C50;--orange-dk:#C0500A;
+  --blue:#1A56A0;--blue-pale:#D0E4F8;
+  --red:#B0321D;--red-pale:#F8DDD8;
+  --text:#1A1A1A;--text-muted:#888;--text-soft:#555;
+  --border:#C8BE9A;--border-lt:#DDD6BE;--shadow:rgba(44,90,27,.10);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:'Outfit',sans-serif;background:var(--cream);color:var(--text);
+  padding:1.25rem 1rem 2rem;min-height:100vh;line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:.85rem}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+.hdr{display:flex;justify-content:space-between;align-items:flex-start;column-gap:1rem;row-gap:.35rem;flex-wrap:wrap}
+.hdr>div:first-child{flex:1 1 auto;min-width:0}
+.hdr h1{font-size:clamp(1.25rem,2.2vw,1.6rem);font-weight:700;color:var(--g-dk);letter-spacing:-.02em;line-height:1.2}
+.hdr p.subtitle{font-size:.86rem;color:var(--text-muted);margin-top:.18rem}
+.hdr-rule{border:none;border-top:2.5px solid var(--g-dk);margin-top:.55rem}
+
+/* ── Fixed copyright ─────────────────────────────────────────────── */
+.cr-top{
+  position:fixed;top:.75rem;right:1rem;z-index:1000;
+  font-size:.72rem;color:var(--text-muted);text-align:right;
+  background:rgba(250,247,240,.92);padding:.2rem .5rem;
+  border-radius:5px;backdrop-filter:blur(4px);
+  border:1px solid var(--border-lt);
+}
+.cr-top a{color:var(--orange);text-decoration:none}
+.cr-top a:hover{text-decoration:underline}
+
+/* ── Tab bar ─────────────────────────────────────────────────────── */
+.tab-bar{
+  display:flex;flex-wrap:wrap;gap:.3rem;background:white;
+  border:1px solid var(--border);border-radius:8px;
+  padding:.35rem;box-shadow:0 2px 8px var(--shadow);
+}
+.tab-bar button{
+  font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:500;
+  padding:.42rem .85rem;border:1px solid transparent;background:transparent;
+  color:var(--text-soft);border-radius:6px;cursor:pointer;
+  transition:background .12s,color .12s;white-space:nowrap;
+}
+.tab-bar button:hover{background:var(--cream-mid);color:var(--g-dk)}
+.tab-bar button.active{background:var(--g-dk);color:white;border-color:var(--g-dk)}
+.tab-bar button .n{
+  font-family:'IBM Plex Mono',monospace;font-size:.76em;
+  color:var(--orange);font-weight:500;margin-right:.35rem;
+}
+.tab-bar button.active .n{color:var(--orange-lt)}
+
+/* ── Explorer grid ───────────────────────────────────────────────── */
+.explorer-grid{display:grid;grid-template-columns:290px 1fr;gap:.85rem;align-items:start}
+@media(max-width:800px){.explorer-grid{grid-template-columns:1fr}}
+.left-col{display:flex;flex-direction:column;gap:.75rem}
+.right-col{display:flex;flex-direction:column;gap:.75rem}
+
+/* ── Cards ───────────────────────────────────────────────────────── */
+.card{background:white;border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem;box-shadow:0 2px 8px var(--shadow)}
+.card-title{font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--g-dk);margin-bottom:.55rem}
+
+/* ── Sliders ─────────────────────────────────────────────────────── */
+.srow{display:flex;align-items:center;gap:.45rem;margin-bottom:.2rem}
+.slbl{font-family:'IBM Plex Mono',monospace;font-size:.82rem;font-weight:500;color:var(--g-dk);min-width:22px}
+input[type=range]{flex:1;appearance:none;-webkit-appearance:none;height:4px;background:var(--cream-dk);border-radius:2px;cursor:pointer;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--g-mid);border:2.5px solid white;box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:pointer}
+.sval{font-family:'IBM Plex Mono',monospace;font-size:.76rem;color:var(--text-muted);min-width:40px;text-align:right}
+.hint-txt{font-size:.7rem;color:var(--text-muted);font-style:italic;margin-top:.15rem;padding-left:1.6rem}
+
+/* ── Buttons ─────────────────────────────────────────────────────── */
+.btn-group{display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:.35rem}
+.kbtn{
+  font-family:'Outfit',sans-serif;font-size:.78rem;font-weight:500;
+  padding:.26rem .7rem;border-radius:16px;cursor:pointer;
+  border:1.5px solid var(--border);background:var(--cream);color:var(--g-dk);
+  transition:all .12s;
+}
+.kbtn:hover{background:var(--g-pale);border-color:var(--g-lt)}
+.kbtn.active{background:var(--g-dk);border-color:var(--g-dk);color:white}
+.ctrl-btns{display:flex;gap:.45rem;flex-wrap:wrap}
+.pbtn{
+  font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:600;
+  padding:.35rem .9rem;border-radius:6px;cursor:pointer;
+  border:1.5px solid var(--border);background:var(--cream);color:var(--g-dk);
+  transition:all .12s;
+}
+.pbtn:hover{background:var(--g-pale);border-color:var(--g-lt)}
+.pbtn.primary{background:var(--g-mid);border-color:var(--g-mid);color:white}
+.pbtn.primary:hover{background:var(--g-dk);border-color:var(--g-dk)}
+.pbtn.danger{background:var(--red-pale);border-color:var(--red);color:var(--red)}
+
+/* ── Equation bar ────────────────────────────────────────────────── */
+.eq-bar{
+  background:var(--g-dk);color:white;border-radius:8px;
+  padding:.6rem 1rem;
+}
+.eq-name{font-size:.62rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:.2rem}
+.eq-text{font-family:'IBM Plex Mono',monospace;font-size:.82rem;line-height:1.55}
+
+/* ── Annotation box ──────────────────────────────────────────────── */
+.anno-box{
+  border-radius:6px;padding:.55rem .75rem;font-size:.78rem;line-height:1.55;
+  background:var(--blue-pale);color:var(--blue);border-left:3px solid var(--blue);
+  min-height:3.5rem;
+}
+.anno-box.warn{background:var(--red-pale);color:var(--red);border-color:var(--red)}
+.anno-box.good{background:var(--g-pale);color:var(--g-dk);border-color:var(--g-mid)}
+.anno-box.neutral{background:var(--cream-mid);color:var(--text-soft);border-color:var(--border)}
+
+/* ── Status bar ──────────────────────────────────────────────────── */
+.status-bar{
+  display:flex;gap:.6rem;flex-wrap:wrap;font-family:'IBM Plex Mono',monospace;
+  font-size:.72rem;color:var(--text-muted);
+}
+.stat-pill{
+  background:var(--cream-mid);border:1px solid var(--border-lt);
+  border-radius:12px;padding:.15rem .55rem;
+}
+.stat-pill span{color:var(--g-dk);font-weight:600}
+
+/* ── Canvas wrappers ─────────────────────────────────────────────── */
+.canvas-land-wrap{width:100%;aspect-ratio:1/1;position:relative;cursor:crosshair}
+.canvas-land-wrap canvas{width:100%;height:100%;display:block;border-radius:5px}
+.canvas-curve-wrap{width:100%;aspect-ratio:5/2;position:relative}
+.canvas-curve-wrap canvas{width:100%;height:100%;display:block;border-radius:5px}
+
+.plot-label{font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);text-align:center;margin-bottom:.35rem}
+.legend{display:flex;gap:.9rem;flex-wrap:wrap;font-size:.73rem;color:var(--text-soft);margin-top:.45rem;align-items:center}
+.legend-swatch{width:20px;height:3px;border-radius:2px;display:inline-block;vertical-align:middle;margin-right:.2rem}
+.legend-dot{width:10px;height:10px;border-radius:50%;display:inline-block;vertical-align:middle;margin-right:.2rem}
+
+/* ── Contour click hint overlay ──────────────────────────────────── */
+.land-hint{
+  position:absolute;bottom:.4rem;left:50%;transform:translateX(-50%);
+  font-size:.65rem;color:rgba(255,255,255,.8);background:rgba(0,0,0,.35);
+  border-radius:10px;padding:.15rem .6rem;pointer-events:none;white-space:nowrap;
+}
+</style>
+</head>
+<body>
+
+<div class="cr-top">© 2026 Greg T. Chism<br><a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a></div>
+
+<div class="wrap">
+
+<header>
+  <div class="hdr">
+    <div>
+      <h1>Gradient Descent &amp; Cost Functions — Interactive Explorer</h1>
+      <p class="subtitle">Animate optimization on 2D loss landscapes — tune learning rate, compare GD variants, discover saddle points and flat regions</p>
+    </div>
+  </div>
+  <hr class="hdr-rule">
+</header>
+
+<!-- Tab bar -->
+<nav class="tab-bar" id="tab-bar">
+  <button class="active" data-land="mse"><span class="n">1</span>MSE</button>
+  <button data-land="mae"><span class="n">2</span>MAE</button>
+  <button data-land="ce"><span class="n">3</span>Cross-Entropy</button>
+  <button data-land="hinge"><span class="n">4</span>Hinge Loss</button>
+  <button data-land="nonconvex"><span class="n">★</span>Non-Convex</button>
+</nav>
+
+<!-- Main explorer -->
+<div class="explorer-grid">
+
+  <!-- LEFT: Controls -->
+  <div class="left-col">
+
+    <div class="card">
+      <div class="card-title">Learning Rate η</div>
+      <div class="srow">
+        <span class="slbl">η</span>
+        <input type="range" id="sld-lr" min="0.005" max="0.75" step="0.005" value="0.1">
+        <span class="sval" id="val-lr">0.100</span>
+      </div>
+      <div class="hint-txt" id="lr-hint">moderate — steady convergence</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Gradient Descent Variant</div>
+      <div class="btn-group" id="mode-btns">
+        <button class="kbtn active" data-mode="batch">Batch GD</button>
+        <button class="kbtn" data-mode="sgd">SGD</button>
+        <button class="kbtn" data-mode="minibatch">Mini-Batch</button>
+      </div>
+      <div class="hint-txt" id="mode-hint">exact gradient — smooth deterministic path</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Simulation</div>
+      <div class="ctrl-btns">
+        <button id="btn-play" class="pbtn primary">▶ Play</button>
+        <button id="btn-step" class="pbtn">Step</button>
+        <button id="btn-reset" class="pbtn">↺ Reset</button>
+      </div>
+      <div style="margin-top:.5rem;font-size:.7rem;color:var(--text-muted)">Click the landscape to reposition the ball</div>
+    </div>
+
+    <div class="eq-bar">
+      <div class="eq-name">Cost Function</div>
+      <div class="eq-text" id="eq-text">—</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">What's happening?</div>
+      <div class="anno-box neutral" id="anno-box">Select a landscape and press Play.</div>
+    </div>
+
+    <div class="status-bar">
+      <div class="stat-pill">Step <span id="stat-step">0</span></div>
+      <div class="stat-pill">Loss <span id="stat-loss">—</span></div>
+      <div class="stat-pill">‖∇L‖ <span id="stat-grad">—</span></div>
+    </div>
+
+  </div>
+
+  <!-- RIGHT: Visualization -->
+  <div class="right-col">
+
+    <div class="card">
+      <div class="plot-label">Loss Landscape (w₁, w₂) — contours &amp; optimization path</div>
+      <div class="canvas-land-wrap" id="land-wrap">
+        <canvas id="canvas-land"></canvas>
+        <div class="land-hint" id="land-hint">click to set start · dragging resets</div>
+      </div>
+      <div class="legend">
+        <span><span class="legend-swatch" style="background:linear-gradient(to right,#1A2380,#007B8A,#2e7d32,#F9A825,#B71C1C)"></span>Low → High loss</span>
+        <span><span class="legend-dot" style="background:#E8630A;border:2px solid white;box-shadow:0 0 0 1px #E8630A"></span>Ball</span>
+        <span><span class="legend-dot" style="background:white;border:2px solid #2D5A1B"></span>★ Global min</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="plot-label">Loss Curve — iteration vs. L(w)</div>
+      <div class="canvas-curve-wrap">
+        <canvas id="canvas-curve"></canvas>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+</div>
+
+<footer id="course-nav-footer" style="margin-top:1.5rem;padding:0.75rem 0 0 1rem;border-top:1px solid #E0DAC0;font-size:0.8rem;color:#78786A;text-align:left;">
+  <a href="../" style="color:#2e7d32;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">&larr; All course visualizations</a>
+</footer>
+<script>
+if (window.self !== window.top) { var f = document.getElementById('course-nav-footer'); if (f) { f.style.display = 'none'; } }
+</script>
+
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════════════════════════════════
+   LANDSCAPE DEFINITIONS
+═══════════════════════════════════════════════════════════════════ */
+
+function numGrad(fn, x, y, eps) {
+  eps = eps || 1e-5;
+  return [
+    (fn(x + eps, y) - fn(x - eps, y)) / (2 * eps),
+    (fn(x, y + eps) - fn(x, y - eps)) / (2 * eps)
+  ];
+}
+
+const LANDS = {
+  mse: {
+    label: 'MSE', tabN: '1',
+    xmin: -2, xmax: 2, ymin: -2, ymax: 2,
+    startDefault: [-1.5, 1.4],
+    minPos: [0.4, -0.5],
+    equation: 'L = 1.8(w₁ − 0.4)² + 0.5(w₂ + 0.5)²',
+    desc: 'MSE produces a convex quadratic bowl. GD always finds the global minimum — but the elliptical shape (unequal curvature on each axis) causes zigzag oscillations when the learning rate is too large.',
+    fn(x, y) { return 1.8 * (x - 0.4) ** 2 + 0.5 * (y + 0.5) ** 2; },
+    grad(x, y) { return [3.6 * (x - 0.4), 1.0 * (y + 0.5)]; },
+  },
+  mae: {
+    label: 'MAE', tabN: '2',
+    xmin: -2, xmax: 2, ymin: -2, ymax: 2,
+    startDefault: [-1.5, 1.4],
+    minPos: [0.4, -0.5],
+    equation: 'L = 1.5|w₁ − 0.4| + 0.8|w₂ + 0.5|',
+    desc: 'MAE produces diamond-shaped (L1-norm) contours. The gradient is ±1 everywhere — it does not shrink near the minimum — so GD always moves at the same speed and must use a very small LR to not overshoot.',
+    fn(x, y) { return 1.5 * Math.abs(x - 0.4) + 0.8 * Math.abs(y + 0.5); },
+    grad(x, y) { return [1.5 * Math.sign(x - 0.4 || 1), 0.8 * Math.sign(y + 0.5 || 1)]; },
+  },
+  ce: {
+    label: 'Cross-Entropy', tabN: '3',
+    xmin: -1.5, xmax: 5.5, ymin: -1.5, ymax: 5.5,
+    startDefault: [-1.0, -1.0],
+    minPos: null,
+    equation: 'L = 2·log(1+e⁻ʷ¹) + 1.5·log(1+e⁻ʷ²) + 0.05‖w‖²',
+    desc: 'Cross-entropy has steep gradients for negative weights (high loss, fast descent) and near-zero gradients for large positive weights (sigmoid saturation). Starting in the flat region causes the vanishing gradient problem.',
+    fn(x, y) {
+      return 2 * Math.log(1 + Math.exp(-x)) + 1.5 * Math.log(1 + Math.exp(-y)) + 0.05 * (x * x + y * y);
+    },
+    grad(x, y) {
+      const sx = 1 / (1 + Math.exp(x));  // σ(−x)
+      const sy = 1 / (1 + Math.exp(y));
+      return [-2 * sx + 0.1 * x, -1.5 * sy + 0.1 * y];
+    },
+  },
+  hinge: {
+    label: 'Hinge Loss', tabN: '4',
+    xmin: -0.5, xmax: 3.5, ymin: -0.5, ymax: 3.5,
+    startDefault: [0.1, 0.1],
+    minPos: [1.5, 1.5],
+    equation: 'L = max(0,1−w₁)² + max(0,1−w₂)² + 0.1‖w−1.5‖²',
+    desc: 'Hinge loss is piecewise: quadratic where the margin is violated (w < 1), zero gradient where satisfied (w > 1). The kinks at w=1 are clearly visible in the contours.',
+    fn(x, y) {
+      const hx = Math.max(0, 1 - x), hy = Math.max(0, 1 - y);
+      return hx * hx + hy * hy + 0.1 * (x - 1.5) ** 2 + 0.1 * (y - 1.5) ** 2;
+    },
+    grad(x, y) {
+      const gx = x < 1 ? -2 * (1 - x) + 0.2 * (x - 1.5) : 0.2 * (x - 1.5);
+      const gy = y < 1 ? -2 * (1 - y) + 0.2 * (y - 1.5) : 0.2 * (y - 1.5);
+      return [gx, gy];
+    },
+  },
+  nonconvex: {
+    label: 'Non-Convex', tabN: '★',
+    xmin: -2.5, xmax: 2.5, ymin: -2.5, ymax: 2.5,
+    startDefault: [2.1, 2.1],
+    minPos: null,
+    equation: 'L = 0.35‖w‖² − 1.8G(w;μ₁) − 1.3G(w;μ₂) − 0.9G(w;μ₃)',
+    desc: 'Non-convex landscape with multiple local minima, saddle points, and flat basins between peaks. Batch GD can get stuck; SGD noise helps escape local minima and saddle regions.',
+    fn(x, y) {
+      let v = 0.35 * (x * x + y * y);
+      v -= 1.8 * Math.exp(-((x - 1.1) ** 2 + (y - 0.7) ** 2) / 0.38);
+      v -= 1.3 * Math.exp(-((x + 1.0) ** 2 + (y + 1.2) ** 2) / 0.45);
+      v -= 0.9 * Math.exp(-((x - 0.3) ** 2 + (y + 1.7) ** 2) / 0.28);
+      return v;
+    },
+    grad(x, y) { return numGrad(LANDS.nonconvex.fn, x, y); },
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════════════════════ */
+
+const S = {
+  landKey: 'mse',
+  mode: 'batch',     // batch | sgd | minibatch
+  lr: 0.1,
+  running: false,
+  pos: [-1.5, 1.4],
+  startPos: [-1.5, 1.4],
+  renderPos: [-1.5, 1.4],  // smoothed display position (lerped toward pos each frame)
+  history: [],       // [[x,y], ...]
+  lossHistory: [],   // [loss, ...]
+  step: 0,
+  maxSteps: 600,
+  raf: null,
+  heatCache: {},     // { landKey: { imgData, minL, maxL, N } }
+};
+
+/* ═══════════════════════════════════════════════════════════════════
+   COLOR MAP  (blue → teal → green → amber → red)
+═══════════════════════════════════════════════════════════════════ */
+
+const CM_STOPS = [
+  [0.00, [26,  35, 126]],
+  [0.18, [13,  71, 161]],
+  [0.38, [ 0, 121, 107]],
+  [0.58, [46, 125,  50]],
+  [0.75, [249,168,  37]],
+  [0.88, [230, 81,   0]],
+  [1.00, [183, 28,  28]],
+];
+
+function cmColor(t) {
+  t = Math.max(0, Math.min(1, t));
+  let i = 0;
+  while (i < CM_STOPS.length - 2 && CM_STOPS[i + 1][0] <= t) i++;
+  const [t0, c0] = CM_STOPS[i], [t1, c1] = CM_STOPS[i + 1];
+  const u = (t - t0) / (t1 - t0);
+  return [
+    Math.round(c0[0] + u * (c1[0] - c0[0])),
+    Math.round(c0[1] + u * (c1[1] - c0[1])),
+    Math.round(c0[2] + u * (c1[2] - c0[2])),
+  ];
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   HEATMAP PRECOMPUTATION
+═══════════════════════════════════════════════════════════════════ */
+
+function buildHeat(land) {
+  const N = 220;
+  const { xmin, xmax, ymin, ymax, fn } = land;
+  const vals = new Float32Array(N * N);
+
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) {
+      const x = xmin + (xmax - xmin) * i / (N - 1);
+      const y = ymax - (ymax - ymin) * j / (N - 1); // canvas y is flipped
+      vals[j * N + i] = fn(x, y);
+    }
+  }
+
+  // Percentile clamp for better color spread
+  const sorted = Float32Array.from(vals).sort();
+  const lo = sorted[Math.floor(N * N * 0.02)];
+  const hi = sorted[Math.floor(N * N * 0.97)];
+  const range = hi - lo || 1;
+
+  // Build ImageData (will be drawn onto a temp canvas then scaled)
+  const imgData = new ImageData(N, N);
+  for (let k = 0; k < N * N; k++) {
+    const t = (vals[k] - lo) / range;
+    const [r, g, b] = cmColor(t);
+    // Contour lines: thin bands at evenly-spaced levels
+    const tc = t * 14;
+    const frac = tc - Math.floor(tc);
+    const onContour = frac < 0.06 || frac > 0.94;
+    imgData.data[k * 4]     = onContour ? Math.round(r * 0.55) : r;
+    imgData.data[k * 4 + 1] = onContour ? Math.round(g * 0.55) : g;
+    imgData.data[k * 4 + 2] = onContour ? Math.round(b * 0.55) : b;
+    imgData.data[k * 4 + 3] = 255;
+  }
+
+  return { imgData, lo, hi, N };
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   CANVAS SETUP
+═══════════════════════════════════════════════════════════════════ */
+
+const DPR = window.devicePixelRatio || 1;
+let _tmpCanvas = null;
+
+function getCtx(canvas) {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const w = rect.width || 300;
+  const h = rect.height || 300;
+  const pw = Math.round(w * DPR);
+  const ph = Math.round(h * DPR);
+  if (canvas.width !== pw || canvas.height !== ph) {
+    canvas.width = pw;
+    canvas.height = ph;
+  }
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  return { ctx, w, h };
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   RENDER — LANDSCAPE CANVAS
+═══════════════════════════════════════════════════════════════════ */
+
+function renderLand() {
+  const canvas = document.getElementById('canvas-land');
+  const { ctx, w, h } = getCtx(canvas);
+  const land = LANDS[S.landKey];
+  const { xmin, xmax, ymin, ymax } = land;
+
+  // 1. Draw heatmap (precomputed)
+  const heat = S.heatCache[S.landKey];
+  if (heat) {
+    if (!_tmpCanvas) _tmpCanvas = document.createElement('canvas');
+    _tmpCanvas.width = heat.N;
+    _tmpCanvas.height = heat.N;
+    _tmpCanvas.getContext('2d').putImageData(heat.imgData, 0, 0);
+    ctx.drawImage(_tmpCanvas, 0, 0, w, h);
+  } else {
+    ctx.fillStyle = '#EEE';
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  // Coordinate transforms
+  const toX = x => (x - xmin) / (xmax - xmin) * w;
+  const toY = y => h - (y - ymin) / (ymax - ymin) * h;
+
+  // 2. Draw path
+  const hist = S.history;
+  if (hist.length > 1) {
+    for (let i = 1; i < hist.length; i++) {
+      const alpha = 0.15 + 0.85 * i / hist.length;
+      ctx.beginPath();
+      ctx.strokeStyle = `rgba(232,99,10,${alpha.toFixed(2)})`;
+      ctx.lineWidth = 2;
+      ctx.moveTo(toX(hist[i - 1][0]), toY(hist[i - 1][1]));
+      ctx.lineTo(toX(hist[i][0]), toY(hist[i][1]));
+      ctx.stroke();
+    }
+    // Dots at each step (for SGD zig-zag visibility)
+    if (S.mode !== 'batch' || hist.length <= 80) {
+      for (let i = 0; i < hist.length; i += Math.max(1, Math.floor(hist.length / 60))) {
+        const alpha = 0.25 + 0.75 * i / hist.length;
+        ctx.beginPath();
+        ctx.arc(toX(hist[i][0]), toY(hist[i][1]), 2, 0, 2 * Math.PI);
+        ctx.fillStyle = `rgba(232,99,10,${alpha.toFixed(2)})`;
+        ctx.fill();
+      }
+    }
+  }
+
+  // 3. Global minimum marker (if known)
+  if (land.minPos) {
+    const [mx, my] = land.minPos;
+    const px = toX(mx), py = toY(my);
+    ctx.beginPath();
+    ctx.arc(px, py, 8, 0, 2 * Math.PI);
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fill();
+    ctx.strokeStyle = '#2D5A1B';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = '#1C3A0E';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('★', px, py);
+  }
+
+  // 4. Ball (drawn at interpolated renderPos for smooth animation)
+  const [bx, by] = S.renderPos;
+  const px = toX(bx), py = toY(by);
+  ctx.save();
+  ctx.shadowBlur = 10;
+  ctx.shadowColor = 'rgba(0,0,0,0.5)';
+  ctx.shadowOffsetX = 2;
+  ctx.shadowOffsetY = 2;
+  ctx.beginPath();
+  ctx.arc(px, py, 10, 0, 2 * Math.PI);
+  const grd = ctx.createRadialGradient(px - 3, py - 3, 1, px, py, 10);
+  grd.addColorStop(0, '#F08C50');
+  grd.addColorStop(1, '#C0500A');
+  ctx.fillStyle = grd;
+  ctx.fill();
+  ctx.restore();
+  ctx.beginPath();
+  ctx.arc(px, py, 10, 0, 2 * Math.PI);
+  ctx.strokeStyle = 'white';
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+
+  // 5. Axis labels
+  ctx.fillStyle = 'rgba(255,255,255,0.75)';
+  ctx.font = `bold ${11}px Outfit, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText('w₁', w / 2, h - 3);
+  ctx.save();
+  ctx.translate(10, h / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.textBaseline = 'top';
+  ctx.fillText('w₂', 0, 0);
+  ctx.restore();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   RENDER — LOSS CURVE CANVAS
+═══════════════════════════════════════════════════════════════════ */
+
+function renderCurve() {
+  const canvas = document.getElementById('canvas-curve');
+  const { ctx, w, h } = getCtx(canvas);
+  const lh = S.lossHistory;
+
+  ctx.fillStyle = '#FDFAF5';
+  ctx.fillRect(0, 0, w, h);
+
+  // Axes
+  const PAD = { l: 46, r: 10, t: 10, b: 28 };
+  const pw = w - PAD.l - PAD.r, ph = h - PAD.t - PAD.b;
+
+  // Grid lines
+  ctx.strokeStyle = '#E8E2D4';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = PAD.t + ph * i / 4;
+    ctx.beginPath(); ctx.moveTo(PAD.l, y); ctx.lineTo(PAD.l + pw, y); ctx.stroke();
+  }
+
+  // Axis lines
+  ctx.strokeStyle = '#C8BE9A';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(PAD.l, PAD.t); ctx.lineTo(PAD.l, PAD.t + ph); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(PAD.l, PAD.t + ph); ctx.lineTo(PAD.l + pw, PAD.t + ph); ctx.stroke();
+
+  ctx.fillStyle = '#999';
+  ctx.font = '10px IBM Plex Mono, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('Iteration', PAD.l + pw / 2, h - 4);
+  ctx.save();
+  ctx.translate(10, PAD.t + ph / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = 'center';
+  ctx.fillText('Loss', 0, 0);
+  ctx.restore();
+
+  if (lh.length < 2) return;
+
+  const maxStep = Math.max(lh.length, 30);
+  const rawMin = Math.min(...lh), rawMax = Math.max(...lh);
+  const pad = (rawMax - rawMin) * 0.1 || 0.5;
+  const minL = Math.max(0, rawMin - pad), maxL = rawMax + pad;
+
+  const toX = i => PAD.l + (i / (maxStep - 1)) * pw;
+  const toY = v => PAD.t + ph - (v - minL) / (maxL - minL) * ph;
+
+  // Y-axis labels
+  ctx.fillStyle = '#999';
+  ctx.font = '9px IBM Plex Mono, monospace';
+  ctx.textAlign = 'right';
+  for (let i = 0; i <= 4; i++) {
+    const v = minL + (maxL - minL) * (1 - i / 4);
+    ctx.fillText(v.toFixed(2), PAD.l - 4, PAD.t + ph * i / 4 + 3);
+  }
+
+  // X-axis labels
+  ctx.textAlign = 'center';
+  for (let i = 0; i <= 4; i++) {
+    const step = Math.round((lh.length - 1) * i / 4);
+    ctx.fillText(step, toX(step), PAD.t + ph + 14);
+  }
+
+  // Loss line
+  ctx.beginPath();
+  ctx.strokeStyle = '#2D5A1B';
+  ctx.lineWidth = 2;
+  lh.forEach((v, i) => {
+    const px = toX(i), py = Math.max(PAD.t, Math.min(PAD.t + ph, toY(v)));
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  });
+  ctx.stroke();
+
+  // Current point
+  const n = lh.length - 1;
+  const cx = toX(n), cy = Math.max(PAD.t, Math.min(PAD.t + ph, toY(lh[n])));
+  ctx.beginPath();
+  ctx.arc(cx, cy, 4.5, 0, 2 * Math.PI);
+  ctx.fillStyle = '#E8630A';
+  ctx.fill();
+  ctx.strokeStyle = 'white';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   OPTIMIZER STEP
+═══════════════════════════════════════════════════════════════════ */
+
+function takeStep() {
+  const land = LANDS[S.landKey];
+  const { xmin, xmax, ymin, ymax } = land;
+  const [x, y] = S.pos;
+  let [gx, gy] = land.grad(x, y);
+
+  // Add noise based on mode
+  if (S.mode === 'sgd') {
+    const σ = S.lr * 1.8;
+    gx += (Math.random() - 0.5) * σ;
+    gy += (Math.random() - 0.5) * σ;
+  } else if (S.mode === 'minibatch') {
+    const σ = S.lr * 0.6;
+    gx += (Math.random() - 0.5) * σ;
+    gy += (Math.random() - 0.5) * σ;
+  }
+
+  let nx = x - S.lr * gx;
+  let ny = y - S.lr * gy;
+
+  // Clamp to landscape bounds (with small margin)
+  nx = Math.max(xmin + 0.01, Math.min(xmax - 0.01, nx));
+  ny = Math.max(ymin + 0.01, Math.min(ymax - 0.01, ny));
+
+  S.pos = [nx, ny];
+  S.history.push([nx, ny]);
+  S.lossHistory.push(land.fn(nx, ny));
+  S.step++;
+
+  // Trim history for performance
+  if (S.history.length > 500) {
+    S.history.splice(0, 100);
+    S.lossHistory.splice(0, 100);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ANNOTATION DETECTION
+═══════════════════════════════════════════════════════════════════ */
+
+function detectAnnotation() {
+  const land = LANDS[S.landKey];
+  const [x, y] = S.pos;
+  const lh = S.lossHistory;
+  const n = lh.length;
+  if (n < 2) return { type: 'neutral', text: land.desc };
+
+  const loss = lh[n - 1];
+  const initLoss = lh[0];
+  const [gx, gy] = land.grad(x, y);
+  const gMag = Math.sqrt(gx * gx + gy * gy);
+
+  // Diverging: loss grew substantially vs initial
+  if (n > 6 && loss > initLoss * 3 && loss > lh[n - 4]) {
+    return {
+      type: 'warn',
+      text: '⚠ Diverging — loss is growing. The learning rate is too large: GD overshoots the minimum each step. Rule of thumb: η < 2/λmax where λmax is the largest eigenvalue of the Hessian (curvature). Halve η and reset.'
+    };
+  }
+
+  // Oscillating: loss alternates up-down for many steps
+  if (n > 10) {
+    let flips = 0;
+    for (let i = n - 7; i < n - 1; i++) {
+      if ((lh[i + 1] - lh[i]) * (lh[i] - lh[i - 1]) < 0) flips++;
+    }
+    if (flips >= 5) {
+      return {
+        type: 'warn',
+        text: '↕ Oscillating across the valley. The learning rate is near-critical — the ball overshoots and bounces back repeatedly. This is caused by high curvature (steep walls). Try a smaller η, or observe how SGD\'s noise smooths the path.'
+      };
+    }
+  }
+
+  // Near minimum (gradient very small and loss much less than initial)
+  if (gMag < 0.025 && loss < initLoss * 0.08) {
+    return {
+      type: 'good',
+      text: '✓ Converged to a minimum. The gradient is nearly zero. GD cannot distinguish local from global minima — for non-convex surfaces this may be a local optimum.'
+    };
+  }
+
+  // Saddle point or flat basin: small gradient but not a minimum
+  if (gMag < 0.04 && loss > initLoss * 0.3) {
+    return {
+      type: 'warn',
+      text: '⚑ Saddle point or flat region. Gradient ≈ 0 but loss is still high — the optimizer is stalled without converging. Saddle points are common in high-dimensional networks. SGD\'s noise helps escape; Batch GD gets stuck.'
+    };
+  }
+
+  // Vanishing gradient (CE-specific: large positive weights, flat zone)
+  if (S.landKey === 'ce' && (x > 3.5 || y > 3.5) && gMag < 0.15) {
+    return {
+      type: 'warn',
+      text: '⬛ Vanishing gradient — saturation zone. σ(w) ≈ 1 so ∂L/∂w ≈ 0. This mirrors the vanishing gradient problem: when sigmoid/tanh activations saturate, gradient signal cannot flow back through the network.'
+    };
+  }
+
+  // Zero gradient in hinge satisfied region
+  if (S.landKey === 'hinge' && x > 1 && y > 1 && gMag < 0.12) {
+    return {
+      type: 'neutral',
+      text: '■ Zero-gradient region — margin satisfied. Both hinge terms are 0 here (all training points correctly classified with margin). Only the L2 regularizer pulls the weights toward the origin. This "dead zone" is unique to hinge loss.'
+    };
+  }
+
+  // Slow progress
+  if (n > 30 && Math.abs(lh[n - 1] - lh[n - 10]) < initLoss * 0.003) {
+    return {
+      type: 'neutral',
+      text: '⏸ Very slow progress. The landscape is nearly flat or the learning rate is very small. Near the minimum, gradients shrink (for smooth losses) and convergence slows — this is the basis for adaptive-rate optimizers like Adam.'
+    };
+  }
+
+  // Mode-specific default
+  if (S.mode === 'sgd') {
+    return {
+      type: 'neutral',
+      text: 'SGD: one random sample per step — the noisy gradient causes a jagged path. The noise can escape local minima and saddle points that trap Batch GD, but slows final convergence to high precision.'
+    };
+  }
+  if (S.mode === 'minibatch') {
+    return {
+      type: 'neutral',
+      text: 'Mini-Batch GD: gradient averaged over a random subset — moderate noise. Used in practice for all deep learning. Balances the smooth convergence of Batch GD with the exploration benefit of SGD.'
+    };
+  }
+
+  return { type: 'neutral', text: land.desc };
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   UI UPDATES
+═══════════════════════════════════════════════════════════════════ */
+
+function updateStatus() {
+  const land = LANDS[S.landKey];
+  const loss = land.fn(S.pos[0], S.pos[1]);
+  const [gx, gy] = land.grad(S.pos[0], S.pos[1]);
+  const gMag = Math.sqrt(gx * gx + gy * gy);
+
+  document.getElementById('stat-step').textContent = S.step;
+  document.getElementById('stat-loss').textContent = loss.toFixed(4);
+  document.getElementById('stat-grad').textContent = gMag.toFixed(4);
+
+  const { type, text } = detectAnnotation();
+  const box = document.getElementById('anno-box');
+  box.textContent = text;
+  box.className = 'anno-box ' + (type || 'neutral');
+}
+
+function updateEquation() {
+  document.getElementById('eq-text').textContent = LANDS[S.landKey].equation;
+}
+
+function updateLrHint() {
+  const lr = S.lr;
+  const hint = lr < 0.02 ? 'very small — safe but very slow convergence'
+    : lr < 0.06 ? 'small — slow but stable'
+    : lr < 0.15 ? 'moderate — good balance'
+    : lr < 0.3  ? 'large — watch for oscillations'
+    : 'very large — likely to diverge!';
+  document.getElementById('lr-hint').textContent = hint;
+}
+
+function updateModeHint() {
+  const hints = {
+    batch: 'exact gradient — smooth deterministic path',
+    sgd: 'one sample — noisy path, can escape local minima',
+    minibatch: 'mini-batch average — moderate noise, practical choice',
+  };
+  document.getElementById('mode-hint').textContent = hints[S.mode];
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ANIMATION LOOP
+═══════════════════════════════════════════════════════════════════ */
+
+function renderAll() {
+  renderLand();
+  renderCurve();
+  updateStatus();
+}
+
+function tick() {
+  if (S.running && S.step < S.maxSteps) {
+    const stepsPerFrame = S.mode === 'batch' ? 2 : 3;
+    for (let i = 0; i < stepsPerFrame; i++) {
+      if (S.step < S.maxSteps) takeStep();
+    }
+    // Auto-stop on convergence or divergence
+    const lh = S.lossHistory;
+    if (lh.length > 10) {
+      const loss = lh[lh.length - 1];
+      const [gx, gy] = LANDS[S.landKey].grad(S.pos[0], S.pos[1]);
+      const gMag = Math.sqrt(gx * gx + gy * gy);
+      const diverged = loss > lh[0] * 8;
+      const converged = gMag < 0.008 && loss < lh[0] * 0.05;
+      if (diverged || converged || S.step >= S.maxSteps) {
+        setRunning(false);
+      }
+    }
+  }
+  // Lerp display position toward logical position for smooth animation
+  S.renderPos[0] += (S.pos[0] - S.renderPos[0]) * 0.22;
+  S.renderPos[1] += (S.pos[1] - S.renderPos[1]) * 0.22;
+  renderAll();
+  S.raf = requestAnimationFrame(tick);
+}
+
+function setRunning(val) {
+  S.running = val;
+  const btn = document.getElementById('btn-play');
+  btn.textContent = val ? '⏸ Pause' : '▶ Play';
+  btn.classList.toggle('primary', !val);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   RESET / SWITCH LANDSCAPE
+═══════════════════════════════════════════════════════════════════ */
+
+function reset(switchLand) {
+  if (S.raf) { cancelAnimationFrame(S.raf); S.raf = null; }
+  setRunning(false);
+  const land = LANDS[S.landKey];
+  S.pos = [...S.startPos];
+  S.renderPos = [...S.startPos];
+  S.history = [[...S.startPos]];
+  S.lossHistory = [land.fn(S.startPos[0], S.startPos[1])];
+  S.step = 0;
+
+  if (switchLand || !S.heatCache[S.landKey]) {
+    S.heatCache[S.landKey] = buildHeat(land);
+  }
+
+  updateEquation();
+  updateLrHint();
+  updateModeHint();
+  renderAll();
+  S.raf = requestAnimationFrame(tick);
+}
+
+function switchLand(key) {
+  S.landKey = key;
+  S.startPos = [...LANDS[key].startDefault];
+  document.querySelectorAll('.tab-bar button').forEach(b =>
+    b.classList.toggle('active', b.dataset.land === key)
+  );
+  reset(true);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   CLICK ON LANDSCAPE — set start position
+═══════════════════════════════════════════════════════════════════ */
+
+document.getElementById('canvas-land').addEventListener('pointerdown', e => {
+  const canvas = e.currentTarget;
+  const rect = canvas.getBoundingClientRect();
+  const cx = (e.clientX - rect.left) / rect.width;
+  const cy = (e.clientY - rect.top) / rect.height;
+  const land = LANDS[S.landKey];
+  const wx = land.xmin + cx * (land.xmax - land.xmin);
+  const wy = land.ymin + (1 - cy) * (land.ymax - land.ymin);
+  S.startPos = [wx, wy];
+  reset(false);
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   CONTROL EVENT HANDLERS
+═══════════════════════════════════════════════════════════════════ */
+
+document.getElementById('tab-bar').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-land]');
+  if (btn) switchLand(btn.dataset.land);
+});
+
+document.getElementById('mode-btns').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-mode]');
+  if (!btn) return;
+  S.mode = btn.dataset.mode;
+  document.querySelectorAll('#mode-btns button').forEach(b =>
+    b.classList.toggle('active', b.dataset.mode === S.mode)
+  );
+  updateModeHint();
+  reset(false);
+});
+
+document.getElementById('btn-play').addEventListener('click', () => {
+  if (S.step >= S.maxSteps) reset(false);
+  setRunning(!S.running);
+});
+
+document.getElementById('btn-step').addEventListener('click', () => {
+  if (S.running) setRunning(false);
+  if (S.step < S.maxSteps) {
+    takeStep();
+    renderAll();
+  }
+});
+
+document.getElementById('btn-reset').addEventListener('click', () => reset(false));
+
+document.getElementById('sld-lr').addEventListener('input', function () {
+  S.lr = +this.value;
+  document.getElementById('val-lr').textContent = S.lr.toFixed(3);
+  updateLrHint();
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   RESIZE
+═══════════════════════════════════════════════════════════════════ */
+
+let _resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(_resizeTimer);
+  _resizeTimer = setTimeout(() => renderAll(), 120);
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════════════════ */
+
+// Start RAF loop immediately (renders even when paused)
+S.raf = requestAnimationFrame(tick);
+
+// First render after layout settles
+requestAnimationFrame(() => requestAnimationFrame(() => {
+  switchLand('mse');
+}));
+</script>
+</body>
+</html>

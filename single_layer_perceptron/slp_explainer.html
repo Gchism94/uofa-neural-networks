@@ -1,4 +1,6 @@
 <!DOCTYPE html>
+<!-- Copyright © 2026 Theodore P. Pavlic. Arizona State University. MIT License.
+     Adapted for INFO 557: Neural Networks by Greg Chism, University of Arizona. -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -10,18 +12,19 @@
 <meta property="og:type" content="website">
 <meta property="og:title" content="Single-Layer Perceptron — Neuron &amp; Lever Explainer">
 <meta property="og:description" content="Animated explainer linking the biological neuron to the linear classifier: adjust synaptic weights and inputs to watch the decision boundary shift in real time.">
-<meta property="og:image" content="https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/single_layer_perceptron/slp_explainer-preview.png">
+<meta property="og:image" content="https://gchism94.github.io/uofa-neural-networks/single_layer_perceptron/slp_explainer-preview.png">
 <meta property="og:image:width" content="1904">
 <meta property="og:image:height" content="828">
-<meta property="og:url" content="https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/single_layer_perceptron/slp_explainer.html">
+<meta property="og:url" content="https://gchism94.github.io/uofa-neural-networks/single_layer_perceptron/slp_explainer.html">
 <meta property="fb:app_id" content="2385695445236853">
 
 <!-- Twitter/X card -->
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Single-Layer Perceptron — Neuron &amp; Lever Explainer">
 <meta name="twitter:description" content="Animated explainer linking the biological neuron to the linear classifier: adjust synaptic weights and inputs to watch the decision boundary shift in real time.">
-<meta name="twitter:image" content="https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/single_layer_perceptron/slp_explainer-preview.png">
+<meta name="twitter:image" content="https://gchism94.github.io/uofa-neural-networks/single_layer_perceptron/slp_explainer-preview.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -81,11 +84,22 @@ input[type=range].bsld::-webkit-slider-thumb{background:var(--orange)}
 #soma-glow{transition:stroke .4s,opacity .4s}
 #ap-terminal{transition:fill .4s,stroke .4s}
 footer{display:flex;justify-content:flex-end;font-size:.68rem;color:var(--text-muted)}
-footer a,.cr-top a{color:var(--orange);text-decoration:none}
-.cr-top{font-size:.65rem;color:var(--text-muted);text-align:right;line-height:1.5}
+footer a{color:var(--orange);text-decoration:none}
+
+/* ── Fixed copyright ─────────────────────────────────────────────── */
+.cr-top{
+  position:fixed;top:.75rem;right:1rem;z-index:1000;
+  font-size:.72rem;color:var(--text-muted);text-align:right;
+  background:rgba(250,247,240,.92);padding:.2rem .5rem;
+  border-radius:5px;backdrop-filter:blur(4px);
+  border:1px solid var(--border-lt);
+}
+.cr-top a{color:var(--orange);text-decoration:none}
+.cr-top a:hover{text-decoration:underline}
 </style>
 </head>
 <body>
+<div class="cr-top">© 2026 Theodore P. Pavlic<br><a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a></div>
 <div class="wrap">
 
 <header>
@@ -94,7 +108,6 @@ footer a,.cr-top a{color:var(--orange);text-decoration:none}
       <h1>The Single-Layer Perceptron</h1>
       <p>Animated connection between the biological neuron and the linear classifier</p>
     </div>
-    <div class="cr-top">© 2026 Theodore P. Pavlic<br><a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a></div>
   </div>
   <hr class="hdr-rule">
 </header>

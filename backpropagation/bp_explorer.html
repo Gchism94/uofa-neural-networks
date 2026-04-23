@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<!-- Copyright © 2026 Greg Chism. University of Arizona, College of Information Science.
+     INFO 557: Neural Networks. MIT License. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Backpropagation &amp; Computational Graphs — Interactive Explorer | INFO 557: Neural Networks</title>
+<meta name="description" content="Step through forward and backward passes on a computational graph — see values propagate forward and gradients flow back via the chain rule, with live equations and annotations at every node.">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Backpropagation &amp; Computational Graphs — Interactive Explorer">
+<meta property="og:description" content="Step through forward and backward passes on a computational graph — see values propagate forward and gradients flow back via the chain rule, with live equations and annotations at every node.">
+<meta property="og:image" content="https://gchism94.github.io/uofa-neural-networks/backpropagation/bp_explorer-preview.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="600">
+<meta property="og:url" content="https://gchism94.github.io/uofa-neural-networks/backpropagation/bp_explorer.html">
+<meta property="fb:app_id" content="2385695445236853">
+
+<!-- Twitter/X card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Backpropagation &amp; Computational Graphs — Interactive Explorer">
+<meta name="twitter:description" content="Step through forward and backward passes on a computational graph — see values propagate forward and gradients flow back via the chain rule, with live equations and annotations at every node.">
+<meta name="twitter:image" content="https://gchism94.github.io/uofa-neural-networks/backpropagation/bp_explorer-preview.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+
+<style>
+/* ── Design tokens (identical to gd_explorer.html) ──────────────── */
+:root{
+  --cream:#FAF7F0;--cream-mid:#F0EBE0;--cream-dk:#E2D9C5;
+  --g-dk:#1C3A0E;--g-mid:#2D5A1B;--g-lt:#4A8C2F;--g-pale:#C8E6A8;
+  --orange:#E8630A;--orange-lt:#F08C50;--orange-dk:#C0500A;
+  --blue:#1A56A0;--blue-pale:#D0E4F8;
+  --red:#B0321D;--red-pale:#F8DDD8;
+  --text:#1A1A1A;--text-muted:#888;--text-soft:#555;
+  --border:#C8BE9A;--border-lt:#DDD6BE;--shadow:rgba(44,90,27,.10);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:'Outfit',sans-serif;background:var(--cream);color:var(--text);
+  padding:1.25rem 1rem 2rem;min-height:100vh;line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:.85rem}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+.hdr{display:flex;justify-content:space-between;align-items:flex-start;column-gap:1rem;row-gap:.35rem;flex-wrap:wrap}
+.hdr>div:first-child{flex:1 1 auto;min-width:0}
+.hdr h1{font-size:clamp(1.25rem,2.2vw,1.6rem);font-weight:700;color:var(--g-dk);letter-spacing:-.02em;line-height:1.2}
+.hdr p.subtitle{font-size:.86rem;color:var(--text-muted);margin-top:.18rem}
+.hdr-rule{border:none;border-top:2.5px solid var(--g-dk);margin-top:.55rem}
+
+/* ── Fixed copyright ─────────────────────────────────────────────── */
+.cr-top{
+  position:fixed;top:.75rem;right:1rem;z-index:1000;
+  font-size:.72rem;color:var(--text-muted);text-align:right;
+  background:rgba(250,247,240,.92);padding:.2rem .5rem;
+  border-radius:5px;backdrop-filter:blur(4px);
+  border:1px solid var(--border-lt);
+}
+.cr-top a{color:var(--orange);text-decoration:none}
+.cr-top a:hover{text-decoration:underline}
+
+/* ── Tab bar ─────────────────────────────────────────────────────── */
+.tab-bar{
+  display:flex;flex-wrap:wrap;gap:.3rem;background:white;
+  border:1px solid var(--border);border-radius:8px;
+  padding:.35rem;box-shadow:0 2px 8px var(--shadow);
+}
+.tab-bar button{
+  font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:500;
+  padding:.42rem .85rem;border:1px solid transparent;background:transparent;
+  color:var(--text-soft);border-radius:6px;cursor:pointer;
+  transition:background .12s,color .12s;white-space:nowrap;
+}
+.tab-bar button:hover{background:var(--cream-mid);color:var(--g-dk)}
+.tab-bar button.active{background:var(--g-dk);color:white;border-color:var(--g-dk)}
+.tab-bar button .n{
+  font-family:'IBM Plex Mono',monospace;font-size:.76em;
+  color:var(--orange);font-weight:500;margin-right:.35rem;
+}
+.tab-bar button.active .n{color:var(--orange-lt)}
+
+/* ── Explorer grid ───────────────────────────────────────────────── */
+.explorer-grid{display:grid;grid-template-columns:290px 1fr;gap:.85rem;align-items:start}
+@media(max-width:800px){.explorer-grid{grid-template-columns:1fr}}
+.left-col{display:flex;flex-direction:column;gap:.75rem}
+.right-col{display:flex;flex-direction:column;gap:.75rem}
+
+/* ── Cards ───────────────────────────────────────────────────────── */
+.card{background:white;border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem;box-shadow:0 2px 8px var(--shadow)}
+.card-title{font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--g-dk);margin-bottom:.55rem}
+
+/* ── Sliders ─────────────────────────────────────────────────────── */
+.srow{display:flex;align-items:center;gap:.45rem;margin-bottom:.2rem}
+.slbl{font-family:'IBM Plex Mono',monospace;font-size:.82rem;font-weight:500;color:var(--g-dk);min-width:28px}
+input[type=range]{flex:1;appearance:none;-webkit-appearance:none;height:4px;background:var(--cream-dk);border-radius:2px;cursor:pointer;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--g-mid);border:2.5px solid white;box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:pointer}
+.sval{font-family:'IBM Plex Mono',monospace;font-size:.76rem;color:var(--text-muted);min-width:40px;text-align:right}
+.hint-txt{font-size:.7rem;color:var(--text-muted);font-style:italic;margin-top:.15rem;padding-left:1.6rem}
+
+/* ── Buttons ─────────────────────────────────────────────────────── */
+.btn-group{display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:.35rem}
+.kbtn{
+  font-family:'Outfit',sans-serif;font-size:.78rem;font-weight:500;
+  padding:.26rem .7rem;border-radius:16px;cursor:pointer;
+  border:1.5px solid var(--border);background:var(--cream);color:var(--g-dk);
+  transition:all .12s;
+}
+.kbtn:hover{background:var(--g-pale);border-color:var(--g-lt)}
+.kbtn.active{background:var(--g-dk);border-color:var(--g-dk);color:white}
+.kbtn.active-bwd{background:#BF360C;border-color:#BF360C;color:white}
+.kbtn.active-bwd:hover{background:#8D2607}
+.ctrl-btns{display:flex;gap:.45rem;flex-wrap:wrap}
+.pbtn{
+  font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:600;
+  padding:.35rem .9rem;border-radius:6px;cursor:pointer;
+  border:1.5px solid var(--border);background:var(--cream);color:var(--g-dk);
+  transition:all .12s;
+}
+.pbtn:hover{background:var(--g-pale);border-color:var(--g-lt)}
+.pbtn.primary{background:var(--g-mid);border-color:var(--g-mid);color:white}
+.pbtn.primary:hover{background:var(--g-dk);border-color:var(--g-dk)}
+.pbtn:disabled{opacity:.4;cursor:not-allowed}
+.pbtn:disabled:hover{background:var(--cream);border-color:var(--border)}
+
+/* ── Equation / chain rule bar ───────────────────────────────────── */
+.eq-bar{
+  background:var(--g-dk);color:white;border-radius:8px;
+  padding:.6rem 1rem;
+}
+.eq-name{font-size:.62rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:.2rem}
+.eq-text{font-family:'IBM Plex Mono',monospace;font-size:.82rem;line-height:1.55}
+
+/* ── Annotation box ──────────────────────────────────────────────── */
+.anno-box{
+  border-radius:6px;padding:.55rem .75rem;font-size:.78rem;line-height:1.55;
+  background:var(--blue-pale);color:var(--blue);border-left:3px solid var(--blue);
+  min-height:3.5rem;
+}
+.anno-box.warn{background:var(--red-pale);color:var(--red);border-color:var(--red)}
+.anno-box.good{background:var(--g-pale);color:var(--g-dk);border-color:var(--g-mid)}
+.anno-box.neutral{background:var(--cream-mid);color:var(--text-soft);border-color:var(--border)}
+.anno-box.bwd{background:#FBE9E7;color:#BF360C;border-color:#E64A19}
+
+/* ── Status bar ──────────────────────────────────────────────────── */
+.status-bar{
+  display:flex;gap:.6rem;flex-wrap:wrap;font-family:'IBM Plex Mono',monospace;
+  font-size:.72rem;color:var(--text-muted);
+}
+.stat-pill{
+  background:var(--cream-mid);border:1px solid var(--border-lt);
+  border-radius:12px;padding:.15rem .55rem;
+}
+.stat-pill span{color:var(--g-dk);font-weight:600}
+
+/* ── Graph canvas wrapper ────────────────────────────────────────── */
+.canvas-graph-wrap{
+  width:100%;aspect-ratio:4/3;position:relative;cursor:default;
+}
+.canvas-graph-wrap canvas{
+  width:100%;height:100%;display:block;border-radius:5px;
+  background:#111C0F;
+}
+
+/* ── Graph legend ────────────────────────────────────────────────── */
+.graph-legend{
+  display:flex;gap:.75rem;flex-wrap:wrap;font-size:.73rem;
+  color:var(--text-soft);margin-top:.45rem;align-items:center;
+}
+.gl-node{
+  width:14px;height:14px;border-radius:50%;display:inline-block;
+  vertical-align:middle;margin-right:.25rem;
+  border:2px solid rgba(0,0,0,.15);
+}
+
+/* ── Pass-mode badge ─────────────────────────────────────────────── */
+.pass-badge{
+  display:inline-block;font-size:.6rem;font-weight:700;
+  letter-spacing:.08em;text-transform:uppercase;
+  padding:.1rem .4rem;border-radius:10px;margin-right:.5rem;
+  vertical-align:middle;
+}
+.pass-badge.fwd{background:var(--g-pale);color:var(--g-dk)}
+.pass-badge.bwd{background:#FBE9E7;color:#BF360C}
+
+/* ── Chain rule numerical substitution ──────────────────────────── */
+.chain-detail{
+  font-family:'IBM Plex Mono',monospace;font-size:.78rem;
+  color:var(--text-soft);margin-top:.5rem;line-height:1.6;
+  padding:.4rem .6rem;background:var(--cream-mid);
+  border-radius:5px;border:1px solid var(--border-lt);
+  min-height:2.4rem;
+}
+
+/* ── Plot label ──────────────────────────────────────────────────── */
+.plot-label{font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);text-align:center;margin-bottom:.35rem}
+
+/* ── Weight table ────────────────────────────────────────────────── */
+.weight-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:.3rem .5rem;
+  margin-top:.4rem;
+}
+.weight-cell{
+  font-family:'IBM Plex Mono',monospace;font-size:.72rem;
+  background:var(--cream-mid);border:1px solid var(--border-lt);
+  border-radius:4px;padding:.2rem .35rem;
+  display:flex;justify-content:space-between;align-items:center;
+  gap:.25rem;
+}
+.weight-lbl{color:var(--text-muted)}
+.weight-val{color:var(--g-dk);font-weight:600}
+</style>
+</head>
+<body>
+
+<div class="cr-top">© 2026 Greg T. Chism<br><a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a></div>
+
+<div class="wrap">
+
+<header>
+  <div class="hdr">
+    <div>
+      <h1>Backpropagation &amp; Computational Graphs — Interactive Explorer</h1>
+      <p class="subtitle">Step through forward and backward passes — see values flow forward and gradients flow back via the chain rule, one node at a time</p>
+    </div>
+  </div>
+  <hr class="hdr-rule">
+</header>
+
+<!-- Tab bar: network examples -->
+<nav class="tab-bar" id="tab-bar">
+  <button class="active" data-net="neuron"><span class="n">1</span>Simple Neuron</button>
+  <button data-net="xor"><span class="n">2</span>XOR Network</button>
+  <button data-net="deep"><span class="n">3</span>3-Layer Network</button>
+</nav>
+
+<!-- Main explorer grid -->
+<div class="explorer-grid">
+
+  <!-- LEFT: Controls -->
+  <div class="left-col">
+
+    <!-- Input values -->
+    <div class="card">
+      <div class="card-title">Input Values</div>
+      <div class="srow">
+        <span class="slbl">x₁</span>
+        <input type="range" id="sld-x1" min="-3" max="3" step="0.1" value="2.0">
+        <span class="sval" id="val-x1">2.0</span>
+      </div>
+      <div class="srow">
+        <span class="slbl">x₂</span>
+        <input type="range" id="sld-x2" min="-3" max="3" step="0.1" value="1.0">
+        <span class="sval" id="val-x2">1.0</span>
+      </div>
+      <div class="hint-txt" id="input-hint">changing inputs resets the current pass</div>
+    </div>
+
+    <!-- Weights (shown/hidden based on network) -->
+    <div class="card" id="card-weights">
+      <div class="card-title">Weights &amp; Bias</div>
+      <div class="weight-grid" id="weight-grid">
+        <div class="weight-cell"><span class="weight-lbl">w₁</span><span class="weight-val" id="wv-w1">0.50</span></div>
+        <div class="weight-cell"><span class="weight-lbl">w₂</span><span class="weight-val" id="wv-w2">−0.30</span></div>
+        <div class="weight-cell"><span class="weight-lbl">b</span><span class="weight-val" id="wv-b">0.10</span></div>
+      </div>
+      <div class="hint-txt" style="margin-top:.3rem">fixed for this network example</div>
+    </div>
+
+    <!-- Pass mode -->
+    <div class="card">
+      <div class="card-title">Pass Mode</div>
+      <div class="btn-group" id="mode-btns">
+        <button class="kbtn active" data-mode="forward">▶ Forward Pass</button>
+        <button class="kbtn" data-mode="backward">◀ Backward Pass</button>
+      </div>
+      <div class="hint-txt" id="mode-hint">computing node values left → right</div>
+    </div>
+
+    <!-- Step controls -->
+    <div class="card">
+      <div class="card-title">Navigation</div>
+      <div class="ctrl-btns">
+        <button id="btn-prev" class="pbtn" disabled>← Prev</button>
+        <button id="btn-next" class="pbtn primary">Next →</button>
+        <button id="btn-reset" class="pbtn">↺ Reset</button>
+      </div>
+      <div style="margin-top:.5rem;font-size:.7rem;color:var(--text-muted)">Step through nodes one at a time</div>
+    </div>
+
+    <!-- Annotation -->
+    <div class="card">
+      <div class="card-title">What's happening?</div>
+      <div class="anno-box neutral" id="anno-box">Select a pass mode and press <strong>Next →</strong> to begin stepping through the graph.</div>
+    </div>
+
+    <!-- Status pills -->
+    <div class="status-bar">
+      <div class="stat-pill">Step <span id="stat-step">0</span></div>
+      <div class="stat-pill">Node <span id="stat-node">—</span></div>
+      <div class="stat-pill">Value <span id="stat-val">—</span></div>
+    </div>
+
+  </div><!-- /.left-col -->
+
+  <!-- RIGHT: Visualization -->
+  <div class="right-col">
+
+    <!-- Computational graph canvas -->
+    <div class="card">
+      <div class="plot-label">Computational Graph — nodes &amp; data flow</div>
+      <div class="canvas-graph-wrap" id="graph-wrap">
+        <canvas id="canvas-graph"></canvas>
+      </div>
+      <div class="graph-legend">
+        <span><span class="gl-node" style="background:#1B5E20;border-color:#66BB6A"></span>Fwd active</span>
+        <span><span class="gl-node" style="background:#2D5A1B;border-color:#4A8C2F"></span>Fwd done</span>
+        <span><span class="gl-node" style="background:#5D1A00;border-color:#FF6D00"></span>Bwd active</span>
+        <span><span class="gl-node" style="background:#3D1400;border-color:#BF5A30"></span>Bwd done</span>
+      </div>
+    </div>
+
+    <!-- Chain rule panel -->
+    <div class="card">
+      <div class="eq-bar" id="eq-bar">
+        <div class="eq-name">
+          <span class="pass-badge fwd" id="pass-badge">Forward</span>Chain Rule at this Step
+        </div>
+        <div class="eq-text" id="eq-text">—</div>
+      </div>
+      <div class="chain-detail" id="chain-detail">—</div>
+    </div>
+
+  </div><!-- /.right-col -->
+
+</div><!-- /.explorer-grid -->
+</div><!-- /.wrap -->
+
+<script>
+'use strict';
+
+const DPR = window.devicePixelRatio || 1;
+
+/* ═══════════════════════════════════════════════════════════════════
+   NETWORK DEFINITION — Simple 2-Input Neuron
+═══════════════════════════════════════════════════════════════════ */
+
+const NETS = {
+  neuron: {
+    nodes: [
+      { id:'x1',   label:'x₁',  type:'input',  nx:0.09, ny:0.28 },
+      { id:'x2',   label:'x₂',  type:'input',  nx:0.09, ny:0.72 },
+      { id:'w1',   label:'w₁',  type:'param',  nx:0.26, ny:0.13 },
+      { id:'w2',   label:'w₂',  type:'param',  nx:0.26, ny:0.87 },
+      { id:'b',    label:'b',   type:'param',  nx:0.54, ny:0.88 },
+      { id:'mul1', label:'×',   type:'op',     nx:0.43, ny:0.34, op:'mul' },
+      { id:'mul2', label:'×',   type:'op',     nx:0.43, ny:0.66, op:'mul' },
+      { id:'add',  label:'+',   type:'op',     nx:0.65, ny:0.50, op:'add' },
+      { id:'sig',  label:'σ',   type:'output', nx:0.85, ny:0.50, op:'sigmoid' },
+    ],
+    edges: [
+      ['x1','mul1'],['w1','mul1'],
+      ['x2','mul2'],['w2','mul2'],
+      ['mul1','add'],['mul2','add'],['b','add'],
+      ['add','sig'],
+    ],
+    params: { w1:0.50, w2:-0.30, b:0.10 },
+    fwdOrder: ['x1','x2','w1','w2','b','mul1','mul2','add','sig'],
+    bwdOrder: ['sig','add','mul1','mul2','b','w1','x1','w2','x2'],
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════════════════════ */
+
+const S = {
+  netKey:     'neuron',
+  mode:       'forward',
+  x1:         2.0,
+  x2:         1.0,
+  stepIdx:    0,
+  nodeVals:   {},      // id → number (forward pass values)
+  nodeState:  {},      // id → 'idle' | 'active' | 'done' | 'bwd-active' | 'bwd-done'
+  nodeGrads:  {},      // id → number (backward pass gradients)
+  bwdStepIdx: 0,
+  inBwdPass:  false,
+};
+
+/* ═══════════════════════════════════════════════════════════════════
+   HELPERS
+═══════════════════════════════════════════════════════════════════ */
+
+const fmt = v => (+v).toFixed(3);
+
+function net() { return NETS[S.netKey]; }
+
+function nodeMap() {
+  const m = {};
+  net().nodes.forEach(n => m[n.id] = n);
+  return m;
+}
+
+function incomingIds(toId) {
+  return net().edges.filter(([,t]) => t === toId).map(([f]) => f);
+}
+
+function computeNode(node) {
+  if (node.type === 'input') return node.id === 'x1' ? S.x1 : S.x2;
+  if (node.type === 'param') return net().params[node.id];
+  const ins = incomingIds(node.id).map(id => S.nodeVals[id]);
+  if (node.op === 'mul')     return ins[0] * ins[1];
+  if (node.op === 'add')     return ins.reduce((a, b) => a + b, 0);
+  if (node.op === 'sigmoid') return 1 / (1 + Math.exp(-ins[0]));
+  return NaN;
+}
+
+function computeGrad(nodeId) {
+  const yhat    = S.nodeVals['sig'];
+  const sigLoc  = yhat * (1 - yhat);   // σ(z)(1−σ(z))
+  if (nodeId === 'sig')  return 1;
+  if (nodeId === 'add')  return (S.nodeGrads['sig']  || 0) * sigLoc;
+  if (nodeId === 'mul1') return (S.nodeGrads['add']  || 0);
+  if (nodeId === 'mul2') return (S.nodeGrads['add']  || 0);
+  if (nodeId === 'b')    return (S.nodeGrads['add']  || 0);
+  if (nodeId === 'w1')   return (S.nodeGrads['mul1'] || 0) * S.nodeVals['x1'];
+  if (nodeId === 'x1')   return (S.nodeGrads['mul1'] || 0) * S.nodeVals['w1'];
+  if (nodeId === 'w2')   return (S.nodeGrads['mul2'] || 0) * S.nodeVals['x2'];
+  if (nodeId === 'x2')   return (S.nodeGrads['mul2'] || 0) * S.nodeVals['w2'];
+  return 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   FORWARD PASS ANNOTATIONS  (one entry per node in fwdOrder)
+═══════════════════════════════════════════════════════════════════ */
+
+function fwdAnnotation(nodeId) {
+  const v = S.nodeVals[nodeId];
+  const f = id => S.nodeVals[id] !== undefined ? fmt(S.nodeVals[id]) : '?';
+
+  const A = {
+    x1: {
+      eq:     'x₁  →  input leaf node',
+      detail: 'x₁ = ' + fmt(v),
+      text:   'x₁ is an input leaf node — no computation, just the raw data value flowing in. Leaf nodes have no incoming edges; all forward computation originates here.',
+      cls:    'neutral',
+    },
+    x2: {
+      eq:     'x₂  →  input leaf node',
+      detail: 'x₂ = ' + fmt(v),
+      text:   'x₂ is the second input leaf. Every value in the graph is ultimately a deterministic function of the input leaves and the parameter leaves.',
+      cls:    'neutral',
+    },
+    w1: {
+      eq:     'w₁  →  learnable parameter (leaf)',
+      detail: 'w₁ = ' + fmt(v),
+      text:   'w₁ is a weight parameter — also a leaf node, fixed during the forward pass. After backprop computes ∂L/∂w₁, the optimizer will nudge it in the direction that reduces loss.',
+      cls:    'neutral',
+    },
+    w2: {
+      eq:     'w₂  →  learnable parameter (leaf)',
+      detail: 'w₂ = ' + fmt(v),
+      text:   'w₂ scales x₂\'s contribution. Parameters and inputs are both leaves — the only structural difference is that parameters accumulate gradients across many training examples.',
+      cls:    'neutral',
+    },
+    b: {
+      eq:     'b  →  bias parameter (leaf)',
+      detail: 'b = ' + fmt(v),
+      text:   'Bias b shifts the weighted sum independently of any input, freeing the decision boundary from the origin. Its gradient ∂L/∂b = ∂L/∂z (the local derivative of the + gate is 1).',
+      cls:    'neutral',
+    },
+    mul1: {
+      eq:     'z₁ = w₁ · x₁',
+      detail: 'z₁ = ' + f('w1') + ' × ' + f('x1') + ' = ' + fmt(v),
+      text:   '× gate computes w₁·x₁. Its local derivatives are ∂z₁/∂w₁ = x₁ and ∂z₁/∂x₁ = w₁ — the input values swap roles as gradient multipliers during backprop.',
+      cls:    'good',
+    },
+    mul2: {
+      eq:     'z₂ = w₂ · x₂',
+      detail: 'z₂ = ' + f('w2') + ' × ' + f('x2') + ' = ' + fmt(v),
+      text:   '× gate computes w₂·x₂. The two multiply gates are independent — this is why neurons in a layer can be parallelized across hardware with no data dependency.',
+      cls:    'good',
+    },
+    add: {
+      eq:     'z = z₁ + z₂ + b',
+      detail: 'z = ' + f('mul1') + ' + (' + f('mul2') + ') + ' + f('b') + ' = ' + fmt(v),
+      text:   '+ gate sums all incoming values into the pre-activation z. The + gate has a special backprop property: it distributes the upstream gradient equally to every input (local derivative = 1 for all).',
+      cls:    'good',
+    },
+    sig: {
+      eq:     'ŷ = σ(z) = 1 / (1 + e⁻ᶻ)',
+      detail: 'ŷ = σ(' + f('add') + ') = ' + fmt(v),
+      text:   'σ squashes z ∈ ℝ into (0, 1), interpretable as a probability. Its derivative σ(z)(1−σ(z)) reuses the forward value — this is why the forward pass must complete before backprop begins.',
+      cls:    'good',
+    },
+  };
+  return A[nodeId] || { eq:'—', detail:'—', text:'—', cls:'neutral' };
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   BACKWARD PASS ANNOTATIONS  (one entry per node in bwdOrder)
+═══════════════════════════════════════════════════════════════════ */
+
+function bwdAnnotation(nodeId) {
+  const f4 = v => (+v).toFixed(4);
+  const f3 = v => (+v).toFixed(3);
+  const yhat   = S.nodeVals['sig'];
+  const sigLoc = yhat * (1 - yhat);
+  const g = id => S.nodeGrads[id] !== undefined ? f4(S.nodeGrads[id]) : '?';
+
+  const A = {
+    sig: {
+      label:  '∂L/∂ŷ',
+      eq:     '∂L/∂ŷ = 1  (output seed)',
+      detail: '∂ŷ/∂z = σ(z)·(1−σ(z)) = ' + f4(yhat) + ' × (1 − ' + f4(yhat) + ') = ' + f4(sigLoc),
+      text:   'σ seeds the backward pass with gradient 1. Its local derivative σ(z)(1−σ(z)) = ' + f4(sigLoc) + ' is computed from the forward value ŷ — which is why the forward pass must finish before backprop can begin. This local gradient flows to the + gate in the next step.',
+      cls:    'warn',
+    },
+    add: {
+      label:  '∂L/∂z',
+      eq:     '∂L/∂z = ∂L/∂ŷ × ∂ŷ/∂z  =  1 × σ(z)(1−σ(z))',
+      detail: '∂L/∂z = 1 × ' + f4(sigLoc) + ' = ' + g('add'),
+      text:   'The + gate receives upstream gradient ∂L/∂z = ' + g('add') + '. The + gate\'s local derivative w.r.t. each input is 1 — so it distributes this gradient equally to mul₁, mul₂, and b with no amplification or attenuation.',
+      cls:    'warn',
+    },
+    mul1: {
+      label:  '∂L/∂z₁',
+      eq:     '∂L/∂z₁ = ∂L/∂z × ∂z/∂z₁  =  ∂L/∂z × 1',
+      detail: '∂L/∂z₁ = ' + g('add') + ' × 1 = ' + g('mul1'),
+      text:   'The + gate passes its gradient unchanged to mul₁ (local derivative = 1). The × gate will now split this into ∂L/∂w₁ and ∂L/∂x₁ — inputs and weights swap roles as gradient multipliers.',
+      cls:    'warn',
+    },
+    mul2: {
+      label:  '∂L/∂z₂',
+      eq:     '∂L/∂z₂ = ∂L/∂z × ∂z/∂z₂  =  ∂L/∂z × 1',
+      detail: '∂L/∂z₂ = ' + g('add') + ' × 1 = ' + g('mul2'),
+      text:   'Symmetric to mul₁ — the + gate distributes the same upstream gradient to both branches independently. This is what enables layer-wise parallel gradient computation across neurons.',
+      cls:    'warn',
+    },
+    b: {
+      label:  '∂L/∂b',
+      eq:     '∂L/∂b = ∂L/∂z × ∂z/∂b  =  ∂L/∂z × 1',
+      detail: '∂L/∂b = ' + g('add') + ' × 1 = ' + g('b'),
+      text:   '∂z/∂b = 1 since z = z₁ + z₂ + b is linear in b. The bias gradient equals the upstream gradient directly. The optimizer will shift b by −η × ' + g('b') + ' each training step.',
+      cls:    'warn',
+    },
+    w1: {
+      label:  '∂L/∂w₁',
+      eq:     '∂L/∂w₁ = ∂L/∂z₁ × ∂z₁/∂w₁  =  ∂L/∂z₁ × x₁',
+      detail: '∂L/∂w₁ = ' + g('mul1') + ' × ' + f3(S.nodeVals['x1']) + ' = ' + g('w1'),
+      text:   'The × gate\'s local derivative w.r.t. w₁ is x₁ = ' + f3(S.nodeVals['x1']) + '. This is the gradient used to update w₁: w₁ ← w₁ − η × ∂L/∂w₁. Larger |x₁| means a larger gradient step for w₁.',
+      cls:    'warn',
+    },
+    x1: {
+      label:  '∂L/∂x₁',
+      eq:     '∂L/∂x₁ = ∂L/∂z₁ × ∂z₁/∂x₁  =  ∂L/∂z₁ × w₁',
+      detail: '∂L/∂x₁ = ' + g('mul1') + ' × ' + f3(S.nodeVals['w1']) + ' = ' + g('x1'),
+      text:   'The × gate\'s local derivative w.r.t. x₁ is w₁ = ' + f3(S.nodeVals['w1']) + '. For input leaves, this gradient would propagate further back in deeper networks. Here it tells us how sensitive the loss is to the first input feature.',
+      cls:    'warn',
+    },
+    w2: {
+      label:  '∂L/∂w₂',
+      eq:     '∂L/∂w₂ = ∂L/∂z₂ × ∂z₂/∂w₂  =  ∂L/∂z₂ × x₂',
+      detail: '∂L/∂w₂ = ' + g('mul2') + ' × ' + f3(S.nodeVals['x2']) + ' = ' + g('w2'),
+      text:   'The × gate\'s local derivative w.r.t. w₂ is x₂ = ' + f3(S.nodeVals['x2']) + '. This is the second weight gradient, used for the optimizer update w₂ ← w₂ − η × ∂L/∂w₂.',
+      cls:    'warn',
+    },
+    x2: {
+      label:  '∂L/∂x₂',
+      eq:     '∂L/∂x₂ = ∂L/∂z₂ × ∂z₂/∂x₂  =  ∂L/∂z₂ × w₂',
+      detail: '∂L/∂x₂ = ' + g('mul2') + ' × ' + f3(S.nodeVals['w2']) + ' = ' + g('x2'),
+      text:   'Backprop terminates here — all nine gradients are now computed. In training, only the parameter gradients (∂L/∂w₁, ∂L/∂w₂, ∂L/∂b) are used to update the model. Input gradients like this one would propagate further back only in a deeper architecture.',
+      cls:    'good',
+    },
+  };
+  return A[nodeId] || { label: nodeId, eq: '—', detail: '—', text: '—', cls: 'neutral' };
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   CANVAS RENDERING
+═══════════════════════════════════════════════════════════════════ */
+
+const NODE_R = { input:18, param:14, op:20, output:20 };
+
+function renderGraph() {
+  const canvas = document.getElementById('canvas-graph');
+  const rect   = document.getElementById('graph-wrap').getBoundingClientRect();
+  const W = rect.width || 400, H = rect.height || 300;
+  const pw = Math.round(W * DPR), ph = Math.round(H * DPR);
+  if (canvas.width !== pw || canvas.height !== ph) {
+    canvas.width = pw; canvas.height = ph;
+  }
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+  ctx.fillStyle = '#111C0F';
+  ctx.fillRect(0, 0, W, H);
+
+  const nm  = nodeMap();
+  const toP = (nx, ny) => [nx * W, ny * H];
+  const nr  = n => NODE_R[n.type] || 18;
+
+  /* ── Edges ─────────────────────────────────────────────────── */
+  net().edges.forEach(([fId, tId]) => {
+    const fn = nm[fId], tn = nm[tId];
+    const [fx, fy] = toP(fn.nx, fn.ny);
+    const [tx, ty] = toP(tn.nx, tn.ny);
+    const dx = tx - fx, dy = ty - fy, dist = Math.hypot(dx, dy);
+    const ux = dx / dist, uy = dy / dist;
+    const x1 = fx + ux * nr(fn), y1 = fy + uy * nr(fn);
+    const x2 = tx - ux * nr(tn), y2 = ty - uy * nr(tn);
+
+    const fState   = S.nodeState[fId] || 'idle';
+    const fFwdLive = fState !== 'idle';
+    const tFwdLive = (S.nodeState[tId] || 'idle') !== 'idle';
+    const hasBwd   = S.nodeGrads[fId] !== undefined;
+
+    let edgeColor, edgeWidth;
+    if (hasBwd) {
+      edgeColor = 'rgba(255,140,0,0.72)'; edgeWidth = 2;
+    } else if (fFwdLive && tFwdLive) {
+      edgeColor = 'rgba(100,210,80,0.80)'; edgeWidth = 2;
+    } else {
+      edgeColor = 'rgba(100,120,100,0.28)'; edgeWidth = 1.2;
+    }
+
+    ctx.beginPath();
+    ctx.strokeStyle = edgeColor; ctx.lineWidth = edgeWidth;
+    ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+
+    // Arrowhead
+    const angle = Math.atan2(y2 - y1, x2 - x1);
+    ctx.fillStyle = edgeColor;
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - 7 * Math.cos(angle - 0.5), y2 - 7 * Math.sin(angle - 0.5));
+    ctx.lineTo(x2 - 7 * Math.cos(angle + 0.5), y2 - 7 * Math.sin(angle + 0.5));
+    ctx.closePath(); ctx.fill();
+
+    const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+
+    // Forward value label (one side of edge, dimmed when bwd active)
+    if (fFwdLive && S.nodeVals[fId] !== undefined) {
+      ctx.save();
+      ctx.font = '500 8.5px "IBM Plex Mono", monospace';
+      ctx.fillStyle = hasBwd ? 'rgba(100,200,80,0.45)' : 'rgba(180,230,150,0.9)';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(fmt(S.nodeVals[fId]), mx - uy * 11, my + ux * 11);
+      ctx.restore();
+    }
+
+    // Gradient label (other side of edge, shown during backward pass)
+    if (hasBwd) {
+      ctx.save();
+      ctx.font = '600 8px "IBM Plex Mono", monospace';
+      ctx.fillStyle = 'rgba(255,165,50,0.95)';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('∂:' + (+S.nodeGrads[fId]).toFixed(3), mx + uy * 11, my - ux * 11);
+      ctx.restore();
+    }
+  });
+
+  /* ── Nodes ─────────────────────────────────────────────────── */
+  const FILLS   = {
+    idle:'#252525', active:'#1B5E20', done:'#2D5A1B',
+    'bwd-active':'#5D1A00', 'bwd-done':'#3D1400',
+  };
+  const STROKES = {
+    idle:'#4A4A4A', active:'#66BB6A', done:'#4A8C2F',
+    'bwd-active':'#FF6D00', 'bwd-done':'#BF5A30',
+  };
+  const SYM_CLR = {
+    idle:'#777', active:'#E8F5E9', done:'#C8E6C9',
+    'bwd-active':'#FFF3E0', 'bwd-done':'#FFCCBC',
+  };
+
+  net().nodes.forEach(node => {
+    const [x, y] = toP(node.nx, node.ny);
+    const r  = nr(node);
+    const st = S.nodeState[node.id] || 'idle';
+
+    // Glow for active nodes
+    if (st === 'active') {
+      ctx.save();
+      ctx.shadowBlur = 22; ctx.shadowColor = '#69F0AE';
+      ctx.beginPath(); ctx.arc(x, y, r + 3, 0, Math.PI * 2);
+      ctx.fillStyle = '#2e7d32'; ctx.fill();
+      ctx.restore();
+    } else if (st === 'bwd-active') {
+      ctx.save();
+      ctx.shadowBlur = 22; ctx.shadowColor = '#FF6D00';
+      ctx.beginPath(); ctx.arc(x, y, r + 3, 0, Math.PI * 2);
+      ctx.fillStyle = '#7F3000'; ctx.fill();
+      ctx.restore();
+    }
+
+    // Circle body
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle   = FILLS[st]   || FILLS.idle;   ctx.fill();
+    ctx.strokeStyle = STROKES[st] || STROKES.idle;
+    ctx.lineWidth   = (st === 'active' || st === 'bwd-active') ? 2.5 : 1.5; ctx.stroke();
+
+    // Symbol inside
+    ctx.fillStyle = SYM_CLR[st] || '#777';
+    const symPx = (node.type === 'op' || node.type === 'output') ? 13 : 10;
+    ctx.font = `600 ${symPx}px "Outfit", sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(node.label, x, y);
+
+    // Value below node (fwd) or gradient below node (bwd)
+    if (st === 'bwd-active' || st === 'bwd-done') {
+      if (S.nodeGrads[node.id] !== undefined) {
+        ctx.fillStyle = st === 'bwd-active' ? '#FFB74D' : '#FF8A65';
+        ctx.font = '500 9px "IBM Plex Mono", monospace';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+        ctx.fillText('∂:' + (+S.nodeGrads[node.id]).toFixed(3), x, y + r + 4);
+      }
+    } else if (st !== 'idle' && S.nodeVals[node.id] !== undefined) {
+      ctx.fillStyle = st === 'active' ? '#A5D6A7' : '#81C784';
+      ctx.font = '500 9px "IBM Plex Mono", monospace';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      ctx.fillText(fmt(S.nodeVals[node.id]), x, y + r + 4);
+    }
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   UI PANEL UPDATES
+═══════════════════════════════════════════════════════════════════ */
+
+function updatePanels(nodeId) {
+  const nm   = nodeMap();
+  const v    = S.nodeVals[nodeId];
+  const info = fwdAnnotation(nodeId);
+
+  document.getElementById('stat-step').textContent = S.stepIdx;
+  document.getElementById('stat-node').textContent = (nm[nodeId] && nm[nodeId].label) || nodeId;
+  document.getElementById('stat-val').textContent  = v !== undefined ? fmt(v) : '—';
+
+  document.getElementById('eq-text').textContent      = info.eq;
+  document.getElementById('chain-detail').textContent = info.detail;
+
+  const box = document.getElementById('anno-box');
+  box.textContent = info.text;
+  box.className   = 'anno-box ' + (info.cls || 'neutral');
+
+  document.getElementById('pass-badge').textContent = 'Forward';
+  document.getElementById('pass-badge').className   = 'pass-badge fwd';
+}
+
+function resetPanels() {
+  document.getElementById('stat-step').textContent    = '0';
+  document.getElementById('stat-node').textContent    = '—';
+  document.getElementById('stat-val').textContent     = '—';
+  document.getElementById('eq-text').textContent      = '—';
+  document.getElementById('chain-detail').textContent = '—';
+  const box = document.getElementById('anno-box');
+  box.textContent = 'Select a pass mode and press Next → to begin stepping through the graph.';
+  box.className   = 'anno-box neutral';
+  document.getElementById('pass-badge').textContent = 'Forward';
+  document.getElementById('pass-badge').className   = 'pass-badge fwd';
+}
+
+function updateBwdPanels(nodeId) {
+  const nm   = nodeMap();
+  const info = bwdAnnotation(nodeId);
+  const g    = S.nodeGrads[nodeId];
+
+  document.getElementById('stat-step').textContent    = S.bwdStepIdx;
+  document.getElementById('stat-node').textContent    = info.label || nodeId;
+  document.getElementById('stat-val').textContent     = g !== undefined ? (+g).toFixed(4) : '—';
+  document.getElementById('eq-text').textContent      = info.eq;
+  document.getElementById('chain-detail').textContent = info.detail;
+
+  const box = document.getElementById('anno-box');
+  box.textContent = info.text;
+  box.className   = 'anno-box ' + (info.cls || 'neutral');
+
+  document.getElementById('pass-badge').textContent = 'Backward';
+  document.getElementById('pass-badge').className   = 'pass-badge bwd';
+}
+
+function resetBwdPanels() {
+  document.getElementById('stat-step').textContent    = '0';
+  document.getElementById('stat-node').textContent    = '—';
+  document.getElementById('stat-val').textContent     = '—';
+  document.getElementById('eq-text').textContent      = '—';
+  document.getElementById('chain-detail').textContent = '—';
+  const box = document.getElementById('anno-box');
+  box.textContent = 'Forward pass complete. Press Next → to begin stepping through the backward pass.';
+  box.className   = 'anno-box neutral';
+  document.getElementById('pass-badge').textContent = 'Backward';
+  document.getElementById('pass-badge').className   = 'pass-badge bwd';
+}
+
+function updateButtons() {
+  if (S.inBwdPass) {
+    document.getElementById('btn-prev').disabled = S.bwdStepIdx === 0;
+    document.getElementById('btn-next').disabled = S.bwdStepIdx >= net().bwdOrder.length;
+  } else {
+    document.getElementById('btn-prev').disabled = S.stepIdx === 0;
+    document.getElementById('btn-next').disabled = S.stepIdx >= net().fwdOrder.length;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   STEP LOGIC
+═══════════════════════════════════════════════════════════════════ */
+
+function initState() {
+  S.nodeVals    = {};
+  S.nodeState   = {};
+  S.nodeGrads   = {};
+  S.stepIdx     = 0;
+  S.bwdStepIdx  = 0;
+  S.inBwdPass   = false;
+  net().nodes.forEach(n => { S.nodeState[n.id] = 'idle'; });
+}
+
+function stepForward() {
+  const order = net().fwdOrder;
+  if (S.stepIdx >= order.length) return;
+
+  // Mark previously active node as done
+  if (S.stepIdx > 0) {
+    S.nodeState[order[S.stepIdx - 1]] = 'done';
+  }
+
+  // Compute and activate current node
+  const nodeId = order[S.stepIdx];
+  S.nodeVals[nodeId]  = computeNode(nodeMap()[nodeId]);
+  S.nodeState[nodeId] = 'active';
+  S.stepIdx++;
+
+  updatePanels(nodeId);
+  updateButtons();
+  renderGraph();
+}
+
+function stepBack() {
+  if (S.stepIdx === 0) return;
+
+  const order  = net().fwdOrder;
+  const curId  = order[S.stepIdx - 1];  // currently active node
+
+  // Remove computation and mark idle
+  delete S.nodeVals[curId];
+  S.nodeState[curId] = 'idle';
+  S.stepIdx--;
+
+  if (S.stepIdx > 0) {
+    // Reactivate the node before it
+    const prevId = order[S.stepIdx - 1];
+    S.nodeState[prevId] = 'active';
+    updatePanels(prevId);
+  } else {
+    resetPanels();
+  }
+
+  updateButtons();
+  renderGraph();
+}
+
+function stepBwdPass() {
+  const bwdOrder = net().bwdOrder;
+  if (S.bwdStepIdx >= bwdOrder.length) return;
+
+  // Mark previously active backward node as done
+  if (S.bwdStepIdx > 0) {
+    S.nodeState[bwdOrder[S.bwdStepIdx - 1]] = 'bwd-done';
+  }
+
+  const nodeId = bwdOrder[S.bwdStepIdx];
+  S.nodeGrads[nodeId]  = computeGrad(nodeId);
+  S.nodeState[nodeId]  = 'bwd-active';
+  S.bwdStepIdx++;
+
+  updateBwdPanels(nodeId);
+  updateButtons();
+  renderGraph();
+}
+
+function stepBwdBack() {
+  if (S.bwdStepIdx === 0) return;
+
+  const bwdOrder = net().bwdOrder;
+  const curId    = bwdOrder[S.bwdStepIdx - 1];
+
+  delete S.nodeGrads[curId];
+  S.nodeState[curId] = 'done';   // revert to forward-done state
+  S.bwdStepIdx--;
+
+  if (S.bwdStepIdx > 0) {
+    const prevId = bwdOrder[S.bwdStepIdx - 1];
+    S.nodeState[prevId] = 'bwd-active';
+    updateBwdPanels(prevId);
+  } else {
+    resetBwdPanels();
+  }
+
+  updateButtons();
+  renderGraph();
+}
+
+function reset() {
+  S.mode = 'forward'; S.inBwdPass = false;
+  document.querySelectorAll('#mode-btns .kbtn').forEach(b =>
+    b.classList.toggle('active', b.dataset.mode === 'forward')
+  );
+  document.getElementById('mode-hint').textContent = 'computing node values left → right';
+  initState();
+  renderGraph();
+  resetPanels();
+  updateButtons();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   WEIGHT DISPLAY
+═══════════════════════════════════════════════════════════════════ */
+
+function refreshWeightDisplay() {
+  const p = net().params;
+  ['w1','w2','b'].forEach(id => {
+    const el = document.getElementById('wv-' + id);
+    if (el) el.textContent = fmt(p[id]);
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   EVENT LISTENERS
+═══════════════════════════════════════════════════════════════════ */
+
+document.getElementById('btn-next').addEventListener('click', () => {
+  if (S.inBwdPass) stepBwdPass(); else stepForward();
+});
+document.getElementById('btn-prev').addEventListener('click', () => {
+  if (S.inBwdPass) stepBwdBack(); else stepBack();
+});
+document.getElementById('btn-reset').addEventListener('click', reset);
+
+document.getElementById('sld-x1').addEventListener('input', function() {
+  S.x1 = +this.value;
+  document.getElementById('val-x1').textContent = (+this.value).toFixed(1);
+  reset();
+});
+
+document.getElementById('sld-x2').addEventListener('input', function() {
+  S.x2 = +this.value;
+  document.getElementById('val-x2').textContent = (+this.value).toFixed(1);
+  reset();
+});
+
+document.getElementById('mode-btns').addEventListener('click', e => {
+  const btn = e.target.closest('[data-mode]');
+  if (!btn) return;
+  const m = btn.dataset.mode;
+
+  if (m === 'forward') {
+    reset();   // reset() always goes back to forward mode
+
+  } else if (m === 'backward') {
+    if (S.stepIdx < net().fwdOrder.length) {
+      const box = document.getElementById('anno-box');
+      box.textContent = 'Complete the forward pass first — step through all ' + net().fwdOrder.length + ' nodes, then switch to Backward Pass.';
+      box.className   = 'anno-box warn';
+      return;
+    }
+    // Finalize forward pass (last fwd node may still be 'active')
+    net().fwdOrder.forEach(id => { S.nodeState[id] = 'done'; });
+    S.mode       = 'backward';
+    S.inBwdPass  = true;
+    S.bwdStepIdx = 0;
+    S.nodeGrads  = {};
+    document.querySelectorAll('#mode-btns .kbtn').forEach(b =>
+      b.classList.toggle('active', b.dataset.mode === 'backward')
+    );
+    document.getElementById('mode-hint').textContent = 'computing gradients right → left';
+    resetBwdPanels();
+    updateButtons();
+    renderGraph();
+  }
+});
+
+document.getElementById('tab-bar').addEventListener('click', e => {
+  const btn = e.target.closest('[data-net]');
+  if (!btn) return;
+  if (btn.dataset.net !== 'neuron') {
+    const box = document.getElementById('anno-box');
+    box.textContent = 'XOR Network and 3-Layer Network are coming in a later stage — try Simple Neuron for now.';
+    box.className   = 'anno-box neutral';
+    return;
+  }
+  document.querySelectorAll('#tab-bar button').forEach(b =>
+    b.classList.toggle('active', b.dataset.net === 'neuron')
+  );
+  S.netKey = 'neuron';
+  reset();
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   RESIZE + INIT
+═══════════════════════════════════════════════════════════════════ */
+
+let _rt;
+window.addEventListener('resize', () => { clearTimeout(_rt); _rt = setTimeout(renderGraph, 100); });
+
+initState();
+refreshWeightDisplay();
+updateButtons();
+requestAnimationFrame(() => requestAnimationFrame(renderGraph));
+</script>
+
+<footer id="course-nav-footer" style="margin-top:1.5rem;padding:0.75rem 0 0 1rem;border-top:1px solid #E0DAC0;font-size:0.8rem;color:#78786A;text-align:left;">
+  <a href="../" style="color:#2e7d32;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">&larr; All course visualizations</a>
+</footer>
+<script>
+if (window.self !== window.top) { var f = document.getElementById('course-nav-footer'); if (f) { f.style.display = 'none'; } }
+</script>
+
+</body>
+</html>

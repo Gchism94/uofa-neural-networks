@@ -1,4 +1,6 @@
 <!DOCTYPE html>
+<!-- Copyright © 2026 Theodore P. Pavlic. Arizona State University. MIT License.
+     Adapted for INFO 557: Neural Networks by Greg Chism, University of Arizona. -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -10,20 +12,21 @@
 <meta property="og:type" content="website">
 <meta property="og:title" content="Boltzmann Distribution via Random Exchange — interactive explainer">
 <meta property="og:description" content="N agents repeatedly trade random amounts of a conserved quantity — watch any starting distribution relax to the maximum-entropy Boltzmann (exponential) equilibrium, confirming the statistical mechanics origin of the Gibbs distribution.">
-<meta property="og:image" content="https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/boltzmann_maxent/boltzmann_maxent_random_exchange-preview.png">
+<meta property="og:image" content="https://gchism94.github.io/uofa-neural-networks/boltzmann_maxent/boltzmann_maxent_random_exchange-preview.png">
 <meta property="og:image:width" content="2000">
 <meta property="og:image:height" content="990">
-<meta property="og:url" content="https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/boltzmann_maxent/boltzmann_maxent_random_exchange.html">
+<meta property="og:url" content="https://gchism94.github.io/uofa-neural-networks/boltzmann_maxent/boltzmann_maxent_random_exchange.html">
 <meta property="fb:app_id" content="2385695445236853">
 
 <!-- Twitter/X card -->
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Boltzmann Distribution via Random Exchange — interactive explainer">
 <meta name="twitter:description" content="N agents repeatedly trade random amounts of a conserved quantity — watch any starting distribution relax to the maximum-entropy Boltzmann (exponential) equilibrium, confirming the statistical mechanics origin of the Gibbs distribution.">
-<meta name="twitter:image" content="https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/boltzmann_maxent/boltzmann_maxent_random_exchange-preview.png">
+<meta name="twitter:image" content="https://gchism94.github.io/uofa-neural-networks/boltzmann_maxent/boltzmann_maxent_random_exchange-preview.png">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -41,8 +44,8 @@
   --text:      #1a1f1a;
   --text-mid:  #475445;
   --text-dim:  #8a9e88;
-  --sans:      'DM Sans', system-ui, sans-serif;
-  --mono:      'DM Mono', 'Courier New', monospace;
+  --sans:      'Outfit', system-ui, sans-serif;
+  --mono:      'IBM Plex Mono', 'Courier New', monospace;
 }
 
 body {
@@ -338,9 +341,21 @@ select:focus { border-color: var(--gm); }
 @media (max-width: 380px) {
   .btn { padding: 7px 10px; font-size: 0.73rem; }
 }
+
+/* ── Fixed copyright ─────────────────────────────────────────────── */
+.cr-top{
+  position:fixed;top:.75rem;right:1rem;z-index:1000;
+  font-size:.72rem;color:#888;text-align:right;
+  background:rgba(250,247,240,0.92);padding:.2rem .5rem;
+  border-radius:5px;backdrop-filter:blur(4px);
+  border:1px solid #DDD6BE;
+}
+.cr-top a{color:#E8630A;text-decoration:none}
+.cr-top a:hover{text-decoration:underline}
 </style>
 </head>
 <body>
+<div class="cr-top">© 2026 Theodore P. Pavlic<br><a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a></div>
 
 <div class="page-title">Boltzmann Distribution via Random Exchange</div>
 <div class="page-sub">

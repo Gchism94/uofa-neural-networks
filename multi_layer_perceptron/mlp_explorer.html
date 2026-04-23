@@ -1,4 +1,6 @@
 <!DOCTYPE html>
+<!-- Copyright © 2026 Theodore P. Pavlic. Arizona State University. MIT License.
+     Adapted for INFO 557: Neural Networks by Greg Chism, University of Arizona. -->
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -10,17 +12,17 @@
 <meta property="og:type" content="website">
 <meta property="og:title" content="Multi-Layer Perceptron &amp; Backpropagation — Interactive Explorer">
 <meta property="og:description" content="Interactive explainer for the multi-layer perceptron: XOR, hidden-layer representations, backpropagation as gradient flow, and depth vs. width as a complexity story.">
-<meta property="og:image" content="https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/multi_layer_perceptron/mlp_explorer-preview.png">
+<meta property="og:image" content="https://gchism94.github.io/uofa-neural-networks/multi_layer_perceptron/mlp_explorer-preview.png">
 <meta property="og:image:width" content="2364">
 <meta property="og:image:height" content="1178">
-<meta property="og:url" content="https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/multi_layer_perceptron/mlp_explorer.html">
+<meta property="og:url" content="https://gchism94.github.io/uofa-neural-networks/multi_layer_perceptron/mlp_explorer.html">
 <meta property="fb:app_id" content="2385695445236853">
 
 <!-- Twitter/X card -->
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Multi-Layer Perceptron &amp; Backpropagation — Interactive Explorer">
 <meta name="twitter:description" content="Interactive explainer for the multi-layer perceptron: XOR, hidden-layer representations, backpropagation as gradient flow, and depth vs. width as a complexity story.">
-<meta name="twitter:image" content="https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/multi_layer_perceptron/mlp_explorer-preview.png">
+<meta name="twitter:image" content="https://gchism94.github.io/uofa-neural-networks/multi_layer_perceptron/mlp_explorer-preview.png">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -58,25 +60,16 @@ body{
 .hdr > div:first-child{flex:1 1 auto;min-width:0}
 .hdr h1{font-size:clamp(1.35rem,2.4vw,1.7rem);font-weight:700;color:var(--g-dk);letter-spacing:-.02em;line-height:1.2}
 .hdr p.subtitle{font-size:.88rem;color:var(--text-muted);margin-top:.18rem}
-/* Header copyright: always inline with separator.
-   On wide screens it sits right-aligned beside the title block.
-   When the header flex-wraps, cr-top takes its own full row and left-aligns —
-   no shrink-to-fit + right-align weirdness. */
+/* ── Fixed copyright ─────────────────────────────────────────────── */
 .cr-top{
-  font-size:.7rem;color:var(--text-muted);line-height:1.45;
-  flex-shrink:0;white-space:nowrap;text-align:right;
+  position:fixed;top:.75rem;right:1rem;z-index:1000;
+  font-size:.72rem;color:var(--text-muted);text-align:right;
+  background:rgba(250,247,240,.92);padding:.2rem .5rem;
+  border-radius:5px;backdrop-filter:blur(4px);
+  border:1px solid var(--border-lt);
 }
 .cr-top a{color:var(--orange);text-decoration:none}
 .cr-top a:hover{text-decoration:underline}
-.cr-top .cr-sep{padding:0 .35em}
-@media (max-width:780px){
-  .cr-top{flex-basis:100%;text-align:left;white-space:normal}
-}
-/* Very narrow: drop the separator and break the link onto its own line. */
-@media (max-width:480px){
-  .cr-top .cr-sep{display:none}
-  .cr-top a{display:block}
-}
 
 /* Cards */
 .card{
@@ -1884,6 +1877,7 @@ svg.bp-map{
 </style>
 </head>
 <body>
+<div class="cr-top">© 2026 Theodore P. Pavlic<br><a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a></div>
 <div class="wrap">
 
   <header>
@@ -1891,9 +1885,6 @@ svg.bp-map{
       <div>
         <h1>Multi-Layer Perceptron &amp; Backpropagation</h1>
         <p class="subtitle">XOR, hidden-layer representations, the chain rule made visible, and depth as a compositional shortcut.</p>
-      </div>
-      <div class="cr-top">
-        &copy; 2026 Theodore P. Pavlic<span class="cr-sep" aria-hidden="true">&middot;</span><a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a>
       </div>
     </div>
   </header>

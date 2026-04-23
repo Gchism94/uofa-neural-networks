@@ -1,4 +1,6 @@
 <!DOCTYPE html>
+<!-- Copyright © 2026 Theodore P. Pavlic. Arizona State University. MIT License.
+     Adapted for INFO 557: Neural Networks by Greg Chism, University of Arizona. -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -10,18 +12,20 @@
 <meta property="og:type" content="website">
 <meta property="og:title" content="Recurrent Networks &amp; Temporal Supervision Explorer — interactive explainer">
 <meta property="og:description" content="Explore TDNNs, RNNs with output feedback, autoregressive latent-state RNNs, and BPTT training — plus a visual guide to gated architectures (LSTM, GRU) — through interactive diagrams and live experiments.">
-<meta property="og:image" content="https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/recurrent_neural_networks/rnn_explorer-preview.png">
+<meta property="og:image" content="https://gchism94.github.io/uofa-neural-networks/recurrent_neural_networks/rnn_explorer-preview.png">
 <meta property="og:image:width" content="2170">
 <meta property="og:image:height" content="808">
-<meta property="og:url" content="https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/recurrent_neural_networks/rnn_explorer.html">
+<meta property="og:url" content="https://gchism94.github.io/uofa-neural-networks/recurrent_neural_networks/rnn_explorer.html">
 <meta property="fb:app_id" content="2385695445236853">
 
 <!-- Twitter/X card -->
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Recurrent Networks &amp; Temporal Supervision Explorer — interactive explainer">
 <meta name="twitter:description" content="Explore TDNNs, RNNs with output feedback, autoregressive latent-state RNNs, and BPTT training — plus a visual guide to gated architectures (LSTM, GRU) — through interactive diagrams and live experiments.">
-<meta name="twitter:image" content="https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/recurrent_neural_networks/rnn_explorer-preview.png">
+<meta name="twitter:image" content="https://gchism94.github.io/uofa-neural-networks/recurrent_neural_networks/rnn_explorer-preview.png">
 
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -210,9 +214,21 @@ footer a{color:var(--orange);}
   .copy-sep{display:none;}
   footer{display:flex;flex-direction:column;align-items:center;gap:2px;}
 }
+
+/* ── Fixed copyright ─────────────────────────────────────────────── */
+.cr-top{
+  position:fixed;top:.75rem;right:1rem;z-index:1000;
+  font-size:.72rem;color:#888;text-align:right;
+  background:rgba(250,247,240,0.92);padding:.2rem .5rem;
+  border-radius:5px;backdrop-filter:blur(4px);
+  border:1px solid #DDD6BE;
+}
+.cr-top a{color:#E8630A;text-decoration:none}
+.cr-top a:hover{text-decoration:underline}
 </style>
 </head>
 <body>
+<div class="cr-top">© 2026 Theodore P. Pavlic<br><a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a></div>
 
 <header class="hdr">
   <h1>Recurrent Networks &amp; Temporal Supervision Explorer</h1>

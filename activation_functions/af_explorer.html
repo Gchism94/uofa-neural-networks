@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<!-- Copyright © 2026 Greg Chism. University of Arizona, College of Information Science.
+     INFO 557: Neural Networks. MIT License. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Activation Functions — Interactive Explorer | INFO 557: Neural Networks</title>
+<meta name="description" content="Explore neural network activation functions interactively: adjust parameters, compare function and derivative plots, and see annotations for saturation zones, vanishing gradients, and usage guidance.">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Activation Functions — Interactive Explorer">
+<meta property="og:description" content="Explore neural network activation functions interactively: adjust parameters, compare function and derivative plots, and see annotations for saturation zones, vanishing gradients, and usage guidance.">
+<meta property="og:image" content="https://gchism94.github.io/uofa-neural-networks/activation_functions/af_explorer-preview.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="600">
+<meta property="og:url" content="https://gchism94.github.io/uofa-neural-networks/activation_functions/af_explorer.html">
+<meta property="fb:app_id" content="2385695445236853">
+
+<!-- Twitter/X card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Activation Functions — Interactive Explorer">
+<meta name="twitter:description" content="Explore neural network activation functions interactively: adjust parameters, compare function and derivative plots, and see annotations for saturation zones, vanishing gradients, and usage guidance.">
+<meta name="twitter:image" content="https://gchism94.github.io/uofa-neural-networks/activation_functions/af_explorer-preview.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --cream:#FAF7F0;--cream-mid:#F0EBE0;--cream-dk:#E2D9C5;
+  --g-dk:#1C3A0E;--g-mid:#2D5A1B;--g-lt:#4A8C2F;--g-pale:#C8E6A8;
+  --orange:#E8630A;--orange-lt:#F08C50;--orange-dk:#C0500A;
+  --text:#1A1A1A;--text-muted:#888;--text-soft:#555;
+  --border:#C8BE9A;--border-lt:#DDD6BE;--shadow:rgba(44,90,27,.10);
+  --blue:#1A56A0;--blue-lt:#4A86D0;--blue-pale:#D0E4F8;
+  --red:#B0321D;--red-lt:#D05A40;--red-pale:#F8DDD8;
+  --purple:#6A2D8F;--purple-lt:#9A5DBF;--purple-pale:#EAD8F8;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:'Outfit',sans-serif;
+  background:var(--cream);
+  color:var(--text);
+  padding:1.25rem 1rem 2rem;
+  min-height:100vh;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:.85rem}
+
+/* Header */
+.hdr{display:flex;justify-content:space-between;align-items:flex-start;column-gap:1rem;row-gap:.35rem;flex-wrap:wrap}
+.hdr>div:first-child{flex:1 1 auto;min-width:0}
+.hdr h1{font-size:clamp(1.35rem,2.4vw,1.7rem);font-weight:700;color:var(--g-dk);letter-spacing:-.02em;line-height:1.2}
+.hdr p.subtitle{font-size:.88rem;color:var(--text-muted);margin-top:.18rem}
+.cr-top{font-size:.7rem;color:var(--text-muted);line-height:1.45;flex-shrink:0;white-space:nowrap;text-align:right}
+.cr-top a{color:var(--orange);text-decoration:none}
+.cr-top a:hover{text-decoration:underline}
+.hdr-rule{border:none;border-top:2.5px solid var(--g-dk);margin-top:.55rem}
+@media(max-width:780px){.cr-top{flex-basis:100%;text-align:left;white-space:normal}}
+
+/* Cards */
+.card{background:white;border:1px solid var(--border);border-radius:8px;padding:.9rem 1.1rem;box-shadow:0 2px 8px var(--shadow)}
+.card-title{font-size:.68rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--g-dk);margin-bottom:.6rem}
+
+/* Tab bar */
+.tab-bar{display:flex;flex-wrap:wrap;gap:.3rem;background:white;border:1px solid var(--border);border-radius:8px;padding:.35rem;box-shadow:0 2px 8px var(--shadow)}
+.tab-bar button{
+  font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:500;
+  padding:.42rem .85rem;border:1px solid transparent;background:transparent;
+  color:var(--text-soft);border-radius:6px;cursor:pointer;
+  transition:background .12s,color .12s,border-color .12s;
+  white-space:nowrap;
+}
+.tab-bar button:hover{background:var(--cream-mid);color:var(--g-dk)}
+.tab-bar button.active{background:var(--g-dk);color:white;border-color:var(--g-dk)}
+.tab-bar button .tag{
+  font-family:'IBM Plex Mono',monospace;font-size:.75em;
+  color:var(--orange);font-weight:500;margin-right:.35rem;
+}
+.tab-bar button.active .tag{color:var(--orange-lt)}
+
+.tab-pane{display:none}
+.tab-pane.active{display:block}
+
+/* Main explorer layout */
+.explorer-grid{display:grid;grid-template-columns:300px 1fr;gap:.85rem;align-items:start}
+@media(max-width:780px){.explorer-grid{grid-template-columns:1fr}}
+
+/* Sliders */
+.srow{display:flex;align-items:center;gap:.45rem;margin-bottom:.4rem}
+.slbl{font-family:'IBM Plex Mono',monospace;font-size:.8rem;font-weight:500;color:var(--g-dk);min-width:24px}
+input[type=range]{flex:1;appearance:none;-webkit-appearance:none;height:4px;background:var(--cream-dk);border-radius:2px;cursor:pointer;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--g-mid);border:2.5px solid white;box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:pointer}
+.sval{font-family:'IBM Plex Mono',monospace;font-size:.75rem;color:var(--text-muted);min-width:38px;text-align:right}
+
+/* Equation bar */
+.eq-bar{
+  background:var(--g-dk);color:white;border-radius:8px;
+  padding:.65rem 1.1rem;font-family:'IBM Plex Mono',monospace;
+  font-size:.9rem;line-height:1.6;
+}
+.eq-bar .eq-name{font-size:.7rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:.1rem}
+.eq-bar .eq-formula{font-size:1rem;color:white}
+.eq-bar .eq-formula .param{color:var(--orange-lt);font-weight:600}
+
+/* Plot area */
+.plots-grid{display:grid;grid-template-columns:1fr 1fr;gap:.85rem}
+@media(max-width:580px){.plots-grid{grid-template-columns:1fr}}
+.plot-wrap{width:100%;aspect-ratio:4/3;position:relative}
+.plot-wrap canvas{width:100%;height:100%;display:block;border-radius:4px}
+.plot-label{font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);text-align:center;margin-bottom:.3rem}
+
+/* Annotation chips */
+.anno-list{display:flex;flex-direction:column;gap:.45rem;margin-top:.1rem}
+.anno{border-radius:6px;padding:.5rem .75rem;font-size:.8rem;line-height:1.5}
+.anno strong{font-weight:600;display:block;font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;margin-bottom:.1rem}
+.anno-sat{background:var(--blue-pale);color:var(--blue)}
+.anno-grad{background:var(--red-pale);color:var(--red)}
+.anno-use{background:var(--g-pale);color:var(--g-dk)}
+.anno-note{background:var(--cream-mid);color:var(--text-soft);border:1px solid var(--border-lt)}
+
+/* Maxout k controls */
+.maxout-k-row{display:flex;align-items:center;gap:.6rem;margin-bottom:.5rem;flex-wrap:wrap}
+.maxout-k-row .klbl{font-size:.8rem;color:var(--text-soft)}
+.kbtn{font-family:'Outfit',sans-serif;font-size:.78rem;font-weight:500;padding:.2rem .65rem;border-radius:16px;cursor:pointer;border:1.5px solid var(--border);background:var(--cream);color:var(--g-dk);transition:all .12s}
+.kbtn:hover{background:var(--g-pale);border-color:var(--g-lt)}
+.kbtn.active{background:var(--g-dk);border-color:var(--g-dk);color:white}
+
+/* Compare tab */
+.compare-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.7rem}
+.cmp-card{background:white;border:1px solid var(--border);border-radius:8px;padding:.6rem .75rem;box-shadow:0 1px 4px var(--shadow)}
+.cmp-card h4{font-size:.78rem;font-weight:600;color:var(--g-dk);margin-bottom:.3rem}
+.cmp-canvas-wrap{width:100%;aspect-ratio:3/2}
+.cmp-canvas-wrap canvas{width:100%;height:100%;display:block}
+
+/* Legend */
+.legend{display:flex;gap:.9rem;flex-wrap:wrap;font-size:.75rem;color:var(--text-soft);margin-top:.4rem}
+.legend-item{display:flex;align-items:center;gap:.35rem}
+.legend-swatch{width:20px;height:3px;border-radius:2px;display:inline-block}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="hdr">
+    <div>
+      <h1>Activation Functions — Interactive Explorer</h1>
+      <p class="subtitle">Plot, differentiate, and annotate every major activation function — adjust parameters live</p>
+    </div>
+    <div class="cr-top">© 2026 Greg T. Chism<br><a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a></div>
+  </div>
+  <hr class="hdr-rule">
+</header>
+
+<!-- Tab bar -->
+<nav class="tab-bar" id="tab-bar">
+  <button class="active" data-tab="relu"><span class="tag">1</span>ReLU Family</button>
+  <button data-tab="sigmoid"><span class="tag">2</span>Sigmoid &amp; Tanh</button>
+  <button data-tab="maxout"><span class="tag">3</span>Maxout Units</button>
+  <button data-tab="linear"><span class="tag">4</span>Linear Units</button>
+  <button data-tab="compare"><span class="tag">★</span>Compare All</button>
+</nav>
+
+<!-- ═══ TAB 1: ReLU Family ════════════════════════════════════════════ -->
+<div class="tab-pane active" id="tab-relu">
+  <div class="explorer-grid">
+
+    <!-- Left panel: controls -->
+    <div style="display:flex;flex-direction:column;gap:.75rem">
+      <div class="card">
+        <div class="card-title">Function</div>
+        <div style="display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:.7rem" id="relu-fn-btns">
+          <button class="kbtn active" data-fn="relu">ReLU</button>
+          <button class="kbtn" data-fn="leaky">Leaky ReLU</button>
+          <button class="kbtn" data-fn="absval">Abs Value</button>
+          <button class="kbtn" data-fn="elu">ELU</button>
+          <button class="kbtn" data-fn="swish">Swish</button>
+        </div>
+
+        <!-- Parameter sliders (shown/hidden by function) -->
+        <div id="relu-params">
+          <!-- Leaky alpha -->
+          <div id="param-alpha" style="display:none">
+            <div class="srow">
+              <span class="slbl">α</span>
+              <input type="range" id="sld-alpha" min="0.001" max="0.5" step="0.001" value="0.01">
+              <span class="sval" id="val-alpha">0.010</span>
+            </div>
+            <div style="font-size:.72rem;color:var(--text-muted);margin-top:-.2rem;margin-bottom:.3rem;padding-left:1.8rem">negative-slope coefficient</div>
+          </div>
+          <!-- ELU alpha -->
+          <div id="param-elu-alpha" style="display:none">
+            <div class="srow">
+              <span class="slbl">α</span>
+              <input type="range" id="sld-elu-alpha" min="0.1" max="3" step="0.01" value="1">
+              <span class="sval" id="val-elu-alpha">1.00</span>
+            </div>
+            <div style="font-size:.72rem;color:var(--text-muted);margin-top:-.2rem;margin-bottom:.3rem;padding-left:1.8rem">saturation level for x&lt;0</div>
+          </div>
+          <!-- Swish beta -->
+          <div id="param-beta" style="display:none">
+            <div class="srow">
+              <span class="slbl">β</span>
+              <input type="range" id="sld-beta" min="0.1" max="5" step="0.05" value="1">
+              <span class="sval" id="val-beta">1.00</span>
+            </div>
+            <div style="font-size:.72rem;color:var(--text-muted);margin-top:-.2rem;margin-bottom:.3rem;padding-left:1.8rem">sharpness / temperature</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Equation -->
+      <div class="eq-bar" id="relu-eq">
+        <div class="eq-name">Equation</div>
+        <div class="eq-formula" id="relu-eq-text">f(x) = max(0, x)</div>
+      </div>
+
+      <!-- Annotations -->
+      <div class="card">
+        <div class="card-title">Properties</div>
+        <div class="anno-list" id="relu-annos"></div>
+      </div>
+    </div>
+
+    <!-- Right panel: plots -->
+    <div style="display:flex;flex-direction:column;gap:.75rem">
+      <div class="card">
+        <div class="plots-grid">
+          <div>
+            <div class="plot-label">f(x) — activation</div>
+            <div class="plot-wrap"><canvas id="relu-fn-canvas"></canvas></div>
+          </div>
+          <div>
+            <div class="plot-label">f′(x) — derivative</div>
+            <div class="plot-wrap"><canvas id="relu-dr-canvas"></canvas></div>
+          </div>
+        </div>
+        <div class="legend" style="margin-top:.6rem">
+          <div class="legend-item"><span class="legend-swatch" style="background:var(--g-mid)"></span>f(x)</div>
+          <div class="legend-item"><span class="legend-swatch" style="background:var(--orange)"></span>f′(x)</div>
+          <div class="legend-item"><span class="legend-swatch" style="background:#AAA;border-top:1px dashed #888"></span>identity / zero reference</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══ TAB 2: Sigmoid & Tanh ════════════════════════════════════════ -->
+<div class="tab-pane" id="tab-sigmoid">
+  <div class="explorer-grid">
+    <div style="display:flex;flex-direction:column;gap:.75rem">
+      <div class="card">
+        <div class="card-title">Function</div>
+        <div style="display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:.7rem" id="sig-fn-btns">
+          <button class="kbtn active" data-fn="sigmoid">Sigmoid</button>
+          <button class="kbtn" data-fn="tanh">Tanh</button>
+        </div>
+        <div id="sig-params">
+          <div class="srow">
+            <span class="slbl">β</span>
+            <input type="range" id="sld-sig-beta" min="0.1" max="5" step="0.05" value="1">
+            <span class="sval" id="val-sig-beta">1.00</span>
+          </div>
+          <div style="font-size:.72rem;color:var(--text-muted);margin-top:-.2rem;margin-bottom:.3rem;padding-left:1.8rem">temperature (sharpness of transition)</div>
+        </div>
+      </div>
+      <div class="eq-bar" id="sig-eq">
+        <div class="eq-name">Equation</div>
+        <div class="eq-formula" id="sig-eq-text">f(x) = 1 / (1 + e^(−βx))</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Properties</div>
+        <div class="anno-list" id="sig-annos"></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:.75rem">
+      <div class="card">
+        <div class="plots-grid">
+          <div>
+            <div class="plot-label">f(x) — activation</div>
+            <div class="plot-wrap"><canvas id="sig-fn-canvas"></canvas></div>
+          </div>
+          <div>
+            <div class="plot-label">f′(x) — derivative</div>
+            <div class="plot-wrap"><canvas id="sig-dr-canvas"></canvas></div>
+          </div>
+        </div>
+        <div class="legend" style="margin-top:.6rem">
+          <div class="legend-item"><span class="legend-swatch" style="background:var(--purple)"></span>f(x)</div>
+          <div class="legend-item"><span class="legend-swatch" style="background:var(--orange)"></span>f′(x)</div>
+          <div class="legend-item"><span class="legend-swatch" style="background:#AAA"></span>saturation bounds</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TAB 3: Maxout ════════════════════════════════════════════════ -->
+<div class="tab-pane" id="tab-maxout">
+  <div class="explorer-grid">
+    <div style="display:flex;flex-direction:column;gap:.75rem">
+      <div class="card">
+        <div class="card-title">Number of linear pieces k</div>
+        <div class="maxout-k-row" id="maxout-k-btns">
+          <button class="kbtn active" data-k="2">k = 2</button>
+          <button class="kbtn" data-k="3">k = 3</button>
+          <button class="kbtn" data-k="4">k = 4</button>
+          <button class="kbtn" data-k="5">k = 5</button>
+        </div>
+        <div style="font-size:.78rem;color:var(--text-soft);margin-bottom:.5rem">
+          Maxout takes the max over k learned linear functions. Adjust each affine piece's slope and intercept below.
+        </div>
+        <div id="maxout-pieces-ctrl"></div>
+      </div>
+      <div class="eq-bar">
+        <div class="eq-name">Equation</div>
+        <div class="eq-formula" id="maxout-eq-text">h(x) = max<sub style="font-size:.7em">j∈[k]</sub> (w<sub style="font-size:.7em">j</sub>x + b<sub style="font-size:.7em">j</sub>)</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Properties</div>
+        <div class="anno-list" id="maxout-annos"></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:.75rem">
+      <div class="card">
+        <div class="plots-grid">
+          <div>
+            <div class="plot-label">h(x) — maxout output</div>
+            <div class="plot-wrap"><canvas id="maxout-fn-canvas"></canvas></div>
+          </div>
+          <div>
+            <div class="plot-label">h′(x) — derivative (a.e.)</div>
+            <div class="plot-wrap"><canvas id="maxout-dr-canvas"></canvas></div>
+          </div>
+        </div>
+        <div class="legend" style="margin-top:.6rem" id="maxout-legend"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TAB 4: Linear Units ═════════════════════════════════════════ -->
+<div class="tab-pane" id="tab-linear">
+  <div class="explorer-grid">
+    <div style="display:flex;flex-direction:column;gap:.75rem">
+      <div class="card">
+        <div class="card-title">Parameters</div>
+        <div class="srow">
+          <span class="slbl">w</span>
+          <input type="range" id="sld-lin-w" min="-3" max="3" step="0.01" value="1">
+          <span class="sval" id="val-lin-w">1.00</span>
+        </div>
+        <div style="font-size:.72rem;color:var(--text-muted);margin-top:-.2rem;margin-bottom:.45rem;padding-left:1.8rem">slope (weight)</div>
+        <div class="srow">
+          <span class="slbl">b</span>
+          <input type="range" id="sld-lin-b" min="-3" max="3" step="0.01" value="0">
+          <span class="sval" id="val-lin-b">0.00</span>
+        </div>
+        <div style="font-size:.72rem;color:var(--text-muted);margin-top:-.2rem;margin-bottom:.3rem;padding-left:1.8rem">bias (intercept)</div>
+      </div>
+      <div class="eq-bar">
+        <div class="eq-name">Equation</div>
+        <div class="eq-formula" id="lin-eq-text">f(x) = wx + b</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Properties</div>
+        <div class="anno-list" id="lin-annos"></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:.75rem">
+      <div class="card">
+        <div class="plots-grid">
+          <div>
+            <div class="plot-label">f(x) — activation</div>
+            <div class="plot-wrap"><canvas id="lin-fn-canvas"></canvas></div>
+          </div>
+          <div>
+            <div class="plot-label">f′(x) — derivative</div>
+            <div class="plot-wrap"><canvas id="lin-dr-canvas"></canvas></div>
+          </div>
+        </div>
+        <div class="legend" style="margin-top:.6rem">
+          <div class="legend-item"><span class="legend-swatch" style="background:var(--blue)"></span>f(x)</div>
+          <div class="legend-item"><span class="legend-swatch" style="background:var(--orange)"></span>f′(x) = w (constant)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TAB 5: Compare All ══════════════════════════════════════════ -->
+<div class="tab-pane" id="tab-compare">
+  <div class="card" style="margin-bottom:.75rem">
+    <div class="card-title">All Activation Functions — Function Plot (default parameters)</div>
+    <div class="plot-wrap" style="aspect-ratio:16/5;max-height:320px">
+      <canvas id="cmp-main-canvas"></canvas>
+    </div>
+    <div class="legend" style="margin-top:.5rem" id="cmp-legend"></div>
+  </div>
+  <div class="compare-grid" id="cmp-cards"></div>
+</div>
+
+</div><!-- /.wrap -->
+
+<footer id="course-nav-footer" style="margin-top:1.5rem;padding:0.75rem 0 0 1rem;border-top:1px solid #E0DAC0;font-size:0.8rem;color:#78786A;text-align:left;">
+  <a href="../" style="color:#2e7d32;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">&larr; All course visualizations</a>
+</footer>
+<script>
+if (window.self !== window.top) { var f = document.getElementById('course-nav-footer'); if (f) { f.style.display = 'none'; } }
+</script>
+
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════════════════════════════════
+   UTILITY — canvas helpers
+═══════════════════════════════════════════════════════════════════ */
+
+const DPR = window.devicePixelRatio || 1;
+
+function initCanvas(el) {
+  const rect = el.getBoundingClientRect();
+  const w = rect.width || el.parentElement.clientWidth || 300;
+  const h = rect.height || el.parentElement.clientHeight || 225;
+  el.width = w * DPR;
+  el.height = h * DPR;
+  const ctx = el.getContext('2d');
+  ctx.scale(DPR, DPR);
+  return { ctx, w, h };
+}
+
+function resizeCanvas(el) {
+  const rect = el.parentElement.getBoundingClientRect();
+  const w = rect.width;
+  const h = rect.height;
+  if (!w || !h) return null;
+  el.width = w * DPR;
+  el.height = h * DPR;
+  const ctx = el.getContext('2d');
+  ctx.scale(DPR, DPR);
+  return { ctx, w, h };
+}
+
+/* Plot a function on a canvas.
+   opts: { xmin, xmax, ymin, ymax, color, dashed, lineWidth }
+   fn: x → y  */
+function plotFn(ctx, w, h, fn, opts = {}) {
+  const { xmin = -4, xmax = 4, color = '#2D5A1B', dashed = false, lineWidth = 2 } = opts;
+  let { ymin, ymax } = opts;
+
+  // Sample
+  const N = Math.max(w * 2, 400);
+  const xs = [], ys = [];
+  for (let i = 0; i <= N; i++) {
+    const x = xmin + (xmax - xmin) * i / N;
+    xs.push(x);
+    ys.push(fn(x));
+  }
+  if (ymin === undefined) ymin = Math.min(...ys.filter(isFinite));
+  if (ymax === undefined) ymax = Math.max(...ys.filter(isFinite));
+  // Add padding
+  const pad = (ymax - ymin) * 0.1 || 0.5;
+  if (opts.ymin === undefined) ymin -= pad;
+  if (opts.ymax === undefined) ymax += pad;
+
+  const toX = x => (x - xmin) / (xmax - xmin) * w;
+  const toY = y => h - (y - ymin) / (ymax - ymin) * h;
+
+  ctx.beginPath();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lineWidth;
+  if (dashed) ctx.setLineDash([5, 4]);
+  else ctx.setLineDash([]);
+
+  let penDown = false;
+  for (let i = 0; i <= N; i++) {
+    const px = toX(xs[i]);
+    const py = toY(ys[i]);
+    if (!isFinite(ys[i])) { penDown = false; continue; }
+    if (!penDown) { ctx.moveTo(px, py); penDown = true; }
+    else ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+  return { xmin, xmax, ymin, ymax, toX, toY };
+}
+
+/* Draw axes, grid, zero-lines */
+function drawAxes(ctx, w, h, xmin, xmax, ymin, ymax) {
+  const toX = x => (x - xmin) / (xmax - xmin) * w;
+  const toY = y => h - (y - ymin) / (ymax - ymin) * h;
+
+  ctx.clearRect(0, 0, w, h);
+
+  // light grid
+  ctx.strokeStyle = '#E8E2D4';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([]);
+  const xStep = niceStep(xmax - xmin, 6);
+  const yStep = niceStep(ymax - ymin, 6);
+  for (let x = Math.ceil(xmin / xStep) * xStep; x <= xmax + 1e-9; x += xStep) {
+    const px = toX(x);
+    ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, h); ctx.stroke();
+  }
+  for (let y = Math.ceil(ymin / yStep) * yStep; y <= ymax + 1e-9; y += yStep) {
+    const py = toY(y);
+    ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(w, py); ctx.stroke();
+  }
+
+  // axes
+  ctx.strokeStyle = '#888';
+  ctx.lineWidth = 1;
+  const x0 = toX(0), y0 = toY(0);
+  if (x0 >= 0 && x0 <= w) { ctx.beginPath(); ctx.moveTo(x0, 0); ctx.lineTo(x0, h); ctx.stroke(); }
+  if (y0 >= 0 && y0 <= h) { ctx.beginPath(); ctx.moveTo(0, y0); ctx.lineTo(w, y0); ctx.stroke(); }
+
+  // tick labels
+  ctx.fillStyle = '#999';
+  ctx.font = `${10 * (w < 200 ? 0.8 : 1)}px IBM Plex Mono, monospace`;
+  ctx.textAlign = 'center';
+  for (let x = Math.ceil(xmin / xStep) * xStep; x <= xmax + 1e-9; x += xStep) {
+    if (Math.abs(x) < 1e-9) continue;
+    const px = toX(x);
+    ctx.fillText(fmt(x), px, Math.min(h - 2, y0 + 12));
+  }
+  ctx.textAlign = 'right';
+  for (let y = Math.ceil(ymin / yStep) * yStep; y <= ymax + 1e-9; y += yStep) {
+    if (Math.abs(y) < 1e-9) continue;
+    const py = toY(y);
+    ctx.fillText(fmt(y), Math.max(30, x0 - 4), py + 4);
+  }
+
+  return { toX, toY };
+}
+
+function niceStep(range, targetTicks) {
+  const raw = range / targetTicks;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const norm = raw / mag;
+  let step;
+  if (norm < 1.5) step = 1;
+  else if (norm < 3.5) step = 2;
+  else if (norm < 7.5) step = 5;
+  else step = 10;
+  return step * mag;
+}
+
+function fmt(v) {
+  if (Math.abs(v) >= 10) return v.toFixed(0);
+  if (Math.abs(v) >= 1) return v.toFixed(1);
+  return v.toFixed(2);
+}
+
+/* Shade a region between two y values */
+function shadeRegion(ctx, w, h, toX, toY, xA, xB, yA, yB, color) {
+  const px1 = Math.max(0, toX(xA));
+  const px2 = Math.min(w, toX(xB));
+  const py1 = Math.max(0, toY(yB));
+  const py2 = Math.min(h, toY(yA));
+  ctx.fillStyle = color;
+  ctx.fillRect(px1, py1, px2 - px1, py2 - py1);
+}
+
+/* Draw horizontal dashed reference line */
+function hLine(ctx, w, toY, y, color = '#AAA') {
+  ctx.beginPath();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 4]);
+  ctx.moveTo(0, toY(y));
+  ctx.lineTo(w, toY(y));
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ACTIVATION FUNCTION DEFINITIONS
+═══════════════════════════════════════════════════════════════════ */
+
+const AF = {
+  relu: {
+    label: 'ReLU',
+    color: '#2D5A1B',
+    fn: (x, p) => Math.max(0, x),
+    dr: (x, p) => x > 0 ? 1 : 0,
+    eq: () => 'f(x) = max(0, x)',
+    annos: () => [
+      { cls: 'anno-sat', title: 'Saturation', text: 'Zero for all x < 0. No saturation on the positive side — output grows without bound.' },
+      { cls: 'anno-grad', title: 'Vanishing Gradient', text: 'Gradient is exactly 0 for x < 0 ("dying ReLU" problem). Neurons that always receive negative pre-activations become permanently inactive.' },
+      { cls: 'anno-use', title: 'When to use', text: 'Default choice for hidden layers in feedforward and convolutional networks. Fast, sparse activations, but watch for dying neurons with large learning rates.' },
+      { cls: 'anno-note', title: 'Note', text: 'Not differentiable at x = 0. In practice the sub-gradient 0 is used there.' },
+    ]
+  },
+  leaky: {
+    label: 'Leaky ReLU',
+    color: '#2D5A1B',
+    fn: (x, p) => x > 0 ? x : p.alpha * x,
+    dr: (x, p) => x > 0 ? 1 : p.alpha,
+    eq: (p) => `f(x) = x if x > 0, else αx   (α = ${p.alpha.toFixed(3)})`,
+    annos: (p) => [
+      { cls: 'anno-sat', title: 'Saturation', text: 'No hard saturation on either side. The negative slope α prevents dead neurons.' },
+      { cls: 'anno-grad', title: 'Vanishing Gradient', text: `Gradient is α = ${p.alpha.toFixed(3)} for x < 0 — small but non-zero. Eliminates the dying-ReLU problem at the cost of slight asymmetry.` },
+      { cls: 'anno-use', title: 'When to use', text: 'Preferred over vanilla ReLU when dying neurons are observed. α is often a fixed hyperparameter (e.g. 0.01); for learned α see PReLU.' },
+    ]
+  },
+  absval: {
+    label: 'Abs Value Rectification',
+    color: '#2D5A1B',
+    fn: (x, p) => Math.abs(x),
+    dr: (x, p) => x > 0 ? 1 : (x < 0 ? -1 : 0),
+    eq: () => 'f(x) = |x|',
+    annos: () => [
+      { cls: 'anno-sat', title: 'Saturation', text: 'No saturation. Both positive and negative inputs produce positive outputs, preserving magnitude information.' },
+      { cls: 'anno-grad', title: 'Gradient', text: 'Gradient is ±1 everywhere (except x = 0). No vanishing gradient — even on the negative side.' },
+      { cls: 'anno-use', title: 'When to use', text: 'Used in image processing pipelines and complex-valued networks where polarity is less meaningful than magnitude. Less common as a general hidden-layer activation.' },
+    ]
+  },
+  elu: {
+    label: 'ELU',
+    color: '#2D5A1B',
+    fn: (x, p) => x > 0 ? x : p.eluAlpha * (Math.exp(x) - 1),
+    dr: (x, p) => x > 0 ? 1 : p.eluAlpha * Math.exp(x),
+    eq: (p) => `f(x) = x if x > 0, else α(eˣ − 1)   (α = ${p.eluAlpha.toFixed(2)})`,
+    annos: (p) => [
+      { cls: 'anno-sat', title: 'Saturation', text: `Saturates to −α = ${(-p.eluAlpha).toFixed(2)} as x → −∞. The mean activation is pushed toward zero, reducing internal covariate shift.` },
+      { cls: 'anno-grad', title: 'Vanishing Gradient', text: 'Gradient is always positive: equals 1 for x > 0 and αeˣ for x < 0. No dying units. Gradient shrinks smoothly as x → −∞.' },
+      { cls: 'anno-use', title: 'When to use', text: 'Good alternative to ReLU when near-zero mean activations matter. Slightly more expensive (exponential). SELU is a self-normalizing variant.' },
+    ]
+  },
+  swish: {
+    label: 'Swish (SiLU)',
+    color: '#2D5A1B',
+    fn: (x, p) => x / (1 + Math.exp(-p.beta * x)),
+    dr: (x, p) => {
+      const sig = 1 / (1 + Math.exp(-p.beta * x));
+      return sig + p.beta * x * sig * (1 - sig);
+    },
+    eq: (p) => `f(x) = x · σ(βx)   (β = ${p.beta.toFixed(2)})`,
+    annos: (p) => [
+      { cls: 'anno-sat', title: 'Saturation', text: 'Slightly negative for small negative x (non-monotone), then approaches 0 as x → −∞. Not fully saturating on the positive side.' },
+      { cls: 'anno-grad', title: 'Vanishing Gradient', text: 'Smooth, non-zero gradient everywhere. The non-monotonicity allows the gradient to remain meaningful even for moderately negative inputs.' },
+      { cls: 'anno-use', title: 'When to use', text: `β = 1 is standard (Sigmoid Linear Unit / SiLU). β → ∞ recovers ReLU. Often outperforms ReLU in deep networks (used in EfficientNet, LLaMA, etc.).` },
+      { cls: 'anno-note', title: 'Note', text: 'The slight negative lobe acts as a soft gating mechanism — the network can "push down" weakly activated neurons.' },
+    ]
+  },
+
+  sigmoid: {
+    label: 'Sigmoid',
+    color: '#6A2D8F',
+    fn: (x, p) => 1 / (1 + Math.exp(-p.sigBeta * x)),
+    dr: (x, p) => {
+      const s = 1 / (1 + Math.exp(-p.sigBeta * x));
+      return p.sigBeta * s * (1 - s);
+    },
+    eq: (p) => `f(x) = 1 / (1 + e^(−βx))   (β = ${p.sigBeta.toFixed(2)})`,
+    annos: (p) => [
+      { cls: 'anno-sat', title: 'Saturation', text: 'Saturates to 0 (x → −∞) and 1 (x → +∞). Outputs are bounded in (0, 1) — useful as a probability output layer.' },
+      { cls: 'anno-grad', title: 'Vanishing Gradient', text: `Max gradient is β/4 = ${(p.sigBeta/4).toFixed(3)} at x = 0. For |x| > 3 the gradient falls below 0.05 — gradients vanish in deep networks.` },
+      { cls: 'anno-use', title: 'When to use', text: 'Output layer for binary classification. Rarely used in hidden layers of deep networks due to vanishing gradients and non-zero mean activations.' },
+    ]
+  },
+  tanh: {
+    label: 'Tanh',
+    color: '#6A2D8F',
+    fn: (x, p) => Math.tanh(p.sigBeta * x),
+    dr: (x, p) => {
+      const t = Math.tanh(p.sigBeta * x);
+      return p.sigBeta * (1 - t * t);
+    },
+    eq: (p) => `f(x) = tanh(βx)   (β = ${p.sigBeta.toFixed(2)})`,
+    annos: (p) => [
+      { cls: 'anno-sat', title: 'Saturation', text: 'Saturates to −1 (x → −∞) and +1 (x → +∞). Zero-centered — an advantage over sigmoid for hidden layers.' },
+      { cls: 'anno-grad', title: 'Vanishing Gradient', text: `Max gradient is β at x = 0. Still vanishes for large |x|, but zero-centering mitigates gradient zigzag through layers.` },
+      { cls: 'anno-use', title: 'When to use', text: 'Preferred over sigmoid for hidden layers in RNNs and LSTMs. Better conditioning than sigmoid but still limited in very deep feedforward nets.' },
+    ]
+  },
+
+  linear: {
+    label: 'Linear',
+    color: '#1A56A0',
+    fn: (x, p) => p.linW * x + p.linB,
+    dr: (x, p) => p.linW,
+    eq: (p) => `f(x) = wx + b   (w = ${p.linW.toFixed(2)}, b = ${p.linB.toFixed(2)})`,
+    annos: (p) => [
+      { cls: 'anno-sat', title: 'Saturation', text: 'No saturation at all. Output grows (or shrinks) without bound as |x| increases.' },
+      { cls: 'anno-grad', title: 'Gradient', text: `Gradient is constant: f′(x) = w = ${p.linW.toFixed(2)}. No vanishing or exploding gradient from the activation itself.` },
+      { cls: 'anno-use', title: 'When to use', text: 'Output layer for regression tasks. A stack of linear hidden layers collapses to a single linear function — no representational benefit without non-linearity.' },
+      { cls: 'anno-note', title: 'Note', text: 'Identity activation (w=1, b=0) is used in residual skip connections and output layers when the target is unbounded.' },
+    ]
+  },
+};
+
+/* ═══════════════════════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════════════════════ */
+
+const P = {
+  reluFn: 'relu',
+  alpha: 0.01,
+  eluAlpha: 1.0,
+  beta: 1.0,
+
+  sigFn: 'sigmoid',
+  sigBeta: 1.0,
+
+  linW: 1.0,
+  linB: 0.0,
+
+  maxoutK: 2,
+  maxoutPieces: [
+    { w: 1, b: 0 },
+    { w: -0.5, b: 1 },
+    { w: 0.3, b: -0.5 },
+    { w: -1, b: 2 },
+    { w: 0.8, b: -1 },
+  ]
+};
+
+/* ═══════════════════════════════════════════════════════════════════
+   TAB SWITCHING
+═══════════════════════════════════════════════════════════════════ */
+
+document.getElementById('tab-bar').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-tab]');
+  if (!btn) return;
+  document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  requestAnimationFrame(() => { renderAll(); });
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   RENDER HELPERS
+═══════════════════════════════════════════════════════════════════ */
+
+function renderPlotPair(fnCanvas, drCanvas, fnDef, params, fnColor, drColor, xRange = [-4, 4], fixedYBounds) {
+  const [xmin, xmax] = xRange;
+
+  // Sample to find y range
+  const N = 500;
+  const ys = [], dys = [];
+  for (let i = 0; i <= N; i++) {
+    const x = xmin + (xmax - xmin) * i / N;
+    const y = fnDef.fn(x, params);
+    const dy = fnDef.dr(x, params);
+    if (isFinite(y)) ys.push(y);
+    if (isFinite(dy)) dys.push(dy);
+  }
+
+  const ymin = fixedYBounds ? fixedYBounds[0] : Math.min(...ys) - 0.3;
+  const ymax = fixedYBounds ? fixedYBounds[1] : Math.max(...ys) + 0.3;
+  const dymin = Math.min(...dys) - 0.15;
+  const dymax = Math.max(...dys) + 0.15;
+
+  // Function plot
+  {
+    const r = resizeCanvas(fnCanvas);
+    if (!r) return;
+    const { ctx, w, h } = r;
+    const { toX, toY } = drawAxes(ctx, w, h, xmin, xmax, ymin, ymax);
+    // identity reference dashed
+    ctx.beginPath(); ctx.strokeStyle = '#CCC'; ctx.lineWidth = 1; ctx.setLineDash([4,4]);
+    ctx.moveTo(toX(xmin), toY(xmin)); ctx.lineTo(toX(xmax), toY(xmax)); ctx.stroke();
+    ctx.setLineDash([]);
+    plotFn(ctx, w, h, x => fnDef.fn(x, params), { xmin, xmax, ymin, ymax, color: fnColor, lineWidth: 2.5 });
+  }
+
+  // Derivative plot
+  {
+    const r = resizeCanvas(drCanvas);
+    if (!r) return;
+    const { ctx, w, h } = r;
+    const { toX, toY } = drawAxes(ctx, w, h, xmin, xmax, dymin, dymax);
+    // zero reference
+    hLine(ctx, w, toY, 0, '#CCC');
+    plotFn(ctx, w, h, x => fnDef.dr(x, params), { xmin, xmax, ymin: dymin, ymax: dymax, color: drColor, lineWidth: 2.5 });
+  }
+}
+
+function setAnnos(container, annos) {
+  container.innerHTML = annos.map(a =>
+    `<div class="anno ${a.cls}"><strong>${a.title}</strong>${a.text}</div>`
+  ).join('');
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   RELU TAB
+═══════════════════════════════════════════════════════════════════ */
+
+function renderRelu() {
+  const fnId = P.reluFn;
+  const def = AF[fnId];
+  const params = { alpha: P.alpha, eluAlpha: P.eluAlpha, beta: P.beta };
+
+  document.getElementById('relu-eq-text').innerHTML = def.eq(params);
+  setAnnos(document.getElementById('relu-annos'), def.annos(params));
+
+  renderPlotPair(
+    document.getElementById('relu-fn-canvas'),
+    document.getElementById('relu-dr-canvas'),
+    def, params,
+    '#2D5A1B', '#E8630A'
+  );
+}
+
+// Function selector
+document.getElementById('relu-fn-btns').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-fn]');
+  if (!btn) return;
+  P.reluFn = btn.dataset.fn;
+  document.querySelectorAll('#relu-fn-btns button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  updateReluParamVis();
+  renderRelu();
+});
+
+function updateReluParamVis() {
+  document.getElementById('param-alpha').style.display = P.reluFn === 'leaky' ? '' : 'none';
+  document.getElementById('param-elu-alpha').style.display = P.reluFn === 'elu' ? '' : 'none';
+  document.getElementById('param-beta').style.display = P.reluFn === 'swish' ? '' : 'none';
+}
+
+bindSlider('sld-alpha', 'val-alpha', v => { P.alpha = +v; }, v => v.toFixed(3), renderRelu);
+bindSlider('sld-elu-alpha', 'val-elu-alpha', v => { P.eluAlpha = +v; }, v => v.toFixed(2), renderRelu);
+bindSlider('sld-beta', 'val-beta', v => { P.beta = +v; }, v => v.toFixed(2), renderRelu);
+
+/* ═══════════════════════════════════════════════════════════════════
+   SIGMOID TAB
+═══════════════════════════════════════════════════════════════════ */
+
+function renderSigmoid() {
+  const fnId = P.sigFn;
+  const def = AF[fnId];
+  const params = { sigBeta: P.sigBeta };
+
+  document.getElementById('sig-eq-text').innerHTML = def.eq(params);
+  setAnnos(document.getElementById('sig-annos'), def.annos(params));
+
+  const yBounds = fnId === 'sigmoid' ? [-0.1, 1.1] : [-1.1, 1.1];
+  renderPlotPair(
+    document.getElementById('sig-fn-canvas'),
+    document.getElementById('sig-dr-canvas'),
+    def, params,
+    '#6A2D8F', '#E8630A',
+    [-6, 6],
+    yBounds
+  );
+
+  // Draw saturation markers on the function canvas
+  const cnv = document.getElementById('sig-fn-canvas');
+  const r = resizeCanvas(cnv);
+  if (!r) return;
+  const { ctx, w, h } = r;
+  const xmin = -6, xmax = 6;
+  const [ym, yM] = yBounds;
+  const toX = x => (x - xmin) / (xmax - xmin) * w;
+  const toY = y => h - (y - ym) / (yM - ym) * h;
+  // Re-draw (resizeCanvas cleared it)
+  drawAxes(ctx, w, h, xmin, xmax, ym, yM);
+  ctx.beginPath(); ctx.strokeStyle='#CCC'; ctx.lineWidth=1; ctx.setLineDash([4,4]);
+  ctx.moveTo(toX(xmin),toY(xmin)); ctx.lineTo(toX(xmax),toY(xmax)); ctx.stroke();
+  ctx.setLineDash([]);
+  if (fnId === 'sigmoid') {
+    hLine(ctx, w, toY, 0, 'rgba(106,45,143,0.25)');
+    hLine(ctx, w, toY, 1, 'rgba(106,45,143,0.25)');
+  } else {
+    hLine(ctx, w, toY, -1, 'rgba(106,45,143,0.25)');
+    hLine(ctx, w, toY, 1, 'rgba(106,45,143,0.25)');
+  }
+  plotFn(ctx, w, h, x => def.fn(x, params), { xmin, xmax, ymin: ym, ymax: yM, color: '#6A2D8F', lineWidth: 2.5 });
+}
+
+document.getElementById('sig-fn-btns').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-fn]');
+  if (!btn) return;
+  P.sigFn = btn.dataset.fn;
+  document.querySelectorAll('#sig-fn-btns button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderSigmoid();
+});
+
+bindSlider('sld-sig-beta', 'val-sig-beta', v => { P.sigBeta = +v; }, v => v.toFixed(2), renderSigmoid);
+
+/* ═══════════════════════════════════════════════════════════════════
+   LINEAR TAB
+═══════════════════════════════════════════════════════════════════ */
+
+function renderLinear() {
+  const def = AF.linear;
+  const params = { linW: P.linW, linB: P.linB };
+  document.getElementById('lin-eq-text').textContent = def.eq(params);
+  setAnnos(document.getElementById('lin-annos'), def.annos(params));
+  renderPlotPair(
+    document.getElementById('lin-fn-canvas'),
+    document.getElementById('lin-dr-canvas'),
+    def, params, '#1A56A0', '#E8630A'
+  );
+}
+
+bindSlider('sld-lin-w', 'val-lin-w', v => { P.linW = +v; }, v => v.toFixed(2), renderLinear);
+bindSlider('sld-lin-b', 'val-lin-b', v => { P.linB = +v; }, v => v.toFixed(2), renderLinear);
+
+/* ═══════════════════════════════════════════════════════════════════
+   MAXOUT TAB
+═══════════════════════════════════════════════════════════════════ */
+
+const MAXOUT_COLORS = ['#2D5A1B','#E8630A','#6A2D8F','#1A56A0','#B0321D'];
+
+function buildMaxoutControls() {
+  const cont = document.getElementById('maxout-pieces-ctrl');
+  cont.innerHTML = '';
+  for (let j = 0; j < P.maxoutK; j++) {
+    const pc = P.maxoutPieces[j];
+    const hue = MAXOUT_COLORS[j];
+    const div = document.createElement('div');
+    div.style.cssText = 'margin-bottom:.5rem;padding:.4rem .6rem;border-radius:6px;background:var(--cream-mid);border-left:3px solid ' + hue;
+    div.innerHTML = `
+      <div style="font-size:.72rem;font-weight:600;color:${hue};margin-bottom:.3rem;font-family:'IBM Plex Mono',monospace">Piece ${j+1}</div>
+      <div class="srow">
+        <span class="slbl" style="color:${hue}">w</span>
+        <input type="range" data-j="${j}" data-p="w" min="-3" max="3" step="0.05" value="${pc.w}">
+        <span class="sval" id="mx-w-${j}">${pc.w.toFixed(2)}</span>
+      </div>
+      <div class="srow">
+        <span class="slbl" style="color:${hue}">b</span>
+        <input type="range" data-j="${j}" data-p="b" min="-3" max="3" step="0.05" value="${pc.b}">
+        <span class="sval" id="mx-b-${j}">${pc.b.toFixed(2)}</span>
+      </div>
+    `;
+    cont.appendChild(div);
+  }
+  cont.querySelectorAll('input[type=range]').forEach(sld => {
+    sld.addEventListener('input', () => {
+      const j = +sld.dataset.j, p = sld.dataset.p;
+      P.maxoutPieces[j][p] = +sld.value;
+      document.getElementById(`mx-${p}-${j}`).textContent = (+sld.value).toFixed(2);
+      renderMaxout();
+    });
+  });
+
+  // Legend
+  const leg = document.getElementById('maxout-legend');
+  leg.innerHTML = '';
+  for (let j = 0; j < P.maxoutK; j++) {
+    leg.innerHTML += `<div class="legend-item"><span class="legend-swatch" style="background:${MAXOUT_COLORS[j]}"></span>Piece ${j+1}</div>`;
+  }
+  leg.innerHTML += `<div class="legend-item"><span class="legend-swatch" style="background:#1A1A1A;height:3px"></span>max(·) output</div>`;
+  leg.innerHTML += `<div class="legend-item"><span class="legend-swatch" style="background:var(--orange)"></span>derivative</div>`;
+}
+
+function renderMaxout() {
+  setAnnos(document.getElementById('maxout-annos'), [
+    { cls: 'anno-sat', title: 'Saturation', text: 'No saturation. The max over linear functions is piecewise linear and unbounded.' },
+    { cls: 'anno-grad', title: 'Gradient', text: 'Gradient is the slope of whichever linear piece is currently maximal. Piecewise constant — no vanishing gradient from the activation itself.' },
+    { cls: 'anno-use', title: 'When to use', text: `With k linear pieces, a maxout unit can approximate any convex function. A two-hidden-layer maxout network is a universal approximator. Used in dropout-heavy settings (GAN generators, etc.).` },
+    { cls: 'anno-note', title: 'Note', text: `Each maxout unit requires k times as many parameters as a standard unit. The winning piece changes with x, acting like learned gating.` },
+  ]);
+
+  const xmin = -4, xmax = 4;
+
+  // Compute bounds
+  const N = 400;
+  const ys = [];
+  for (let i = 0; i <= N; i++) {
+    const x = xmin + (xmax - xmin) * i / N;
+    ys.push(maxoutFn(x));
+  }
+  const ymin = Math.min(...ys) - 0.5;
+  const ymax = Math.max(...ys) + 0.5;
+
+  // Function canvas
+  {
+    const cnv = document.getElementById('maxout-fn-canvas');
+    const r = resizeCanvas(cnv);
+    if (!r) return;
+    const { ctx, w, h } = r;
+    drawAxes(ctx, w, h, xmin, xmax, ymin, ymax);
+    // Draw each piece lightly
+    for (let j = 0; j < P.maxoutK; j++) {
+      const pc = P.maxoutPieces[j];
+      plotFn(ctx, w, h, x => pc.w * x + pc.b, { xmin, xmax, ymin, ymax, color: MAXOUT_COLORS[j] + '55', lineWidth: 1.5, dashed: true });
+    }
+    // Draw maxout solid
+    plotFn(ctx, w, h, x => maxoutFn(x), { xmin, xmax, ymin, ymax, color: '#1A1A1A', lineWidth: 2.5 });
+  }
+
+  // Derivative canvas
+  {
+    const cnv = document.getElementById('maxout-dr-canvas');
+    const r = resizeCanvas(cnv);
+    if (!r) return;
+    const { ctx, w, h } = r;
+    const slopes = P.maxoutPieces.slice(0, P.maxoutK).map(pc => pc.w);
+    const dmin = Math.min(...slopes) - 0.3;
+    const dmax = Math.max(...slopes) + 0.3;
+    drawAxes(ctx, w, h, xmin, xmax, dmin, dmax);
+    hLine(ctx, w, y => (h - (y - dmin) / (dmax - dmin) * h), 0, '#CCC');
+    plotFn(ctx, w, h, x => maxoutDr(x), { xmin, xmax, ymin: dmin, ymax: dmax, color: '#E8630A', lineWidth: 2.5 });
+  }
+}
+
+function maxoutFn(x) {
+  let best = -Infinity;
+  for (let j = 0; j < P.maxoutK; j++) {
+    const v = P.maxoutPieces[j].w * x + P.maxoutPieces[j].b;
+    if (v > best) best = v;
+  }
+  return best;
+}
+
+function maxoutDr(x) {
+  let best = -Infinity, bestJ = 0;
+  for (let j = 0; j < P.maxoutK; j++) {
+    const v = P.maxoutPieces[j].w * x + P.maxoutPieces[j].b;
+    if (v > best) { best = v; bestJ = j; }
+  }
+  return P.maxoutPieces[bestJ].w;
+}
+
+document.getElementById('maxout-k-btns').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-k]');
+  if (!btn) return;
+  P.maxoutK = +btn.dataset.k;
+  document.querySelectorAll('#maxout-k-btns button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  buildMaxoutControls();
+  renderMaxout();
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   COMPARE TAB
+═══════════════════════════════════════════════════════════════════ */
+
+const CMP_FNS = [
+  { key: 'relu',    label: 'ReLU',          fn: x => Math.max(0, x),                     color: '#2D5A1B' },
+  { key: 'leaky',   label: 'Leaky ReLU',    fn: x => x > 0 ? x : 0.1 * x,               color: '#4A8C2F' },
+  { key: 'absval',  label: 'Abs Value',     fn: x => Math.abs(x),                        color: '#7AAF50' },
+  { key: 'elu',     label: 'ELU (α=1)',     fn: x => x > 0 ? x : (Math.exp(x) - 1),     color: '#B0D88A' },
+  { key: 'swish',   label: 'Swish (β=1)',   fn: x => x / (1 + Math.exp(-x)),             color: '#C8E6A8' },
+  { key: 'sigmoid', label: 'Sigmoid',       fn: x => 1 / (1 + Math.exp(-x)),             color: '#6A2D8F' },
+  { key: 'tanh',    label: 'Tanh',          fn: x => Math.tanh(x),                       color: '#9A5DBF' },
+  { key: 'linear',  label: 'Linear (w=1)',  fn: x => x,                                  color: '#1A56A0' },
+];
+
+function renderCompare() {
+  // Main overview canvas
+  {
+    const cnv = document.getElementById('cmp-main-canvas');
+    const r = resizeCanvas(cnv);
+    if (!r) return;
+    const { ctx, w, h } = r;
+    drawAxes(ctx, w, h, -4, 4, -2, 4);
+    for (const c of CMP_FNS) {
+      plotFn(ctx, w, h, c.fn, { xmin: -4, xmax: 4, ymin: -2, ymax: 4, color: c.color, lineWidth: 2 });
+    }
+  }
+
+  // Legend
+  const leg = document.getElementById('cmp-legend');
+  leg.innerHTML = CMP_FNS.map(c =>
+    `<div class="legend-item"><span class="legend-swatch" style="background:${c.color}"></span>${c.label}</div>`
+  ).join('');
+
+  // Individual mini cards
+  const grid = document.getElementById('cmp-cards');
+  grid.innerHTML = '';
+  for (const c of CMP_FNS) {
+    const card = document.createElement('div');
+    card.className = 'cmp-card';
+    card.innerHTML = `<h4>${c.label}</h4><div class="cmp-canvas-wrap"><canvas id="cmp-${c.key}"></canvas></div>`;
+    grid.appendChild(card);
+  }
+
+  requestAnimationFrame(() => {
+    for (const c of CMP_FNS) {
+      const cnv = document.getElementById('cmp-' + c.key);
+      const r = resizeCanvas(cnv);
+      if (!r) continue;
+      const { ctx, w, h } = r;
+      drawAxes(ctx, w, h, -4, 4, -1.5, 3.5);
+      plotFn(ctx, w, h, c.fn, { xmin: -4, xmax: 4, ymin: -1.5, ymax: 3.5, color: c.color, lineWidth: 2 });
+    }
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SLIDER BINDING HELPER
+═══════════════════════════════════════════════════════════════════ */
+
+function bindSlider(sliderId, valId, setter, fmtFn, renderer) {
+  const sld = document.getElementById(sliderId);
+  const val = document.getElementById(valId);
+  if (!sld || !val) return;
+  sld.addEventListener('input', () => {
+    setter(sld.value);
+    val.textContent = fmtFn(+sld.value);
+    renderer();
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   RENDER ALL (called on tab switch & resize)
+═══════════════════════════════════════════════════════════════════ */
+
+function renderAll() {
+  const activeTab = document.querySelector('.tab-pane.active');
+  if (!activeTab) return;
+  const id = activeTab.id;
+  if (id === 'tab-relu') renderRelu();
+  else if (id === 'tab-sigmoid') renderSigmoid();
+  else if (id === 'tab-linear') renderLinear();
+  else if (id === 'tab-maxout') renderMaxout();
+  else if (id === 'tab-compare') renderCompare();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════════════════ */
+
+updateReluParamVis();
+buildMaxoutControls();
+
+// Initial render after layout settles
+requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
+    renderRelu();
+  });
+});
+
+// Resize handler (debounced)
+let _resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(_resizeTimer);
+  _resizeTimer = setTimeout(renderAll, 120);
+});
+</script>
+</body>
+</html>

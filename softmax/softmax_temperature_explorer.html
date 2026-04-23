@@ -1,4 +1,6 @@
 <!DOCTYPE html>
+<!-- Copyright © 2026 Theodore P. Pavlic. Arizona State University. MIT License.
+     Adapted for INFO 557: Neural Networks by Greg Chism, University of Arizona. -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -10,17 +12,21 @@
 <meta property="og:type" content="website">
 <meta property="og:title" content="Softmax Temperature Explorer — interactive explainer">
 <meta property="og:description" content="An interactive explorer for the softmax (Gibbs) distribution: see how temperature controls the sharpness of probability distributions over discrete choices, connecting MaxEnt methods to Simulated Annealing and reinforcement learning.">
-<meta property="og:image" content="https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/softmax/softmax_temperature_explorer-preview.png">
+<meta property="og:image" content="https://gchism94.github.io/uofa-neural-networks/softmax/softmax_temperature_explorer-preview.png">
 <meta property="og:image:width" content="1702">
 <meta property="og:image:height" content="850">
-<meta property="og:url" content="https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/softmax/softmax_temperature_explorer.html">
+<meta property="og:url" content="https://gchism94.github.io/uofa-neural-networks/softmax/softmax_temperature_explorer.html">
 <meta property="fb:app_id" content="2385695445236853">
 
 <!-- Twitter/X card -->
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Softmax Temperature Explorer — interactive explainer">
 <meta name="twitter:description" content="An interactive explorer for the softmax (Gibbs) distribution: see how temperature controls the sharpness of probability distributions over discrete choices, connecting MaxEnt methods to Simulated Annealing and reinforcement learning.">
-<meta name="twitter:image" content="https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/softmax/softmax_temperature_explorer-preview.png">
+<meta name="twitter:image" content="https://gchism94.github.io/uofa-neural-networks/softmax/softmax_temperature_explorer-preview.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
 <style>
 :root {
   --bg:      #ffffff;
@@ -48,7 +54,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
   font-size: 15px;
   line-height: 1.6;
   color: var(--tx);
@@ -372,9 +378,21 @@ input[type=range]#smxT::-moz-range-thumb {
 /* ── copyright ──────────────────────────────────── */
 .copy { font-size: 11px; color: var(--tx3); }
 .copy a { color: var(--tx3); text-decoration: underline; text-underline-offset: 2px; }
+
+/* ── Fixed copyright ─────────────────────────────────────────────── */
+.cr-top{
+  position:fixed;top:.75rem;right:1rem;z-index:1000;
+  font-size:.72rem;color:#888;text-align:right;
+  background:rgba(250,247,240,0.92);padding:.2rem .5rem;
+  border-radius:5px;backdrop-filter:blur(4px);
+  border:1px solid #DDD6BE;
+}
+.cr-top a{color:#E8630A;text-decoration:none}
+.cr-top a:hover{text-decoration:underline}
 </style>
 </head>
 <body>
+<div class="cr-top">© 2026 Theodore P. Pavlic<br><a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a></div>
 
 <!-- 1. Formula banner + mode toggle -->
 <div class="fbanner" id="fbanner">

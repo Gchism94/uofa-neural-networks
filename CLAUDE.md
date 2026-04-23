@@ -1,8 +1,14 @@
 # CLAUDE.md — conventions for this repository
 
-This repository hosts supplemental course visualizations for **CSE/IEE 598: Bio-Inspired AI &
-Optimization** at Arizona State University, taught by Theodore P. Pavlic. The live site is at
-<https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/>.
+This repository hosts supplemental course visualizations for **INFO 557: Neural Networks**
+at the University of Arizona, College of Information Science, taught by Greg Chism. The live
+site is at <https://gchism94.github.io/uofa-neural-networks/> *(placeholder — confirm URL
+before publishing)*.
+
+> **Attribution:** This repository is forked from Theodore P. Pavlic's
+> [asu-bioinspired-ai-and-optimization](https://github.com/tpavlic/asu-bioinspired-ai-and-optimization).
+> Some visualizations are adapted from that source under the MIT License.
+> © 2026 Theodore P. Pavlic.
 
 ---
 
@@ -51,17 +57,17 @@ Inside `<head>`, include all of the following, filling in the actual values:
 <meta property="og:type" content="website">
 <meta property="og:title" content="Demo Title — interactive explainer">
 <meta property="og:description" content="One or two sentences describing the demo.">
-<meta property="og:image" content="https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/my_demo/my_demo-preview.png">
+<meta property="og:image" content="https://gchism94.github.io/uofa-neural-networks/my_demo/my_demo-preview.png">
 <meta property="og:image:width" content="ACTUAL_WIDTH">
 <meta property="og:image:height" content="ACTUAL_HEIGHT">
-<meta property="og:url" content="https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/my_demo/my_demo.html">
+<meta property="og:url" content="https://gchism94.github.io/uofa-neural-networks/my_demo/my_demo.html">
 <meta property="fb:app_id" content="2385695445236853">
 
 <!-- Twitter/X card -->
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Demo Title — interactive explainer">
 <meta name="twitter:description" content="One or two sentences describing the demo.">
-<meta name="twitter:image" content="https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/my_demo/my_demo-preview.png">
+<meta name="twitter:image" content="https://gchism94.github.io/uofa-neural-networks/my_demo/my_demo-preview.png">
 </head>
 ```
 
@@ -119,13 +125,8 @@ Current sections and their placeholder comments:
 
 | Section heading | Placeholder comment |
 | --- | --- |
-| Genetic Algorithms | `<!-- Add more genetic algorithm demos here -->` |
-| Evolution Strategies | `<!-- Add more evolution strategies demos here -->` |
-| Evolutionary Programming &amp; Artificial Immune Systems | `<!-- Add more evolutionary programming and AIS demos here -->` |
-| Physics-Inspired Methods | `<!-- Add more physics-inspired demos here -->` |
-| Swarm Intelligence | `<!-- Add more swarm intelligence demos here -->` |
+| Probabilistic Foundations | `<!-- Add more probabilistic foundations demos here -->` |
 | Neural Networks | `<!-- Add more neural network demos here -->` |
-| Cellular Automata | `<!-- Add more cellular automata demos here -->` |
 
 To add a **new section**, copy the structure of an existing `<section class="demo-section">`
 block and add a corresponding nav link in the `<nav>` at the top of the page.
@@ -150,41 +151,11 @@ Add a row to the appropriate table under `## Contents`:
 
 ## Current sections and demos
 
-### Genetic Algorithms
+### Probabilistic Foundations
 
-- `shifting_balance_theory/sbt_four_peaks.html`
-- `ideal_free_distribution/ifd_on_pond.html`
-- `evolution_as_movement_in_drift_field/evolution_as_movement_in_drift_field.html` *(static figure)*
-- `genetic_algorithms/ga_explorer.html`
-
-### Evolution Strategies
-
-- `evolution_strategies/es_explorer.html`
-- `evolution_strategies/cmaes_explorer.html`
-
-### Evolutionary Programming & Artificial Immune Systems
-
-- `evolutionary_programming/evolprog_representations.html`
-- `artificial_immune_systems/ais_explorer.html`
-
-### Physics-Inspired Methods
-
-- `monte_carlo/mc_explorer.html`
-- `simulated_annealing/simulated_annealing_demo.html`
-- `parallel_tempering/parallel_tempering.html`
 - `softmax/softmax_temperature_explorer.html`
 - `maxent/maxent_demo.html`
 - `boltzmann_maxent/boltzmann_maxent_random_exchange.html`
-- `boltzmann_maxent/beta_spacings.html`
-
-### Swarm Intelligence
-
-- `collective_motion/boids_explorer.html`
-- `collective_motion/vicsek_explorer.html`
-- `particle_swarm_optimization/pso_explorer.html`
-- `bacterial_foraging_optimization/bfo_explorer.html` *(full BFO: 1-D and 2-D chemotaxis with cell-to-cell signaling, plus reproduction and elimination-dispersal)*
-- `ant_colony_optimization/aco_explorer.html`
-- `collective_behavior/ant_foraging_explorer.html`
 
 ### Neural Networks
 
@@ -200,11 +171,8 @@ Add a row to the appropriate table under `## Contents`:
 - `unsupervised_learning/autoencoder_explorer.html`
 - `transformers/transformer_explorer.html`
 - `transformers/toward_multimodal_AI.html`
-
-### Cellular Automata
-
-- `cellular_automata/eca_explorer.html`
-- `cellular_automata/voter_model.html`
+- `activation_functions/af_explorer.html`
+- `gradient_descent/gd_explorer.html`
 
 ---
 
@@ -215,35 +183,30 @@ course unit vocabulary so students can orient themselves.
 
 | Course unit | Topics | Index section |
 | --- | --- | --- |
-| Unit 1 | Genetic algorithms, evolutionary algorithms, genetic drift | Genetic Algorithms |
-| Unit 2 | Evolution Strategies, CMA-ES, genetic/evolutionary programming, artificial immune systems | Evolution Strategies; Evolutionary Programming &amp; Artificial Immune Systems |
-| Unit 3 | Multi-objective optimization, MOEA, Pareto ranking, niching | Genetic Algorithms |
-| Unit 4 | Multi-modal optimization, diversity/niching methods, distributed/parallel GAs | Genetic Algorithms |
-| Unit 5 | Simulated Annealing, MaxEnt, Gibbs/softmax, Metropolis–Hastings, MCMC | Physics-Inspired Methods |
-| Unit 6 | Ant Colony Optimization, Bacterial Foraging, Particle Swarm Optimization | Swarm Intelligence |
-| Unit 7 | Perceptrons, RNNs, Hebbian learning, STDP, spiking neural networks | Neural Networks |
-| Unit 8 *(if time)* | Cellular automata | Cellular Automata |
-| Unit 9 *(if time)* | Stochastic policies, multi-scale robotics | *(no section yet)* |
+| Unit 1 | Activation functions, feedforward networks, XOR problem | Neural Networks |
+| Unit 2 | Cost functions, gradient descent, backpropagation, computational graphs | Neural Networks |
+| Unit 3 | Regularization (L1/L2, dropout, early stopping, batch normalization) | Neural Networks |
+| Unit 4 | Optimization algorithms (SGD, momentum, Adam, RMSProp, AdaGrad) | Neural Networks; Probabilistic Foundations |
+| Unit 5 | Convolutional networks (convolution, pooling, translation invariance) | Neural Networks |
+| Unit 6 | Recurrent networks (RNNs, BPTT, LSTMs, GRUs, bidirectional RNNs) | Neural Networks |
+| Unit 7 | Transformers and attention mechanisms | Neural Networks |
+| Unit 8 | Model interpretability (LIME, gradient attribution) | Neural Networks |
 
 **Section title rationale:**
 
-- *"Genetic Algorithms"* — covers Units 1, 3, 4: canonical GA, multi-objective (MOEA/Pareto),
-  multi-modal optimization, niching, island model, and supporting conceptual foundations (fitness
-  landscape, drift, diversity, Ideal Free Distribution).
-- *"Evolution Strategies"* — covers the ES/CMA-ES strand of Unit 2: self-adaptive step sizes,
-  correlated mutations, and covariance matrix adaptation.
-- *"Evolutionary Programming & Artificial Immune Systems"* — covers the EP/AIS strand of Unit 2:
-  non-standard representations (ASTs, linear GP, FSMs) and immune-inspired algorithms (NSA, CLONALG).
-- *"Physics-Inspired Methods"* — matches Unit 5 phrasing exactly; covers both the metaheuristic
-  side (SA, PT) and the probabilistic/information-theoretic side (MaxEnt, Gibbs/softmax), all of
-  which share roots in statistical mechanics and the Boltzmann distribution.
-- *"Swarm Intelligence"* — covers Unit 6: ACO, BFO (chemotaxis, communication, reproduction, elimination-dispersal), and PSO.
-- *"Neural Networks"* — straightforward; covers Unit 7 content.
+- *"Neural Networks"* — the primary section; covers all eight course units: feedforward
+  architectures, training dynamics, regularization, optimization, CNNs, RNNs, Transformers,
+  and interpretability.
+- *"Probabilistic Foundations"* — covers the mathematical underpinnings shared across units:
+  the Gibbs/softmax distribution, Maximum Entropy, and the Boltzmann distribution. These
+  motivate temperature scaling in inference, energy-based models, and the information-theoretic
+  view of neural network training.
 
 ## Shared conventions
 
 - **Accent color:** `#2e7d32` (dark green) — used in links and section headings
-- **Copyright:** © Theodore P. Pavlic, MIT License (`LICENSE` file at repo root)
+- **Copyright:** © 2026 Greg Chism, MIT License (`LICENSE` file at repo root)
+  — © 2026 Theodore P. Pavlic (adapted visualizations, MIT License)
 - **fb:app_id:** `2385695445236853` — include in all OG blocks
-- **GitHub Pages base URL:** `https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/`
-- **YouTube channel:** <https://www.youtube.com/@TedPavlic> — linked from the index header
+- **GitHub Pages base URL:** `https://gchism94.github.io/uofa-neural-networks/` *(placeholder)*
+- **Attribution note:** Some visualizations adapted from Theodore P. Pavlic, ASU (MIT License)

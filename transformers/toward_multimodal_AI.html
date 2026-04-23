@@ -1,4 +1,6 @@
 <!DOCTYPE html>
+<!-- Copyright © 2026 Theodore P. Pavlic. Arizona State University. MIT License.
+     Adapted for INFO 557: Neural Networks by Greg Chism, University of Arizona. -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -10,17 +12,17 @@
 <meta property="og:type" content="website">
 <meta property="og:title" content="Toward Multimodal AI — interactive explainer">
 <meta property="og:description" content="Interactive explainer tracing the path from CNNs and patch embeddings to Vision Transformers (ViT), CLIP-style contrastive pretraining, and modern multimodal architectures — showing how a single attention mechanism unifies vision and language.">
-<meta property="og:image" content="https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/transformers/toward_multimodal_AI-preview.png">
+<meta property="og:image" content="https://gchism94.github.io/uofa-neural-networks/transformers/toward_multimodal_AI-preview.png">
 <meta property="og:image:width" content="2074">
 <meta property="og:image:height" content="796">
-<meta property="og:url" content="https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/transformers/toward_multimodal_AI.html">
+<meta property="og:url" content="https://gchism94.github.io/uofa-neural-networks/transformers/toward_multimodal_AI.html">
 <meta property="fb:app_id" content="2385695445236853">
 
 <!-- Twitter/X card -->
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Toward Multimodal AI — interactive explainer">
 <meta name="twitter:description" content="Interactive explainer tracing the path from CNNs and patch embeddings to Vision Transformers (ViT), CLIP-style contrastive pretraining, and modern multimodal architectures — showing how a single attention mechanism unifies vision and language.">
-<meta name="twitter:image" content="https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/transformers/toward_multimodal_AI-preview.png">
+<meta name="twitter:image" content="https://gchism94.github.io/uofa-neural-networks/transformers/toward_multimodal_AI-preview.png">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -195,9 +197,21 @@ strong{color:var(--green)}
 footer{background:var(--green);color:rgba(255,255,255,.65);text-align:center;padding:15px 32px;font-size:.73rem;font-family:var(--mono);margin-top:40px}
 footer a{color:rgba(255,255,255,.88)}
 hr{border:none;border-top:1px solid var(--border);margin:18px 0}
+
+/* ── Fixed copyright ─────────────────────────────────────────────── */
+.cr-top{
+  position:fixed;top:.75rem;right:1rem;z-index:1000;
+  font-size:.72rem;color:#888;text-align:right;
+  background:rgba(250,247,240,0.92);padding:.2rem .5rem;
+  border-radius:5px;backdrop-filter:blur(4px);
+  border:1px solid #DDD6BE;
+}
+.cr-top a{color:#E8630A;text-decoration:none}
+.cr-top a:hover{text-decoration:underline}
 </style>
 </head>
 <body>
+<div class="cr-top">© 2026 Theodore P. Pavlic<br><a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a></div>
 
 <header>
   <h1>Toward Multimodal AI</h1>

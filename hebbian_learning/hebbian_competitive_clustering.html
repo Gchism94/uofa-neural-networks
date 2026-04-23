@@ -1,4 +1,6 @@
 <!DOCTYPE html>
+<!-- Copyright © 2026 Theodore P. Pavlic. Arizona State University. MIT License.
+     Adapted for INFO 557: Neural Networks by Greg Chism, University of Arizona. -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -10,18 +12,20 @@
 <meta property="og:type" content="website">
 <meta property="og:title" content="Hebbian Learning &amp; Competitive Clustering — interactive explainer">
 <meta property="og:description" content="Explore Hebbian learning rules and lateral inhibition-driven competitive clustering in a traditional ANN — watch winner-take-all dynamics and simple synaptic updates organize input patterns into distinct categories without supervision.">
-<meta property="og:image" content="https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/hebbian_learning/hebbian_competitive_clustering-preview.png">
+<meta property="og:image" content="https://gchism94.github.io/uofa-neural-networks/hebbian_learning/hebbian_competitive_clustering-preview.png">
 <meta property="og:image:width" content="2104">
 <meta property="og:image:height" content="1028">
-<meta property="og:url" content="https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/hebbian_learning/hebbian_competitive_clustering.html">
+<meta property="og:url" content="https://gchism94.github.io/uofa-neural-networks/hebbian_learning/hebbian_competitive_clustering.html">
 <meta property="fb:app_id" content="2385695445236853">
 
 <!-- Twitter/X card -->
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Hebbian Learning &amp; Competitive Clustering — interactive explainer">
 <meta name="twitter:description" content="Explore Hebbian learning rules and lateral inhibition-driven competitive clustering in a traditional ANN — watch winner-take-all dynamics and simple synaptic updates organize input patterns into distinct categories without supervision.">
-<meta name="twitter:image" content="https://tpavlic.github.io/asu-bioinspired-ai-and-optimization/hebbian_learning/hebbian_competitive_clustering-preview.png">
+<meta name="twitter:image" content="https://gchism94.github.io/uofa-neural-networks/hebbian_learning/hebbian_competitive_clustering-preview.png">
 
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -115,9 +119,21 @@ input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;bac
   .hdr-copy .cn{display:block;}.hdr-copy .cs{display:none;}.hdr-copy .cl{display:block;margin-top:1px;}
 }
 .footer{margin-top:18px;text-align:right;font-size:.66rem;font-family:'IBM Plex Mono',monospace;color:var(--txt3);}
+
+/* ── Fixed copyright ─────────────────────────────────────────────── */
+.cr-top{
+  position:fixed;top:.75rem;right:1rem;z-index:1000;
+  font-size:.72rem;color:#888;text-align:right;
+  background:rgba(250,247,240,0.92);padding:.2rem .5rem;
+  border-radius:5px;backdrop-filter:blur(4px);
+  border:1px solid #DDD6BE;
+}
+.cr-top a{color:#E8630A;text-decoration:none}
+.cr-top a:hover{text-decoration:underline}
 </style>
 </head>
 <body>
+<div class="cr-top">© 2026 Theodore P. Pavlic<br><a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a></div>
 <div class="widget">
 
 <div class="hdr">
