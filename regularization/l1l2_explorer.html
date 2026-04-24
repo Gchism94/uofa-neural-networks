@@ -1096,6 +1096,8 @@ function resetLandscape() {
   renderLandscape();
   updateLandscapeAnnotation();
   updateLandscapeStepDisplay();
+  renderHistogram();
+  updateStats();
 }
 
 function stepLandscapeAnim() {
@@ -1279,6 +1281,9 @@ function switchTab(tab) {
     llContourCache = null;
     resetLandscape();
     updateLandscapeLegend();
+    initHistSVG();
+    renderHistogram();
+    updateStats();
   }
 }
 
