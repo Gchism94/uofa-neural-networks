@@ -189,6 +189,13 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 .legend{display:flex;gap:.75rem;flex-wrap:wrap;font-size:.72rem;color:var(--text-soft);margin-top:.45rem;align-items:center}
 .legend-dot{width:11px;height:11px;border-radius:50%;display:inline-block;vertical-align:middle;margin-right:.2rem}
 .legend-dot.dropped{background:#2A2A2A;border:1.5px dashed #555}
+.prop-bar{height:10px;border-radius:4px;overflow:hidden;background:var(--cream-mid);display:flex}
+.prop-active{background:#2e7d32;height:100%;transition:width .3s ease}
+.prop-dropped{background:#3A3A3A;height:100%;transition:width .3s ease}
+.mini-compare{margin-top:.55rem}
+.mini-row{display:flex;gap:.45rem}
+.mini-col{flex:1;min-width:0}
+.mini-col svg{width:100%;display:block;border-radius:4px}
 </style>
 </head>
 <body>
@@ -257,7 +264,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     </div>
 
     <div class="eq-bar">
-      <div class="eq-name">Inverted Dropout</div>
+      <div class="eq-name" id="eq-name">Inverted Dropout</div>
       <div class="eq-text" id="eq-text">ĥ = (h ⊙ Bern(1−p)) / (1−p)</div>
     </div>
 
@@ -296,6 +303,20 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
         <span><span class="legend-dot" style="background:#1A56A0;border:2px solid rgba(255,255,255,.35)"></span>Input node</span>
         <span><span class="legend-dot" style="background:#E8630A;border:2px solid rgba(255,255,255,.35)"></span>Output node</span>
       </div>
+      <div class="mini-compare" id="mini-compare" style="display:none">
+        <div style="font-size:.62rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:.35rem;text-align:center;padding-top:.55rem;border-top:1px solid var(--border-lt)">Training vs Inference</div>
+        <div class="mini-row">
+          <div class="mini-col">
+            <div style="font-size:.6rem;color:var(--text-muted);text-align:center;margin-bottom:.2rem;font-weight:500">Typical training pass</div>
+            <svg id="svg-mini-train" viewBox="0 0 200 150" preserveAspectRatio="none"></svg>
+          </div>
+          <div class="mini-col">
+            <div style="font-size:.6rem;color:var(--text-muted);text-align:center;margin-bottom:.2rem;font-weight:500">Inference — all active</div>
+            <svg id="svg-mini-infer" viewBox="0 0 200 150" preserveAspectRatio="none"></svg>
+          </div>
+        </div>
+        <div id="infer-compare-txt" style="font-size:.7rem;color:var(--text-soft);line-height:1.55;margin-top:.45rem;padding:.4rem .5rem;background:var(--cream-mid);border-radius:5px;border-left:3px solid var(--g-mid)"></div>
+      </div>
     </div>
 
   </div>
@@ -321,6 +342,20 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
         <div class="stat-block">
           <span class="sb-val" id="sb-avg-drop">—</span>
           <div class="sb-lbl">Avg Drop %</div>
+        </div>
+      </div>
+      <div style="margin-top:.5rem;padding-top:.45rem;border-top:1px solid var(--border-lt)">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.3rem">
+          <span style="font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted)">Current p</span>
+          <span id="sb-p-val" style="font-family:'IBM Plex Mono',monospace;font-size:.95rem;font-weight:600;color:var(--g-dk)">0.50</span>
+        </div>
+        <div style="font-size:.58rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.2rem">Hidden node activity</div>
+        <div class="prop-bar">
+          <div class="prop-active" id="prop-active" style="width:100%"></div>
+          <div class="prop-dropped" id="prop-dropped" style="width:0%"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:.58rem;color:var(--text-muted);margin-top:.15rem">
+          <span>Active</span><span>Dropped</span>
         </div>
       </div>
     </div>
@@ -373,6 +408,7 @@ let archKey='small',pVal=0.5,speedIdx=1;
 let passCount=0,lossHist=[],dropHist=[];
 let nodes=[],edges=[];
 let animating=false,playing=false,playTimer=null;
+let currentTab='training',inferenceMark=null;
 
 const svgNet=d3.select('#svg-net');
 const svgLoss=d3.select('#svg-loss');
@@ -401,10 +437,10 @@ function buildNetwork(){
   }
 }
 
-function renderNet(){
+/* ── Training network render ── */
+function renderNetTraining(){
   svgNet.selectAll('*').remove();
   svgNet.append('rect').attr('width',640).attr('height',480).attr('fill','#1A2A1A');
-
   const defs=svgNet.append('defs');
   const fl=defs.append('filter').attr('id','glow').attr('x','-60%').attr('y','-60%')
     .attr('width','220%').attr('height','220%');
@@ -412,14 +448,11 @@ function renderNet(){
   const m=fl.append('feMerge');
   m.append('feMergeNode').attr('in','blur');
   m.append('feMergeNode').attr('in','SourceGraphic');
-
   const nm=Object.fromEntries(nodes.map(n=>[n.id,n]));
-
   svgNet.append('g').selectAll('line').data(edges).join('line')
     .each(function(d){
       const fn=nm[d.from],tn=nm[d.to];
-      const drop=fn.dropped||tn.dropped;
-      const lit=fn.firing||tn.firing;
+      const drop=fn.dropped||tn.dropped,lit=fn.firing||tn.firing;
       d3.select(this)
         .attr('x1',fn.cx).attr('y1',fn.cy).attr('x2',tn.cx).attr('y2',tn.cy)
         .attr('stroke',drop?'#2E2E2E':lit?'#56e866':'#3A7A30')
@@ -427,10 +460,8 @@ function renderNet(){
         .attr('stroke-opacity',drop?0.22:lit?0.88:0.18+Math.abs(d.w)*0.52)
         .attr('stroke-dasharray',drop?'5,4':null);
     });
-
   const ng=svgNet.append('g').selectAll('g').data(nodes).join('g')
     .attr('transform',d=>`translate(${d.cx},${d.cy})`);
-
   ng.append('circle').attr('r',d=>d.r)
     .each(function(d){
       let fill='#2e7d32',stroke='rgba(255,255,255,.4)',sw=2,op=1,filt=null;
@@ -441,23 +472,76 @@ function renderNet(){
       d3.select(this).attr('fill',fill).attr('stroke',stroke).attr('stroke-width',sw)
         .attr('opacity',op).attr('filter',filt);
     });
-
   ng.filter(d=>d.type==='input').append('text')
     .text(d=>'x'+SUB[d.idx]).attr('x',d=>-(d.r+8)).attr('y',4)
     .attr('font-family','IBM Plex Mono,monospace').attr('font-size',11)
     .attr('fill','rgba(255,255,255,.62)').attr('text-anchor','end');
-
   ng.filter(d=>d.type==='output').append('text')
     .text(d=>'y'+SUB[d.idx]).attr('x',d=>d.r+8).attr('y',4)
     .attr('font-family','IBM Plex Mono,monospace').attr('font-size',11)
     .attr('fill','rgba(255,255,255,.62)').attr('text-anchor','start');
-
   ng.filter(d=>d.dropped).append('text').text('✕').attr('y',4)
     .attr('font-family','Outfit,sans-serif').attr('font-size',d=>Math.round(d.r*0.88))
     .attr('fill','#ff5555').attr('font-weight',700)
     .attr('text-anchor','middle').attr('dominant-baseline','middle');
 }
 
+/* ── Inference network render ── */
+function renderNetInference(){
+  const scale=1-pVal;
+  svgNet.selectAll('*').remove();
+  svgNet.append('rect').attr('width',640).attr('height',480).attr('fill','#0D1F0D');
+  const defs=svgNet.append('defs');
+  const fl=defs.append('filter').attr('id','glow').attr('x','-60%').attr('y','-60%')
+    .attr('width','220%').attr('height','220%');
+  fl.append('feGaussianBlur').attr('stdDeviation',7).attr('result','blur');
+  const m=fl.append('feMerge');
+  m.append('feMergeNode').attr('in','blur');
+  m.append('feMergeNode').attr('in','SourceGraphic');
+  // Scaling badge in SVG
+  svgNet.append('rect').attr('x',5).attr('y',5).attr('width',198).attr('height',24)
+    .attr('rx',5).attr('fill','rgba(26,86,160,.72)').attr('stroke','rgba(120,180,255,.4)').attr('stroke-width',1);
+  svgNet.append('text').attr('x',11).attr('y',20)
+    .attr('font-family','IBM Plex Mono,monospace').attr('font-size',12).attr('fill','white')
+    .text(`Inference · weights × (1−p) = ${scale.toFixed(2)}`);
+  const nm=Object.fromEntries(nodes.map(n=>[n.id,n]));
+  svgNet.append('g').selectAll('line').data(edges).join('line')
+    .each(function(d){
+      const fn=nm[d.from],tn=nm[d.to];
+      const lit=fn.firing||tn.firing;
+      const sw=d.w*scale;
+      d3.select(this)
+        .attr('x1',fn.cx).attr('y1',fn.cy).attr('x2',tn.cx).attr('y2',tn.cy)
+        .attr('stroke',lit?'#88ffaa':'#4AAA50')
+        .attr('stroke-width',lit?4.5:1.5+Math.abs(sw)*2.5)
+        .attr('stroke-opacity',lit?0.95:0.28+Math.abs(sw)*0.55);
+    });
+  const ng=svgNet.append('g').selectAll('g').data(nodes).join('g')
+    .attr('transform',d=>`translate(${d.cx},${d.cy})`);
+  ng.append('circle').attr('r',d=>d.r*1.06)
+    .each(function(d){
+      let fill,stroke,sw=2.5,filt=null;
+      if(d.type==='input'){fill='#2A72CC';stroke='rgba(150,200,255,.7)';}
+      else if(d.type==='output'){fill='#F07020';stroke='rgba(255,180,100,.7)';}
+      else if(d.firing){fill='#56e866';stroke='rgba(180,255,190,.85)';sw=3;filt='url(#glow)';}
+      else{fill='#3D9940';stroke='rgba(100,220,110,.65)';}
+      d3.select(this).attr('fill',fill).attr('stroke',stroke).attr('stroke-width',sw).attr('filter',filt);
+    });
+  ng.filter(d=>d.type==='input').append('text')
+    .text(d=>'x'+SUB[d.idx]).attr('x',d=>-(d.r*1.06+8)).attr('y',4)
+    .attr('font-family','IBM Plex Mono,monospace').attr('font-size',11)
+    .attr('fill','rgba(255,255,255,.65)').attr('text-anchor','end');
+  ng.filter(d=>d.type==='output').append('text')
+    .text(d=>'y'+SUB[d.idx]).attr('x',d=>d.r*1.06+8).attr('y',4)
+    .attr('font-family','IBM Plex Mono,monospace').attr('font-size',11)
+    .attr('fill','rgba(255,255,255,.65)').attr('text-anchor','start');
+}
+
+function renderNet(){
+  if(currentTab==='inference')renderNetInference();else renderNetTraining();
+}
+
+/* ── Loss chart ── */
 function renderLoss(){
   svgLoss.selectAll('*').remove();
   const W=200,H=130,ml=28,mr=10,mt=10,mb=22;
@@ -496,8 +580,29 @@ function renderLoss(){
   const last=lossHist[lossHist.length-1];
   g.append('circle').attr('cx',xs(lossHist.length-1)).attr('cy',ys(last))
     .attr('r',3).attr('fill','#2e7d32');
+  // Inference start marker
+  if(inferenceMark!==null&&inferenceMark>=1&&inferenceMark<lossHist.length){
+    const mx=xs(inferenceMark);
+    g.append('line').attr('x1',mx).attr('x2',mx).attr('y1',0).attr('y2',iH)
+      .attr('stroke','#1A56A0').attr('stroke-width',1.5).attr('stroke-dasharray','4,3')
+      .attr('stroke-opacity',0.85);
+    g.append('text').attr('x',mx+2).attr('y',9)
+      .attr('font-size',7).attr('fill','#1A56A0')
+      .attr('font-family','Outfit,sans-serif').text('infer→');
+  }
 }
 
+/* ── Proportion bar ── */
+function renderPropBar(){
+  const hidden=nodes.filter(n=>n.type==='hidden');
+  if(!hidden.length)return;
+  let activePct=currentTab==='inference'?100
+    :dropHist.length?(1-dropHist[dropHist.length-1])*100:100;
+  document.getElementById('prop-active').style.width=activePct.toFixed(0)+'%';
+  document.getElementById('prop-dropped').style.width=(100-activePct).toFixed(0)+'%';
+}
+
+/* ── Stats ── */
 function updateStats(dn,an){
   const ds=dn!=null?String(dn):'—',as=an!=null?String(an):'—';
   ['stat-pass','sb-pass'].forEach(id=>document.getElementById(id).textContent=passCount);
@@ -507,6 +612,8 @@ function updateStats(dn,an){
     const avg=dropHist.reduce((a,b)=>a+b,0)/dropHist.length;
     document.getElementById('sb-avg-drop').textContent=(avg*100).toFixed(0)+'%';
   }else document.getElementById('sb-avg-drop').textContent='—';
+  document.getElementById('sb-p-val').textContent=pVal.toFixed(2);
+  renderPropBar();
 }
 
 function setAnno(txt,cls){
@@ -515,96 +622,270 @@ function setAnno(txt,cls){
   b.textContent=txt;
 }
 
+/* ── Training forward pass ── */
 function forwardPass(onDone){
   if(animating){if(onDone)onDone();return;}
   animating=true;
   document.getElementById('btn-forward').disabled=true;
   passCount++;
-
   const hidden=nodes.filter(n=>n.type==='hidden');
   hidden.forEach(n=>{n.dropped=Math.random()<pVal;n.active=!n.dropped;n.firing=false;});
-  const dn=hidden.filter(n=>n.dropped).length;
-  const an=hidden.length-dn;
+  const dn=hidden.filter(n=>n.dropped).length,an=hidden.length-dn;
   dropHist.push(dn/hidden.length);
-
   const prev=lossHist.length?lossHist[lossHist.length-1]:1.0;
   lossHist.push(Math.max(0.04,prev*0.97-0.008+(Math.random()-.5)*0.07));
-
   updateStats(dn,an);
   document.getElementById('center-label').textContent=
     `Training mode — pass ${passCount} · p = ${pVal.toFixed(2)}`;
-
   let txt=`Pass ${passCount} — dropped ${dn} of ${hidden.length} hidden nodes (p=${pVal.toFixed(2)}). Signal flows only through active nodes.`;
   let cls='neutral';
   if(pVal>0.7){txt+=' ⚠ High dropout rate — risk of destabilizing training.';cls='warn';}
   else if(pVal<0.2){txt+=' Note: very few nodes drop — minimal regularization effect.';cls='good';}
   setAnno(txt,cls);
-
-  renderNet();
-
-  const nL=ARCHS[archKey].length;
-  const step=Math.max(100,Math.round(SPEED_MS[speedIdx]*0.28));
-
+  renderNetTraining();
+  const nL=ARCHS[archKey].length,step=Math.max(100,Math.round(SPEED_MS[speedIdx]*0.28));
   function fireLayer(li){
     if(li>=nL){
       nodes.forEach(n=>{n.firing=false;});
-      renderNet();renderLoss();
+      renderNetTraining();renderLoss();
       animating=false;
       document.getElementById('btn-forward').disabled=false;
-      if(onDone)onDone();
-      return;
+      if(onDone)onDone();return;
     }
     nodes.filter(n=>n.layer===li&&!n.dropped).forEach(n=>{n.firing=true;});
-    renderNet();
-    setTimeout(()=>{
-      nodes.filter(n=>n.layer===li).forEach(n=>{n.firing=false;});
-      fireLayer(li+1);
-    },step);
+    renderNetTraining();
+    setTimeout(()=>{nodes.filter(n=>n.layer===li).forEach(n=>{n.firing=false;});fireLayer(li+1);},step);
   }
-
   setTimeout(()=>fireLayer(0),160);
 }
 
+/* ── Inference forward pass ── */
+function inferencePass(onDone){
+  if(animating){if(onDone)onDone();return;}
+  animating=true;
+  document.getElementById('btn-forward').disabled=true;
+  nodes.forEach(n=>{n.dropped=false;n.active=true;n.firing=false;});
+  const nL=ARCHS[archKey].length,step=Math.max(120,Math.round(SPEED_MS[speedIdx]*0.35));
+  function fireLayer(li){
+    if(li>=nL){
+      nodes.forEach(n=>{n.firing=false;});
+      renderNetInference();
+      animating=false;
+      document.getElementById('btn-forward').disabled=false;
+      if(onDone)onDone();return;
+    }
+    nodes.filter(n=>n.layer===li).forEach(n=>{n.firing=true;});
+    renderNetInference();
+    setTimeout(()=>{nodes.filter(n=>n.layer===li).forEach(n=>{n.firing=false;});fireLayer(li+1);},step);
+  }
+  setTimeout(()=>fireLayer(0),160);
+}
+
+/* ── Mini comparison thumbnails ── */
+function buildMiniNodes(){
+  const layers=ARCHS[archKey],W=200,H=150,px=28,py=20;
+  const uw=W-2*px,uh=H-2*py,nL=layers.length;
+  const r=Math.min(9,Math.floor(uh/(Math.max(...layers)+1)*0.4));
+  const mn=[],me=[];
+  layers.forEach((count,li)=>{
+    const x=px+li*(uw/(nL-1));
+    for(let ni=0;ni<count;ni++){
+      const y=py+(ni+1)*(uh/(count+1));
+      const type=li===0?'input':li===nL-1?'output':'hidden';
+      mn.push({id:`m${li}_${ni}`,layer:li,idx:ni,cx:x,cy:y,r,type});
+    }
+  });
+  for(let li=0;li<nL-1;li++){
+    const fn=mn.filter(n=>n.layer===li),tn=mn.filter(n=>n.layer===li+1);
+    fn.forEach(f=>tn.forEach(t=>me.push({from:f.id,to:t.id})));
+  }
+  return{mn,me};
+}
+
+function renderMiniTrain(){
+  const svg=d3.select('#svg-mini-train');
+  svg.selectAll('*').remove();
+  const W=200,H=150;
+  svg.append('rect').attr('width',W).attr('height',H).attr('fill','#1A2A1A');
+  const{mn,me}=buildMiniNodes();
+  mn.forEach(n=>{n.dropped=n.type==='hidden'&&Math.random()<pVal;});
+  const nm=Object.fromEntries(mn.map(n=>[n.id,n]));
+  svg.append('g').selectAll('line').data(me).join('line')
+    .each(function(d){
+      const fn=nm[d.from],tn=nm[d.to],drop=fn.dropped||tn.dropped;
+      d3.select(this).attr('x1',fn.cx).attr('y1',fn.cy).attr('x2',tn.cx).attr('y2',tn.cy)
+        .attr('stroke',drop?'#2E2E2E':'#3A7A30').attr('stroke-width',drop?0.5:1)
+        .attr('stroke-opacity',drop?0.2:0.5).attr('stroke-dasharray',drop?'3,3':null);
+    });
+  const ng=svg.append('g').selectAll('g').data(mn).join('g')
+    .attr('transform',d=>`translate(${d.cx},${d.cy})`);
+  ng.append('circle').attr('r',d=>d.r)
+    .each(function(d){
+      let fill='#2e7d32',op=1;
+      if(d.type==='input')fill='#1A56A0';
+      else if(d.type==='output')fill='#E8630A';
+      else if(d.dropped){fill='#2E2E2E';op=0.38;}
+      d3.select(this).attr('fill',fill).attr('stroke','rgba(255,255,255,.22)')
+        .attr('stroke-width',1).attr('opacity',op);
+    });
+  ng.filter(d=>d.dropped).append('text').text('✕').attr('y',3)
+    .attr('font-size',d=>Math.round(d.r*0.9)).attr('fill','#ff5555').attr('font-weight',700)
+    .attr('text-anchor','middle').attr('dominant-baseline','middle');
+  svg.append('text').attr('x',W/2).attr('y',H-4)
+    .attr('text-anchor','middle').attr('font-size',8).attr('fill','rgba(255,255,255,.38)')
+    .attr('font-family','Outfit,sans-serif').text('sparse — p='+pVal.toFixed(2));
+}
+
+function renderMiniInfer(){
+  const svg=d3.select('#svg-mini-infer');
+  svg.selectAll('*').remove();
+  const W=200,H=150,scale=1-pVal;
+  svg.append('rect').attr('width',W).attr('height',H).attr('fill','#0D1F0D');
+  const{mn,me}=buildMiniNodes();
+  const nm=Object.fromEntries(mn.map(n=>[n.id,n]));
+  svg.append('g').selectAll('line').data(me).join('line')
+    .each(function(d){
+      const fn=nm[d.from],tn=nm[d.to];
+      d3.select(this).attr('x1',fn.cx).attr('y1',fn.cy).attr('x2',tn.cx).attr('y2',tn.cy)
+        .attr('stroke','#56e866').attr('stroke-width',1.3+scale*1.5).attr('stroke-opacity',0.38+scale*0.38);
+    });
+  const ng=svg.append('g').selectAll('g').data(mn).join('g')
+    .attr('transform',d=>`translate(${d.cx},${d.cy})`);
+  ng.append('circle').attr('r',d=>d.r)
+    .each(function(d){
+      let fill='#3D9940',stroke='rgba(100,220,110,.6)';
+      if(d.type==='input'){fill='#2A72CC';stroke='rgba(150,200,255,.6)';}
+      else if(d.type==='output'){fill='#F07020';stroke='rgba(255,180,100,.6)';}
+      d3.select(this).attr('fill',fill).attr('stroke',stroke).attr('stroke-width',1.5);
+    });
+  svg.append('text').attr('x',W/2).attr('y',H-4)
+    .attr('text-anchor','middle').attr('font-size',8).attr('fill','rgba(200,255,200,.55)')
+    .attr('font-family','Outfit,sans-serif').text('all active · w×'+scale.toFixed(2));
+}
+
+/* ── Mode transitions ── */
+function enterInferenceMode(){
+  currentTab='inference';
+  stopPlay();
+  if(inferenceMark===null&&lossHist.length>0)inferenceMark=lossHist.length-1;
+  nodes.forEach(n=>{n.dropped=false;n.active=true;n.firing=false;});
+  document.getElementById('btn-forward').textContent='▶ Run Inference';
+  document.getElementById('btn-forward').classList.add('primary');
+  document.getElementById('btn-play').disabled=true;
+  document.getElementById('btn-play').style.opacity='0.38';
+  document.getElementById('eq-name').textContent='Inference — No Dropout';
+  document.getElementById('eq-text').textContent=
+    `ŷ = f(x; W·${(1-pVal).toFixed(2)})  — all nodes active`;
+  document.getElementById('center-label').textContent=
+    `Inference mode — all nodes active · weights ×${(1-pVal).toFixed(2)}`;
+  const hidden=nodes.filter(n=>n.type==='hidden');
+  setAnno(
+    `Switching to inference — activating all ${hidden.length} nodes and scaling weights by (1−p) = ${(1-pVal).toFixed(2)}.`,
+    'neutral'
+  );
+  renderNetInference();renderLoss();
+  document.getElementById('mini-compare').style.display='block';
+  renderMiniTrain();renderMiniInfer();
+  updateStats(0,hidden.length);
+  setTimeout(()=>{
+    inferencePass(()=>{
+      const scale=(1-pVal).toFixed(2);
+      const avgAct=dropHist.length
+        ?((1-dropHist.reduce((a,b)=>a+b,0)/dropHist.length)*100).toFixed(0)
+        :'100';
+      const cmpTxt=`During training, only ~${avgAct}% of hidden nodes were active on average. At inference, all ${hidden.length} nodes activate but weights are scaled by (1−p) = ${scale} to match expected activations.`;
+      document.getElementById('infer-compare-txt').textContent=cmpTxt;
+      setAnno(
+        `Inference mode — all ${hidden.length} hidden nodes active. Weights scaled by (1−p) = ${scale}. No randomness — same input always produces the same output. `+cmpTxt,
+        'good'
+      );
+    });
+  },300);
+}
+
+function enterTrainingMode(){
+  currentTab='training';
+  document.getElementById('btn-forward').textContent='▶ Forward Pass';
+  document.getElementById('btn-forward').classList.add('primary');
+  document.getElementById('btn-play').disabled=false;
+  document.getElementById('btn-play').style.opacity='';
+  document.getElementById('eq-name').textContent='Inverted Dropout';
+  document.getElementById('eq-text').textContent=
+    `ĥ = (h ⊙ Bern(${(1-pVal).toFixed(2)})) / ${(1-pVal).toFixed(2)}`;
+  document.getElementById('center-label').textContent=passCount
+    ?`Training mode — pass ${passCount} · p = ${pVal.toFixed(2)}`
+    :`Training mode — thinned subnetwork (p = ${pVal.toFixed(2)})`;
+  nodes.forEach(n=>{n.dropped=false;n.active=true;n.firing=false;});
+  document.getElementById('mini-compare').style.display='none';
+  renderNetTraining();renderLoss();
+  setAnno('Press Forward Pass or Play to continue training.','neutral');
+}
+
+/* ── Play/pause ── */
 function scheduleNext(){
   if(!playing)return;
   playTimer=setTimeout(()=>forwardPass(()=>{if(playing)scheduleNext();}),120);
 }
-
 function startPlay(){
   playing=true;
   const btn=document.getElementById('btn-play');
   btn.textContent='⏸ Pause';btn.classList.add('playing');
   forwardPass(()=>{if(playing)scheduleNext();});
 }
-
 function stopPlay(){
   playing=false;clearTimeout(playTimer);
   const btn=document.getElementById('btn-play');
   btn.textContent='⏵ Auto-Play';btn.classList.remove('playing');
 }
 
+/* ── Reset ── */
 function reset(){
   stopPlay();
-  passCount=0;lossHist=[];dropHist=[];
+  passCount=0;lossHist=[];dropHist=[];inferenceMark=null;
+  currentTab='training';
   nodes.forEach(n=>{n.dropped=false;n.active=true;n.firing=false;});
-  renderNet();renderLoss();
+  document.getElementById('btn-forward').textContent='▶ Forward Pass';
+  document.getElementById('btn-forward').classList.add('primary');
+  document.getElementById('btn-play').disabled=false;
+  document.getElementById('btn-play').style.opacity='';
+  document.getElementById('eq-name').textContent='Inverted Dropout';
+  document.getElementById('eq-text').textContent=
+    `ĥ = (h ⊙ Bern(${(1-pVal).toFixed(2)})) / ${(1-pVal).toFixed(2)}`;
+  document.getElementById('mini-compare').style.display='none';
+  document.getElementById('infer-compare-txt').textContent='';
+  document.querySelectorAll('#tab-bar button').forEach(b=>b.classList.remove('active'));
+  document.querySelector('[data-tab="training"]').classList.add('active');
+  renderNetTraining();renderLoss();
   updateStats(null,null);
   document.getElementById('center-label').textContent=
     `Training mode — thinned subnetwork (p = ${pVal.toFixed(2)})`;
   setAnno('Press Forward Pass or Play to begin. Each pass randomly drops hidden nodes with probability p.','neutral');
 }
 
+/* ── Event listeners ── */
 document.getElementById('sld-dropout').addEventListener('input',function(){
   pVal=parseFloat(this.value);
   document.getElementById('val-dropout').textContent=pVal.toFixed(2);
+  document.getElementById('sb-p-val').textContent=pVal.toFixed(2);
   let h=`${Math.round(pVal*100)}% — each hidden node drops independently`;
   if(pVal>0.7)h+=' ⚠ very high';
   else if(pVal<0.2)h+=' — minimal regularization';
   document.getElementById('dropout-hint').textContent=h;
-  document.getElementById('eq-text').textContent=
-    `ĥ = (h ⊙ Bern(${(1-pVal).toFixed(2)})) / ${(1-pVal).toFixed(2)}`;
-  if(!passCount)document.getElementById('center-label').textContent=
-    `Training mode — thinned subnetwork (p = ${pVal.toFixed(2)})`;
+  if(currentTab==='training'){
+    document.getElementById('eq-text').textContent=
+      `ĥ = (h ⊙ Bern(${(1-pVal).toFixed(2)})) / ${(1-pVal).toFixed(2)}`;
+    if(!passCount)document.getElementById('center-label').textContent=
+      `Training mode — thinned subnetwork (p = ${pVal.toFixed(2)})`;
+  }else{
+    document.getElementById('eq-text').textContent=
+      `ŷ = f(x; W·${(1-pVal).toFixed(2)})  — all nodes active`;
+    document.getElementById('center-label').textContent=
+      `Inference mode — all nodes active · weights ×${(1-pVal).toFixed(2)}`;
+    renderNetInference();
+    if(document.getElementById('mini-compare').style.display!=='none'){
+      renderMiniTrain();renderMiniInfer();
+    }
+  }
 });
 
 document.getElementById('sld-speed').addEventListener('input',function(){
@@ -623,7 +904,9 @@ document.querySelectorAll('#arch-btns .kbtn').forEach(btn=>{
   });
 });
 
-document.getElementById('btn-forward').addEventListener('click',()=>forwardPass());
+document.getElementById('btn-forward').addEventListener('click',()=>{
+  if(currentTab==='inference')inferencePass();else forwardPass();
+});
 document.getElementById('btn-reset').addEventListener('click',reset);
 document.getElementById('btn-play').addEventListener('click',()=>{if(playing)stopPlay();else startPlay();});
 
@@ -632,19 +915,20 @@ document.querySelectorAll('#tab-bar button:not(.tab-soon)').forEach(btn=>{
     if(this.classList.contains('active'))return;
     document.querySelectorAll('#tab-bar button').forEach(b=>b.classList.remove('active'));
     this.classList.add('active');
-    if(this.dataset.tab==='inference'){
-      stopPlay();
-      setAnno('Inference Mode coming in Stage 3. In inference mode, all nodes activate and weights are scaled by (1−p).','neutral');
-    }
+    if(this.dataset.tab==='inference')enterInferenceMode();
+    else enterTrainingMode();
   });
 });
 
+/* ── Init ── */
 buildNetwork();
-renderNet();
+renderNetTraining();
 renderLoss();
 document.getElementById('val-speed').textContent=SPEED_LBL[speedIdx];
 document.getElementById('eq-text').textContent=
   `ĥ = (h ⊙ Bern(${(1-pVal).toFixed(2)})) / ${(1-pVal).toFixed(2)}`;
+document.getElementById('sb-p-val').textContent=pVal.toFixed(2);
+renderPropBar();
 setAnno('Press Forward Pass or Play to begin. Each pass randomly drops hidden nodes with probability p.','neutral');
 
 })();
