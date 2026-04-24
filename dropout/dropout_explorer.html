@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<!-- Copyright © 2026 Greg Chism. University of Arizona, College of Information Science.
+     INFO 557: Neural Networks. MIT License. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dropout Regularization — Interactive Explorer | INFO 557: Neural Networks</title>
+<meta name="description" content="Watch nodes randomly drop during training, then see the full network activate at inference — with weight scaling. Explore how dropout prevents overfitting and acts as an ensemble of subnetworks.">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Dropout Regularization — Interactive Explorer">
+<meta property="og:description" content="Watch nodes randomly drop during training, then see the full network activate at inference — with weight scaling. Explore how dropout prevents overfitting and acts as an ensemble of subnetworks.">
+<meta property="og:image" content="https://gchism94.github.io/uofa-neural-networks/dropout/dropout_explorer-preview.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="600">
+<meta property="og:url" content="https://gchism94.github.io/uofa-neural-networks/dropout/dropout_explorer.html">
+<meta property="fb:app_id" content="2385695445236853">
+
+<!-- Twitter/X card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Dropout Regularization — Interactive Explorer">
+<meta name="twitter:description" content="Watch nodes randomly drop during training, then see the full network activate at inference — with weight scaling. Explore how dropout prevents overfitting and acts as an ensemble of subnetworks.">
+<meta name="twitter:image" content="https://gchism94.github.io/uofa-neural-networks/dropout/dropout_explorer-preview.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+
+<style>
+:root{
+  --cream:#FAF7F0;--cream-mid:#F0EBE0;--cream-dk:#E2D9C5;
+  --g-dk:#1C3A0E;--g-mid:#2D5A1B;--g-lt:#4A8C2F;--g-pale:#C8E6A8;
+  --orange:#E8630A;--orange-lt:#F08C50;--orange-dk:#C0500A;
+  --blue:#1A56A0;--blue-pale:#D0E4F8;
+  --red:#B0321D;--red-pale:#F8DDD8;
+  --text:#1A1A1A;--text-muted:#888;--text-soft:#555;
+  --border:#C8BE9A;--border-lt:#DDD6BE;--shadow:rgba(44,90,27,.10);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:'Outfit',sans-serif;background:var(--cream);color:var(--text);
+  padding:1.25rem 1rem 2rem;min-height:100vh;line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:.85rem}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+.hdr{display:flex;justify-content:space-between;align-items:flex-start;column-gap:1rem;row-gap:.35rem;flex-wrap:wrap}
+.hdr>div:first-child{flex:1 1 auto;min-width:0}
+.hdr h1{font-size:clamp(1.25rem,2.2vw,1.6rem);font-weight:700;color:var(--g-dk);letter-spacing:-.02em;line-height:1.2}
+.hdr p.subtitle{font-size:.86rem;color:var(--text-muted);margin-top:.18rem}
+.hdr-rule{border:none;border-top:2.5px solid var(--g-dk);margin-top:.55rem}
+
+/* ── Fixed copyright ─────────────────────────────────────────────── */
+.cr-top{
+  position:fixed;top:.75rem;right:1rem;z-index:1000;
+  font-size:.72rem;color:var(--text-muted);text-align:right;
+  background:rgba(250,247,240,.92);padding:.2rem 1.5rem .2rem .5rem;
+  border-radius:5px;backdrop-filter:blur(4px);
+  border:1px solid var(--border-lt);white-space:nowrap;min-width:max-content;
+}
+.cr-top a{color:var(--orange);text-decoration:none}
+.cr-top a:hover{text-decoration:underline}
+
+/* ── Tab bar ─────────────────────────────────────────────────────── */
+.tab-bar{
+  display:flex;flex-wrap:wrap;gap:.3rem;background:white;
+  border:1px solid var(--border);border-radius:8px;
+  padding:.35rem;box-shadow:0 2px 8px var(--shadow);
+}
+.tab-bar button{
+  font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:500;
+  padding:.42rem .85rem;border:1px solid transparent;background:transparent;
+  color:var(--text-soft);border-radius:6px;cursor:pointer;
+  transition:background .12s,color .12s;white-space:nowrap;
+}
+.tab-bar button:hover{background:var(--cream-mid);color:var(--g-dk)}
+.tab-bar button.active{background:var(--g-dk);color:white;border-color:var(--g-dk)}
+.tab-bar button.tab-soon{opacity:.4;cursor:not-allowed;pointer-events:none}
+.tab-bar button .n{
+  font-family:'IBM Plex Mono',monospace;font-size:.76em;
+  color:var(--orange);font-weight:500;margin-right:.35rem;
+}
+.tab-bar button.active .n{color:var(--orange-lt)}
+
+/* ── Explorer grid ───────────────────────────────────────────────── */
+.explorer-grid{
+  display:grid;
+  grid-template-columns:260px 1fr 220px;
+  gap:.85rem;
+  align-items:start;
+}
+@media(max-width:980px){
+  .explorer-grid{grid-template-columns:260px 1fr}
+  .right-col{display:none}
+}
+@media(max-width:680px){
+  .explorer-grid{grid-template-columns:1fr}
+}
+.left-col{display:flex;flex-direction:column;gap:.75rem}
+.center-col{display:flex;flex-direction:column;gap:.75rem}
+.right-col{display:flex;flex-direction:column;gap:.75rem}
+
+/* ── Cards ───────────────────────────────────────────────────────── */
+.card{background:white;border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem;box-shadow:0 2px 8px var(--shadow)}
+.card-title{font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--g-dk);margin-bottom:.55rem}
+
+/* ── Sliders ─────────────────────────────────────────────────────── */
+.srow{display:flex;align-items:center;gap:.45rem;margin-bottom:.2rem}
+.slbl{font-family:'IBM Plex Mono',monospace;font-size:.82rem;font-weight:500;color:var(--g-dk);min-width:22px}
+input[type=range]{flex:1;appearance:none;-webkit-appearance:none;height:4px;background:var(--cream-dk);border-radius:2px;cursor:pointer;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--g-mid);border:2.5px solid white;box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:pointer}
+.sval{font-family:'IBM Plex Mono',monospace;font-size:.76rem;color:var(--text-muted);min-width:40px;text-align:right}
+.hint-txt{font-size:.7rem;color:var(--text-muted);font-style:italic;margin-top:.15rem;padding-left:1.6rem}
+
+/* ── Buttons ─────────────────────────────────────────────────────── */
+.btn-group{display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:.35rem}
+.kbtn{
+  font-family:'Outfit',sans-serif;font-size:.78rem;font-weight:500;
+  padding:.26rem .7rem;border-radius:16px;cursor:pointer;
+  border:1.5px solid var(--border);background:var(--cream);color:var(--g-dk);
+  transition:all .12s;
+}
+.kbtn:hover{background:var(--g-pale);border-color:var(--g-lt)}
+.kbtn.active{background:var(--g-dk);border-color:var(--g-dk);color:white}
+.ctrl-btns{display:flex;gap:.45rem;flex-wrap:wrap}
+.pbtn{
+  font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:600;
+  padding:.35rem .9rem;border-radius:6px;cursor:pointer;
+  border:1.5px solid var(--border);background:var(--cream);color:var(--g-dk);
+  transition:all .12s;
+}
+.pbtn:hover{background:var(--g-pale);border-color:var(--g-lt)}
+.pbtn.primary{background:var(--g-mid);border-color:var(--g-mid);color:white}
+.pbtn.primary:hover{background:var(--g-dk);border-color:var(--g-dk)}
+.pbtn.playing{background:var(--orange);border-color:var(--orange-dk);color:white}
+.pbtn.playing:hover{background:var(--orange-dk);border-color:var(--orange-dk)}
+
+/* ── Equation bar ────────────────────────────────────────────────── */
+.eq-bar{
+  background:var(--g-dk);color:white;border-radius:8px;
+  padding:.6rem 1rem;
+}
+.eq-name{font-size:.62rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:.2rem}
+.eq-text{font-family:'IBM Plex Mono',monospace;font-size:.82rem;line-height:1.55}
+
+/* ── Annotation box ──────────────────────────────────────────────── */
+.anno-box{
+  border-radius:6px;padding:.55rem .75rem;font-size:.78rem;line-height:1.55;
+  background:var(--blue-pale);color:var(--blue);border-left:3px solid var(--blue);
+  min-height:3.5rem;
+}
+.anno-box.warn{background:var(--red-pale);color:var(--red);border-color:var(--red)}
+.anno-box.good{background:var(--g-pale);color:var(--g-dk);border-color:var(--g-mid)}
+.anno-box.neutral{background:var(--cream-mid);color:var(--text-soft);border-color:var(--border)}
+
+/* ── Status bar ──────────────────────────────────────────────────── */
+.status-bar{
+  display:flex;gap:.6rem;flex-wrap:wrap;font-family:'IBM Plex Mono',monospace;
+  font-size:.72rem;color:var(--text-muted);
+}
+.stat-pill{
+  background:var(--cream-mid);border:1px solid var(--border-lt);
+  border-radius:12px;padding:.15rem .55rem;
+}
+.stat-pill span{color:var(--g-dk);font-weight:600}
+
+/* ── Network canvas ──────────────────────────────────────────────── */
+.net-wrap{width:100%;aspect-ratio:4/3;position:relative}
+.net-wrap svg{width:100%;height:100%;display:block;border-radius:5px}
+
+/* ── Loss chart ──────────────────────────────────────────────────── */
+.loss-chart-wrap{width:100%}
+.loss-chart-wrap svg{width:100%;display:block;border-radius:5px}
+
+/* ── Stat grid ───────────────────────────────────────────────────── */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.5rem}
+.stat-block{background:var(--cream);border:1px solid var(--border-lt);border-radius:6px;padding:.4rem .5rem;text-align:center}
+.sb-val{display:block;font-family:'IBM Plex Mono',monospace;font-size:1.05rem;font-weight:600;color:var(--g-dk);line-height:1.2}
+.sb-lbl{font-size:.6rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;margin-top:.1rem}
+
+/* ── Plot label ──────────────────────────────────────────────────── */
+.plot-label{font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);text-align:center;margin-bottom:.35rem}
+
+/* ── Legend ──────────────────────────────────────────────────────── */
+.legend{display:flex;gap:.75rem;flex-wrap:wrap;font-size:.72rem;color:var(--text-soft);margin-top:.45rem;align-items:center}
+.legend-dot{width:11px;height:11px;border-radius:50%;display:inline-block;vertical-align:middle;margin-right:.2rem}
+.legend-dot.dropped{background:#2A2A2A;border:1.5px dashed #555}
+</style>
+</head>
+<body>
+
+<div class="cr-top">© 2026 Greg T. Chism · <a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a></div>
+
+<div class="wrap">
+
+<header>
+  <div class="hdr">
+    <div>
+      <h1>Dropout Regularization — Interactive Explorer</h1>
+      <p class="subtitle">Watch nodes randomly drop during training, then see full network activate at inference — with weight scaling</p>
+    </div>
+  </div>
+  <hr class="hdr-rule">
+</header>
+
+<!-- Tab bar -->
+<nav class="tab-bar" id="tab-bar">
+  <button class="active" data-tab="training"><span class="n">1</span>Training Mode</button>
+  <button data-tab="inference"><span class="n">2</span>Inference Mode</button>
+  <button class="tab-soon" data-tab="ensemble" title="Coming soon"><span class="n">3</span>Ensemble View</button>
+</nav>
+
+<!-- Main explorer -->
+<div class="explorer-grid">
+
+  <!-- LEFT: Controls -->
+  <div class="left-col">
+
+    <div class="card">
+      <div class="card-title">Dropout Rate p</div>
+      <div class="srow">
+        <span class="slbl">p</span>
+        <input type="range" id="sld-dropout" min="0.0" max="0.9" step="0.05" value="0.5">
+        <span class="sval" id="val-dropout">0.50</span>
+      </div>
+      <div class="hint-txt" id="dropout-hint">50% — each hidden node drops independently</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Network Architecture</div>
+      <div class="btn-group" id="arch-btns">
+        <button class="kbtn active" data-arch="small">Small (3-4-3)</button>
+        <button class="kbtn" data-arch="medium">Medium (4-6-4)</button>
+        <button class="kbtn" data-arch="large">Large (5-8-5)</button>
+      </div>
+      <div class="hint-txt" id="arch-hint">input – hidden – output nodes</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Simulation</div>
+      <div class="ctrl-btns" style="margin-bottom:.45rem">
+        <button id="btn-forward" class="pbtn primary">▶ Forward Pass</button>
+        <button id="btn-reset" class="pbtn">↺ Reset</button>
+      </div>
+      <div class="ctrl-btns">
+        <button id="btn-play" class="pbtn" style="flex:1">⏵ Auto-Play</button>
+      </div>
+      <div class="srow" style="margin-top:.5rem">
+        <span class="slbl" style="font-size:.72rem;min-width:42px">Speed</span>
+        <input type="range" id="sld-speed" min="0" max="2" step="1" value="1">
+        <span class="sval" id="val-speed">Med</span>
+      </div>
+    </div>
+
+    <div class="eq-bar">
+      <div class="eq-name">Inverted Dropout</div>
+      <div class="eq-text" id="eq-text">ĥ = (h ⊙ Bern(1−p)) / (1−p)</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">What's happening?</div>
+      <div class="anno-box neutral" id="anno-box">Set dropout rate p and press Forward Pass. Each pass samples a fresh random mask — active nodes are scaled by 1/(1−p) so the expected output stays constant regardless of how many nodes survive.</div>
+    </div>
+
+    <div class="status-bar">
+      <div class="stat-pill">Pass <span id="stat-pass">0</span></div>
+      <div class="stat-pill">Dropped <span id="stat-dropped">—</span></div>
+      <div class="stat-pill">Active <span id="stat-active">—</span></div>
+    </div>
+
+  </div>
+
+  <!-- CENTER: Network visualization -->
+  <div class="center-col">
+
+    <div class="card">
+      <div class="plot-label" id="center-label">Training mode — thinned subnetwork (p = 0.50)</div>
+      <div class="net-wrap">
+        <svg id="svg-net" viewBox="0 0 640 480" preserveAspectRatio="none">
+          <rect width="640" height="480" fill="#1A2A1A"/>
+          <text x="320" y="225" text-anchor="middle" dominant-baseline="middle"
+                fill="rgba(255,255,255,.28)" font-family="Outfit, sans-serif"
+                font-size="15">Neural network renders here</text>
+          <text x="320" y="252" text-anchor="middle" dominant-baseline="middle"
+                fill="rgba(255,255,255,.16)" font-family="Outfit, sans-serif"
+                font-size="11">Press Forward Pass to begin</text>
+        </svg>
+      </div>
+      <div class="legend" id="net-legend">
+        <span><span class="legend-dot" style="background:#4A8C2F;border:2px solid rgba(255,255,255,.35)"></span>Active node</span>
+        <span><span class="legend-dot dropped"></span>Dropped node</span>
+        <span><span class="legend-dot" style="background:#1A56A0;border:2px solid rgba(255,255,255,.35)"></span>Input node</span>
+        <span><span class="legend-dot" style="background:#E8630A;border:2px solid rgba(255,255,255,.35)"></span>Output node</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- RIGHT: Statistics panel -->
+  <div class="right-col">
+
+    <div class="card">
+      <div class="card-title">Drop Statistics</div>
+      <div class="stat-grid">
+        <div class="stat-block">
+          <span class="sb-val" id="sb-pass">0</span>
+          <div class="sb-lbl">Pass #</div>
+        </div>
+        <div class="stat-block">
+          <span class="sb-val" id="sb-drop-n">—</span>
+          <div class="sb-lbl">Dropped</div>
+        </div>
+        <div class="stat-block">
+          <span class="sb-val" id="sb-active-n">—</span>
+          <div class="sb-lbl">Active</div>
+        </div>
+        <div class="stat-block">
+          <span class="sb-val" id="sb-avg-drop">—</span>
+          <div class="sb-lbl">Avg Drop %</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Loss over Passes</div>
+      <div class="loss-chart-wrap">
+        <svg id="svg-loss" viewBox="0 0 200 130" preserveAspectRatio="none">
+          <rect width="200" height="130" fill="#FDFAF5"/>
+          <text x="100" y="65" text-anchor="middle" dominant-baseline="middle"
+                fill="rgba(0,0,0,.18)" font-family="Outfit, sans-serif"
+                font-size="10">Loss chart</text>
+        </svg>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Weight Scaling</div>
+      <div style="font-size:.72rem;color:var(--text-soft);line-height:1.7">
+        <div style="margin-bottom:.55rem">
+          <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--g-dk);vertical-align:middle;margin-right:.3rem"></span>
+          <strong style="color:var(--g-dk)">Training</strong><br>
+          Active units scaled ×<span style="font-family:'IBM Plex Mono',monospace;color:var(--g-dk)">1/(1−p)</span>.<br>
+          Expected output unchanged.
+        </div>
+        <div>
+          <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--blue);vertical-align:middle;margin-right:.3rem"></span>
+          <strong style="color:var(--blue)">Inference</strong><br>
+          All units active, no scaling.<br>
+          Network averages all subnetworks.
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+const ARCHS={small:[3,4,3],medium:[4,6,4],large:[5,8,5]};
+const SPEED_MS=[1200,600,200];
+const SPEED_LBL=['Slow','Med','Fast'];
+const SUB=['₁','₂','₃','₄','₅','₆','₇','₈'];
+
+let archKey='small',pVal=0.5,speedIdx=1;
+let passCount=0,lossHist=[],dropHist=[];
+let nodes=[],edges=[];
+let animating=false,playing=false,playTimer=null;
+
+const svgNet=d3.select('#svg-net');
+const svgLoss=d3.select('#svg-loss');
+
+function buildNetwork(){
+  const layers=ARCHS[archKey];
+  nodes=[];edges=[];
+  const W=640,H=480,px=85,py=55;
+  const uw=W-2*px,uh=H-2*py,nL=layers.length;
+  const maxCount=Math.max(...layers);
+  const r=Math.min(18,Math.floor(uh/(maxCount+1)*0.42));
+  layers.forEach((count,li)=>{
+    const x=px+li*(uw/(nL-1));
+    for(let ni=0;ni<count;ni++){
+      const y=py+(ni+1)*(uh/(count+1));
+      const type=li===0?'input':li===nL-1?'output':'hidden';
+      nodes.push({id:`n${li}_${ni}`,layer:li,idx:ni,cx:x,cy:y,r,type,active:true,dropped:false,firing:false});
+    }
+  });
+  for(let li=0;li<nL-1;li++){
+    const fromNodes=nodes.filter(n=>n.layer===li);
+    const toNodes=nodes.filter(n=>n.layer===li+1);
+    fromNodes.forEach(f=>toNodes.forEach(t=>{
+      edges.push({id:`e_${f.id}_${t.id}`,from:f.id,to:t.id,w:(Math.random()*2-1)*0.9});
+    }));
+  }
+}
+
+function renderNet(){
+  svgNet.selectAll('*').remove();
+  svgNet.append('rect').attr('width',640).attr('height',480).attr('fill','#1A2A1A');
+
+  const defs=svgNet.append('defs');
+  const fl=defs.append('filter').attr('id','glow').attr('x','-60%').attr('y','-60%')
+    .attr('width','220%').attr('height','220%');
+  fl.append('feGaussianBlur').attr('stdDeviation',6).attr('result','blur');
+  const m=fl.append('feMerge');
+  m.append('feMergeNode').attr('in','blur');
+  m.append('feMergeNode').attr('in','SourceGraphic');
+
+  const nm=Object.fromEntries(nodes.map(n=>[n.id,n]));
+
+  svgNet.append('g').selectAll('line').data(edges).join('line')
+    .each(function(d){
+      const fn=nm[d.from],tn=nm[d.to];
+      const drop=fn.dropped||tn.dropped;
+      const lit=fn.firing||tn.firing;
+      d3.select(this)
+        .attr('x1',fn.cx).attr('y1',fn.cy).attr('x2',tn.cx).attr('y2',tn.cy)
+        .attr('stroke',drop?'#2E2E2E':lit?'#56e866':'#3A7A30')
+        .attr('stroke-width',drop?0.8:lit?2.5:0.8+Math.abs(d.w)*1.6)
+        .attr('stroke-opacity',drop?0.22:lit?0.88:0.18+Math.abs(d.w)*0.52)
+        .attr('stroke-dasharray',drop?'5,4':null);
+    });
+
+  const ng=svgNet.append('g').selectAll('g').data(nodes).join('g')
+    .attr('transform',d=>`translate(${d.cx},${d.cy})`);
+
+  ng.append('circle').attr('r',d=>d.r)
+    .each(function(d){
+      let fill='#2e7d32',stroke='rgba(255,255,255,.4)',sw=2,op=1,filt=null;
+      if(d.type==='input'){fill='#1A56A0';}
+      else if(d.type==='output'){fill='#E8630A';}
+      else if(d.dropped){fill='#2E2E2E';stroke='rgba(255,255,255,.12)';sw=1;op=0.4;}
+      else if(d.firing){fill='#56e866';stroke='rgba(140,255,160,.8)';sw=2.5;filt='url(#glow)';}
+      d3.select(this).attr('fill',fill).attr('stroke',stroke).attr('stroke-width',sw)
+        .attr('opacity',op).attr('filter',filt);
+    });
+
+  ng.filter(d=>d.type==='input').append('text')
+    .text(d=>'x'+SUB[d.idx]).attr('x',d=>-(d.r+8)).attr('y',4)
+    .attr('font-family','IBM Plex Mono,monospace').attr('font-size',11)
+    .attr('fill','rgba(255,255,255,.62)').attr('text-anchor','end');
+
+  ng.filter(d=>d.type==='output').append('text')
+    .text(d=>'y'+SUB[d.idx]).attr('x',d=>d.r+8).attr('y',4)
+    .attr('font-family','IBM Plex Mono,monospace').attr('font-size',11)
+    .attr('fill','rgba(255,255,255,.62)').attr('text-anchor','start');
+
+  ng.filter(d=>d.dropped).append('text').text('✕').attr('y',4)
+    .attr('font-family','Outfit,sans-serif').attr('font-size',d=>Math.round(d.r*0.88))
+    .attr('fill','#ff5555').attr('font-weight',700)
+    .attr('text-anchor','middle').attr('dominant-baseline','middle');
+}
+
+function renderLoss(){
+  svgLoss.selectAll('*').remove();
+  const W=200,H=130,ml=28,mr=10,mt=10,mb=22;
+  const iW=W-ml-mr,iH=H-mt-mb;
+  svgLoss.append('rect').attr('width',W).attr('height',H).attr('fill','#FDFAF5');
+  if(lossHist.length<2){
+    svgLoss.append('text').attr('x',W/2).attr('y',H/2)
+      .attr('text-anchor','middle').attr('dominant-baseline','middle')
+      .attr('fill','rgba(0,0,0,.18)').attr('font-family','Outfit,sans-serif')
+      .attr('font-size',10).text('Run passes to see loss');
+    return;
+  }
+  const g=svgLoss.append('g').attr('transform',`translate(${ml},${mt})`);
+  const xs=d3.scaleLinear().domain([0,lossHist.length-1]).range([0,iW]);
+  const ys=d3.scaleLinear().domain([0,1.1]).range([iH,0]);
+  [0.25,0.5,0.75,1.0].forEach(v=>
+    g.append('line').attr('x1',0).attr('x2',iW).attr('y1',ys(v)).attr('y2',ys(v))
+      .attr('stroke','#E0DAC0').attr('stroke-width',0.7));
+  g.append('line').attr('x1',0).attr('x2',0).attr('y1',0).attr('y2',iH)
+    .attr('stroke','#C8BE9A').attr('stroke-width',1);
+  g.append('line').attr('x1',0).attr('x2',iW).attr('y1',iH).attr('y2',iH)
+    .attr('stroke','#C8BE9A').attr('stroke-width',1);
+  [0,0.5,1.0].forEach(v=>
+    g.append('text').attr('x',-3).attr('y',ys(v)+1).attr('text-anchor','end')
+      .attr('font-size',8).attr('fill','#888').attr('font-family','IBM Plex Mono,monospace')
+      .text(v.toFixed(1)));
+  g.append('text').attr('x',iW/2).attr('y',iH+16).attr('text-anchor','middle')
+    .attr('font-size',8).attr('fill','#888').attr('font-family','Outfit,sans-serif').text('Pass →');
+  const crv=d3.curveCatmullRom.alpha(.5);
+  g.append('path').datum(lossHist)
+    .attr('fill','rgba(46,125,50,.13)')
+    .attr('d',d3.area().x((_,i)=>xs(i)).y0(iH).y1(d=>ys(d)).curve(crv));
+  g.append('path').datum(lossHist)
+    .attr('fill','none').attr('stroke','#2e7d32').attr('stroke-width',1.8)
+    .attr('d',d3.line().x((_,i)=>xs(i)).y(d=>ys(d)).curve(crv));
+  const last=lossHist[lossHist.length-1];
+  g.append('circle').attr('cx',xs(lossHist.length-1)).attr('cy',ys(last))
+    .attr('r',3).attr('fill','#2e7d32');
+}
+
+function updateStats(dn,an){
+  const ds=dn!=null?String(dn):'—',as=an!=null?String(an):'—';
+  ['stat-pass','sb-pass'].forEach(id=>document.getElementById(id).textContent=passCount);
+  ['stat-dropped','sb-drop-n'].forEach(id=>document.getElementById(id).textContent=ds);
+  ['stat-active','sb-active-n'].forEach(id=>document.getElementById(id).textContent=as);
+  if(dropHist.length){
+    const avg=dropHist.reduce((a,b)=>a+b,0)/dropHist.length;
+    document.getElementById('sb-avg-drop').textContent=(avg*100).toFixed(0)+'%';
+  }else document.getElementById('sb-avg-drop').textContent='—';
+}
+
+function setAnno(txt,cls){
+  const b=document.getElementById('anno-box');
+  b.className='anno-box '+(cls||'neutral');
+  b.textContent=txt;
+}
+
+function forwardPass(onDone){
+  if(animating){if(onDone)onDone();return;}
+  animating=true;
+  document.getElementById('btn-forward').disabled=true;
+  passCount++;
+
+  const hidden=nodes.filter(n=>n.type==='hidden');
+  hidden.forEach(n=>{n.dropped=Math.random()<pVal;n.active=!n.dropped;n.firing=false;});
+  const dn=hidden.filter(n=>n.dropped).length;
+  const an=hidden.length-dn;
+  dropHist.push(dn/hidden.length);
+
+  const prev=lossHist.length?lossHist[lossHist.length-1]:1.0;
+  lossHist.push(Math.max(0.04,prev*0.97-0.008+(Math.random()-.5)*0.07));
+
+  updateStats(dn,an);
+  document.getElementById('center-label').textContent=
+    `Training mode — pass ${passCount} · p = ${pVal.toFixed(2)}`;
+
+  let txt=`Pass ${passCount} — dropped ${dn} of ${hidden.length} hidden nodes (p=${pVal.toFixed(2)}). Signal flows only through active nodes.`;
+  let cls='neutral';
+  if(pVal>0.7){txt+=' ⚠ High dropout rate — risk of destabilizing training.';cls='warn';}
+  else if(pVal<0.2){txt+=' Note: very few nodes drop — minimal regularization effect.';cls='good';}
+  setAnno(txt,cls);
+
+  renderNet();
+
+  const nL=ARCHS[archKey].length;
+  const step=Math.max(100,Math.round(SPEED_MS[speedIdx]*0.28));
+
+  function fireLayer(li){
+    if(li>=nL){
+      nodes.forEach(n=>{n.firing=false;});
+      renderNet();renderLoss();
+      animating=false;
+      document.getElementById('btn-forward').disabled=false;
+      if(onDone)onDone();
+      return;
+    }
+    nodes.filter(n=>n.layer===li&&!n.dropped).forEach(n=>{n.firing=true;});
+    renderNet();
+    setTimeout(()=>{
+      nodes.filter(n=>n.layer===li).forEach(n=>{n.firing=false;});
+      fireLayer(li+1);
+    },step);
+  }
+
+  setTimeout(()=>fireLayer(0),160);
+}
+
+function scheduleNext(){
+  if(!playing)return;
+  playTimer=setTimeout(()=>forwardPass(()=>{if(playing)scheduleNext();}),120);
+}
+
+function startPlay(){
+  playing=true;
+  const btn=document.getElementById('btn-play');
+  btn.textContent='⏸ Pause';btn.classList.add('playing');
+  forwardPass(()=>{if(playing)scheduleNext();});
+}
+
+function stopPlay(){
+  playing=false;clearTimeout(playTimer);
+  const btn=document.getElementById('btn-play');
+  btn.textContent='⏵ Auto-Play';btn.classList.remove('playing');
+}
+
+function reset(){
+  stopPlay();
+  passCount=0;lossHist=[];dropHist=[];
+  nodes.forEach(n=>{n.dropped=false;n.active=true;n.firing=false;});
+  renderNet();renderLoss();
+  updateStats(null,null);
+  document.getElementById('center-label').textContent=
+    `Training mode — thinned subnetwork (p = ${pVal.toFixed(2)})`;
+  setAnno('Press Forward Pass or Play to begin. Each pass randomly drops hidden nodes with probability p.','neutral');
+}
+
+document.getElementById('sld-dropout').addEventListener('input',function(){
+  pVal=parseFloat(this.value);
+  document.getElementById('val-dropout').textContent=pVal.toFixed(2);
+  let h=`${Math.round(pVal*100)}% — each hidden node drops independently`;
+  if(pVal>0.7)h+=' ⚠ very high';
+  else if(pVal<0.2)h+=' — minimal regularization';
+  document.getElementById('dropout-hint').textContent=h;
+  document.getElementById('eq-text').textContent=
+    `ĥ = (h ⊙ Bern(${(1-pVal).toFixed(2)})) / ${(1-pVal).toFixed(2)}`;
+  if(!passCount)document.getElementById('center-label').textContent=
+    `Training mode — thinned subnetwork (p = ${pVal.toFixed(2)})`;
+});
+
+document.getElementById('sld-speed').addEventListener('input',function(){
+  speedIdx=parseInt(this.value);
+  document.getElementById('val-speed').textContent=SPEED_LBL[speedIdx];
+});
+
+document.querySelectorAll('#arch-btns .kbtn').forEach(btn=>{
+  btn.addEventListener('click',function(){
+    document.querySelectorAll('#arch-btns .kbtn').forEach(b=>b.classList.remove('active'));
+    this.classList.add('active');
+    archKey=this.dataset.arch;
+    document.getElementById('arch-hint').textContent=
+      {small:'3-4-3',medium:'4-6-4',large:'5-8-5'}[archKey]+': input – hidden – output nodes';
+    buildNetwork();reset();
+  });
+});
+
+document.getElementById('btn-forward').addEventListener('click',()=>forwardPass());
+document.getElementById('btn-reset').addEventListener('click',reset);
+document.getElementById('btn-play').addEventListener('click',()=>{if(playing)stopPlay();else startPlay();});
+
+document.querySelectorAll('#tab-bar button:not(.tab-soon)').forEach(btn=>{
+  btn.addEventListener('click',function(){
+    if(this.classList.contains('active'))return;
+    document.querySelectorAll('#tab-bar button').forEach(b=>b.classList.remove('active'));
+    this.classList.add('active');
+    if(this.dataset.tab==='inference'){
+      stopPlay();
+      setAnno('Inference Mode coming in Stage 3. In inference mode, all nodes activate and weights are scaled by (1−p).','neutral');
+    }
+  });
+});
+
+buildNetwork();
+renderNet();
+renderLoss();
+document.getElementById('val-speed').textContent=SPEED_LBL[speedIdx];
+document.getElementById('eq-text').textContent=
+  `ĥ = (h ⊙ Bern(${(1-pVal).toFixed(2)})) / ${(1-pVal).toFixed(2)}`;
+setAnno('Press Forward Pass or Play to begin. Each pass randomly drops hidden nodes with probability p.','neutral');
+
+})();
+</script>
+
+<footer id="course-nav-footer" style="margin-top:1.5rem;padding:0.75rem 0 0 1rem;border-top:1px solid #E0DAC0;font-size:0.8rem;color:#78786A;text-align:left;">
+  <a href="../" style="color:#2e7d32;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">&larr; All course visualizations</a>
+</footer>
+<script>
+if (window.self !== window.top) { var f = document.getElementById('course-nav-footer'); if (f) { f.style.display = 'none'; } }
+</script>
+
+</body>
+</html>
