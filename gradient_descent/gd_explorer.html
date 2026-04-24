@@ -27,6 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 
 <style>
 :root{
@@ -155,9 +156,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 
 /* ── Canvas wrappers ─────────────────────────────────────────────── */
 .canvas-land-wrap{width:100%;aspect-ratio:1/1;position:relative;cursor:crosshair}
-.canvas-land-wrap canvas{width:100%;height:100%;display:block;border-radius:5px}
+.canvas-land-wrap svg{width:100%;height:100%;display:block;border-radius:5px}
 .canvas-curve-wrap{width:100%;aspect-ratio:5/2;position:relative}
-.canvas-curve-wrap canvas{width:100%;height:100%;display:block;border-radius:5px}
+.canvas-curve-wrap svg{width:100%;height:100%;display:block;border-radius:5px}
 
 .plot-label{font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);text-align:center;margin-bottom:.35rem}
 .legend{display:flex;gap:.9rem;flex-wrap:wrap;font-size:.73rem;color:var(--text-soft);margin-top:.45rem;align-items:center}
@@ -257,7 +258,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     <div class="card">
       <div class="plot-label">Loss Landscape (w₁, w₂) — contours &amp; optimization path</div>
       <div class="canvas-land-wrap" id="land-wrap">
-        <canvas id="canvas-land"></canvas>
+        <svg id="svg-land" viewBox="0 0 500 500" preserveAspectRatio="none"></svg>
         <div class="land-hint" id="land-hint">click to set start · dragging resets</div>
       </div>
       <div class="legend">
@@ -270,7 +271,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     <div class="card">
       <div class="plot-label">Loss Curve — iteration vs. L(w)</div>
       <div class="canvas-curve-wrap">
-        <canvas id="canvas-curve"></canvas>
+        <svg id="svg-curve" viewBox="0 0 600 240" preserveAspectRatio="none"></svg>
       </div>
     </div>
 
@@ -390,291 +391,276 @@ const S = {
   step: 0,
   maxSteps: 600,
   raf: null,
-  heatCache: {},     // { landKey: { imgData, minL, maxL, N } }
 };
 
 /* ═══════════════════════════════════════════════════════════════════
-   COLOR MAP  (blue → teal → green → amber → red)
+   D3 CONSTANTS & CONTOUR CACHE
 ═══════════════════════════════════════════════════════════════════ */
 
-const CM_STOPS = [
-  [0.00, [26,  35, 126]],
-  [0.18, [13,  71, 161]],
-  [0.38, [ 0, 121, 107]],
-  [0.58, [46, 125,  50]],
-  [0.75, [249,168,  37]],
-  [0.88, [230, 81,   0]],
-  [1.00, [183, 28,  28]],
-];
+const LW = 500, LH = 500, LN = 150;   // landscape SVG logical size & grid resolution
+const CW = 600, CH = 240;              // curve SVG logical size
+const C_PAD = { l: 46, r: 10, t: 10, b: 28 };
 
-function cmColor(t) {
-  t = Math.max(0, Math.min(1, t));
-  let i = 0;
-  while (i < CM_STOPS.length - 2 && CM_STOPS[i + 1][0] <= t) i++;
-  const [t0, c0] = CM_STOPS[i], [t1, c1] = CM_STOPS[i + 1];
-  const u = (t - t0) / (t1 - t0);
-  return [
-    Math.round(c0[0] + u * (c1[0] - c0[0])),
-    Math.round(c0[1] + u * (c1[1] - c0[1])),
-    Math.round(c0[2] + u * (c1[2] - c0[2])),
-  ];
-}
+const contourCache = {};
 
-/* ═══════════════════════════════════════════════════════════════════
-   HEATMAP PRECOMPUTATION
-═══════════════════════════════════════════════════════════════════ */
-
-function buildHeat(land) {
-  const N = 220;
-  const { xmin, xmax, ymin, ymax, fn } = land;
-  const vals = new Float32Array(N * N);
-
+function buildContours(landKey) {
+  if (contourCache[landKey]) return contourCache[landKey];
+  const land = LANDS[landKey];
+  const N = LN;
+  const values = new Float64Array(N * N);
   for (let j = 0; j < N; j++) {
     for (let i = 0; i < N; i++) {
-      const x = xmin + (xmax - xmin) * i / (N - 1);
-      const y = ymax - (ymax - ymin) * j / (N - 1); // canvas y is flipped
-      vals[j * N + i] = fn(x, y);
+      const wx = land.xmin + (i / (N - 1)) * (land.xmax - land.xmin);
+      const wy = land.ymin + (j / (N - 1)) * (land.ymax - land.ymin);
+      values[j * N + i] = land.fn(wx, wy);
     }
   }
+  const sorted = Float64Array.from(values).sort();
+  const lo = sorted[Math.floor(sorted.length * 0.02)];
+  const hi = sorted[Math.floor(sorted.length * 0.97)];
 
-  // Percentile clamp for better color spread
-  const sorted = Float32Array.from(vals).sort();
-  const lo = sorted[Math.floor(N * N * 0.02)];
-  const hi = sorted[Math.floor(N * N * 0.97)];
-  const range = hi - lo || 1;
+  const fillContours = d3.contours().size([N, N])
+    .thresholds(d3.range(lo, hi, (hi - lo) / 22))(values);
+  const lineContours = d3.contours().size([N, N])
+    .thresholds(d3.range(lo, hi, (hi - lo) / 13))(values);
 
-  // Build ImageData (will be drawn onto a temp canvas then scaled)
-  const imgData = new ImageData(N, N);
-  for (let k = 0; k < N * N; k++) {
-    const t = (vals[k] - lo) / range;
-    const [r, g, b] = cmColor(t);
-    // Contour lines: thin bands at evenly-spaced levels
-    const tc = t * 14;
-    const frac = tc - Math.floor(tc);
-    const onContour = frac < 0.06 || frac > 0.94;
-    imgData.data[k * 4]     = onContour ? Math.round(r * 0.55) : r;
-    imgData.data[k * 4 + 1] = onContour ? Math.round(g * 0.55) : g;
-    imgData.data[k * 4 + 2] = onContour ? Math.round(b * 0.55) : b;
-    imgData.data[k * 4 + 3] = 255;
-  }
+  // Color scale: blue (low loss) → red (high loss), matching RdYlBu reversed
+  const colorScale = d3.scaleSequential(d3.interpolateRdYlBu).domain([hi, lo]);
 
-  return { imgData, lo, hi, N };
+  // Project grid coords (0..N) × (0..N) → SVG logical space (0..LW) × (0..LH), y-flipped
+  const proj = d3.geoTransform({
+    point: function(x, y) { this.stream.point(x * LW / N, (N - y) * LH / N); }
+  });
+  const pathGen = d3.geoPath(proj);
+
+  contourCache[landKey] = { fillContours, lineContours, colorScale, pathGen };
+  return contourCache[landKey];
+}
+
+function landScales(land) {
+  const xSc = d3.scaleLinear().domain([land.xmin, land.xmax]).range([0, LW]);
+  const ySc = d3.scaleLinear().domain([land.ymin, land.ymax]).range([LH, 0]);
+  return { xSc, ySc };
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   CANVAS SETUP
+   D3 SVG INIT — LANDSCAPE
 ═══════════════════════════════════════════════════════════════════ */
 
-const DPR = window.devicePixelRatio || 1;
-let _tmpCanvas = null;
+function initLandSVG() {
+  const svg = d3.select('#svg-land');
+  const defs = svg.append('defs');
 
-function getCtx(canvas) {
-  const rect = canvas.parentElement.getBoundingClientRect();
-  const w = rect.width || 300;
-  const h = rect.height || 300;
-  const pw = Math.round(w * DPR);
-  const ph = Math.round(h * DPR);
-  if (canvas.width !== pw || canvas.height !== ph) {
-    canvas.width = pw;
-    canvas.height = ph;
-  }
-  const ctx = canvas.getContext('2d');
-  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  return { ctx, w, h };
+  // Radial gradient for ball
+  const rg = defs.append('radialGradient').attr('id', 'ball-grad')
+    .attr('cx', '35%').attr('cy', '35%').attr('r', '60%');
+  rg.append('stop').attr('offset', '0%').attr('stop-color', '#F08C50');
+  rg.append('stop').attr('offset', '100%').attr('stop-color', '#C0500A');
+
+  // Drop shadow filter for ball
+  const filt = defs.append('filter').attr('id', 'ball-shadow')
+    .attr('x', '-50%').attr('y', '-50%').attr('width', '200%').attr('height', '200%');
+  filt.append('feDropShadow').attr('dx', 2).attr('dy', 2)
+    .attr('stdDeviation', 3).attr('flood-color', 'rgba(0,0,0,0.5)');
+
+  svg.append('rect').attr('id', 'land-bg').attr('width', LW).attr('height', LH).attr('fill', '#1A2A1A');
+  svg.append('g').attr('id', 'g-contours');
+  svg.append('g').attr('id', 'g-clines');
+  svg.append('g').attr('id', 'g-path');
+  svg.append('g').attr('id', 'g-markers');
+
+  // Ball circle (on top of everything)
+  svg.append('circle').attr('id', 'ball-circle')
+    .attr('r', 10).attr('fill', 'url(#ball-grad)')
+    .attr('stroke', 'white').attr('stroke-width', 2.5)
+    .attr('filter', 'url(#ball-shadow)')
+    .attr('cx', -50).attr('cy', -50);
+
+  // Axis labels
+  svg.append('text').attr('x', LW / 2).attr('y', LH - 4)
+    .attr('text-anchor', 'middle').attr('dominant-baseline', 'auto')
+    .attr('fill', 'rgba(255,255,255,0.75)')
+    .attr('font-size', 11).attr('font-family', 'Outfit, sans-serif').attr('font-weight', 'bold')
+    .text('w₁');
+  svg.append('text')
+    .attr('transform', `translate(10,${LH / 2}) rotate(-90)`)
+    .attr('text-anchor', 'middle').attr('dominant-baseline', 'hanging')
+    .attr('fill', 'rgba(255,255,255,0.75)')
+    .attr('font-size', 11).attr('font-family', 'Outfit, sans-serif').attr('font-weight', 'bold')
+    .text('w₂');
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   RENDER — LANDSCAPE CANVAS
+   D3 SVG INIT — LOSS CURVE
 ═══════════════════════════════════════════════════════════════════ */
 
-function renderLand() {
-  const canvas = document.getElementById('canvas-land');
-  const { ctx, w, h } = getCtx(canvas);
-  const land = LANDS[S.landKey];
-  const { xmin, xmax, ymin, ymax } = land;
+function initCurveSVG() {
+  const svg = d3.select('#svg-curve');
+  const { l, r, t, b } = C_PAD;
+  const pw = CW - l - r, ph = CH - t - b;
 
-  // 1. Draw heatmap (precomputed)
-  const heat = S.heatCache[S.landKey];
-  if (heat) {
-    if (!_tmpCanvas) _tmpCanvas = document.createElement('canvas');
-    _tmpCanvas.width = heat.N;
-    _tmpCanvas.height = heat.N;
-    _tmpCanvas.getContext('2d').putImageData(heat.imgData, 0, 0);
-    ctx.drawImage(_tmpCanvas, 0, 0, w, h);
-  } else {
-    ctx.fillStyle = '#EEE';
-    ctx.fillRect(0, 0, w, h);
-  }
+  svg.append('rect').attr('width', CW).attr('height', CH).attr('fill', '#FDFAF5');
 
-  // Coordinate transforms
-  const toX = x => (x - xmin) / (xmax - xmin) * w;
-  const toY = y => h - (y - ymin) / (ymax - ymin) * h;
-
-  // 2. Draw path
-  const hist = S.history;
-  if (hist.length > 1) {
-    for (let i = 1; i < hist.length; i++) {
-      const alpha = 0.15 + 0.85 * i / hist.length;
-      ctx.beginPath();
-      ctx.strokeStyle = `rgba(232,99,10,${alpha.toFixed(2)})`;
-      ctx.lineWidth = 2;
-      ctx.moveTo(toX(hist[i - 1][0]), toY(hist[i - 1][1]));
-      ctx.lineTo(toX(hist[i][0]), toY(hist[i][1]));
-      ctx.stroke();
-    }
-    // Dots at each step (for SGD zig-zag visibility)
-    if (S.mode !== 'batch' || hist.length <= 80) {
-      for (let i = 0; i < hist.length; i += Math.max(1, Math.floor(hist.length / 60))) {
-        const alpha = 0.25 + 0.75 * i / hist.length;
-        ctx.beginPath();
-        ctx.arc(toX(hist[i][0]), toY(hist[i][1]), 2, 0, 2 * Math.PI);
-        ctx.fillStyle = `rgba(232,99,10,${alpha.toFixed(2)})`;
-        ctx.fill();
-      }
-    }
-  }
-
-  // 3. Global minimum marker (if known)
-  if (land.minPos) {
-    const [mx, my] = land.minPos;
-    const px = toX(mx), py = toY(my);
-    ctx.beginPath();
-    ctx.arc(px, py, 8, 0, 2 * Math.PI);
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.fill();
-    ctx.strokeStyle = '#2D5A1B';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.fillStyle = '#1C3A0E';
-    ctx.font = '10px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('★', px, py);
-  }
-
-  // 4. Ball (drawn at interpolated renderPos for smooth animation)
-  const [bx, by] = S.renderPos;
-  const px = toX(bx), py = toY(by);
-  ctx.save();
-  ctx.shadowBlur = 10;
-  ctx.shadowColor = 'rgba(0,0,0,0.5)';
-  ctx.shadowOffsetX = 2;
-  ctx.shadowOffsetY = 2;
-  ctx.beginPath();
-  ctx.arc(px, py, 10, 0, 2 * Math.PI);
-  const grd = ctx.createRadialGradient(px - 3, py - 3, 1, px, py, 10);
-  grd.addColorStop(0, '#F08C50');
-  grd.addColorStop(1, '#C0500A');
-  ctx.fillStyle = grd;
-  ctx.fill();
-  ctx.restore();
-  ctx.beginPath();
-  ctx.arc(px, py, 10, 0, 2 * Math.PI);
-  ctx.strokeStyle = 'white';
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
-
-  // 5. Axis labels
-  ctx.fillStyle = 'rgba(255,255,255,0.75)';
-  ctx.font = `bold ${11}px Outfit, sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'bottom';
-  ctx.fillText('w₁', w / 2, h - 3);
-  ctx.save();
-  ctx.translate(10, h / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.textBaseline = 'top';
-  ctx.fillText('w₂', 0, 0);
-  ctx.restore();
-}
-
-/* ═══════════════════════════════════════════════════════════════════
-   RENDER — LOSS CURVE CANVAS
-═══════════════════════════════════════════════════════════════════ */
-
-function renderCurve() {
-  const canvas = document.getElementById('canvas-curve');
-  const { ctx, w, h } = getCtx(canvas);
-  const lh = S.lossHistory;
-
-  ctx.fillStyle = '#FDFAF5';
-  ctx.fillRect(0, 0, w, h);
-
-  // Axes
-  const PAD = { l: 46, r: 10, t: 10, b: 28 };
-  const pw = w - PAD.l - PAD.r, ph = h - PAD.t - PAD.b;
-
-  // Grid lines
-  ctx.strokeStyle = '#E8E2D4';
-  ctx.lineWidth = 1;
+  // Horizontal grid lines (fixed, not data-dependent)
   for (let i = 0; i <= 4; i++) {
-    const y = PAD.t + ph * i / 4;
-    ctx.beginPath(); ctx.moveTo(PAD.l, y); ctx.lineTo(PAD.l + pw, y); ctx.stroke();
+    svg.append('line')
+      .attr('x1', l).attr('y1', t + ph * i / 4)
+      .attr('x2', l + pw).attr('y2', t + ph * i / 4)
+      .attr('stroke', '#E8E2D4').attr('stroke-width', 1);
   }
 
   // Axis lines
-  ctx.strokeStyle = '#C8BE9A';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.moveTo(PAD.l, PAD.t); ctx.lineTo(PAD.l, PAD.t + ph); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(PAD.l, PAD.t + ph); ctx.lineTo(PAD.l + pw, PAD.t + ph); ctx.stroke();
+  svg.append('line').attr('x1', l).attr('y1', t).attr('x2', l).attr('y2', t + ph)
+    .attr('stroke', '#C8BE9A').attr('stroke-width', 1.5);
+  svg.append('line').attr('x1', l).attr('y1', t + ph).attr('x2', l + pw).attr('y2', t + ph)
+    .attr('stroke', '#C8BE9A').attr('stroke-width', 1.5);
 
-  ctx.fillStyle = '#999';
-  ctx.font = '10px IBM Plex Mono, monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('Iteration', PAD.l + pw / 2, h - 4);
-  ctx.save();
-  ctx.translate(10, PAD.t + ph / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.textAlign = 'center';
-  ctx.fillText('Loss', 0, 0);
-  ctx.restore();
+  // Axis labels
+  svg.append('text').attr('x', l + pw / 2).attr('y', CH - 4)
+    .attr('text-anchor', 'middle').attr('fill', '#999')
+    .attr('font-size', 10).attr('font-family', 'IBM Plex Mono, monospace')
+    .text('Iteration');
+  svg.append('text')
+    .attr('transform', `translate(10,${t + ph / 2}) rotate(-90)`)
+    .attr('text-anchor', 'middle').attr('fill', '#999')
+    .attr('font-size', 10).attr('font-family', 'IBM Plex Mono, monospace')
+    .text('Loss');
+
+  svg.append('g').attr('id', 'c-yticks');
+  svg.append('g').attr('id', 'c-xticks');
+  svg.append('path').attr('id', 'c-line').attr('fill', 'none')
+    .attr('stroke', '#2D5A1B').attr('stroke-width', 2);
+  svg.append('circle').attr('id', 'c-dot')
+    .attr('r', 4.5).attr('fill', '#E8630A')
+    .attr('stroke', 'white').attr('stroke-width', 1.5)
+    .attr('cx', -100).attr('cy', -100);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   BUILD STATIC CONTOUR LAYER (called on landscape switch)
+═══════════════════════════════════════════════════════════════════ */
+
+function buildLandSVG(landKey) {
+  const { fillContours, lineContours, colorScale, pathGen } = buildContours(landKey);
+  const land = LANDS[landKey];
+  const { xSc, ySc } = landScales(land);
+
+  d3.select('#g-contours').selectAll('path').data(fillContours).join('path')
+    .attr('d', pathGen)
+    .attr('fill', d => colorScale(d.value))
+    .attr('stroke', 'none');
+
+  d3.select('#g-clines').selectAll('path').data(lineContours).join('path')
+    .attr('d', pathGen)
+    .attr('fill', 'none')
+    .attr('stroke', 'rgba(255,255,255,0.18)')
+    .attr('stroke-width', 0.7);
+
+  // Minimum marker
+  const markG = d3.select('#g-markers');
+  markG.selectAll('*').remove();
+  if (land.minPos) {
+    const [mx, my] = land.minPos;
+    markG.append('circle').attr('cx', xSc(mx)).attr('cy', ySc(my)).attr('r', 8)
+      .attr('fill', 'rgba(255,255,255,0.85)').attr('stroke', '#2D5A1B').attr('stroke-width', 2);
+    markG.append('text').attr('x', xSc(mx)).attr('y', ySc(my))
+      .attr('text-anchor', 'middle').attr('dominant-baseline', 'middle')
+      .attr('font-size', 10).attr('fill', '#1C3A0E').text('★');
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   RENDER — LANDSCAPE SVG (dynamic elements, called every frame)
+═══════════════════════════════════════════════════════════════════ */
+
+function renderLand() {
+  const land = LANDS[S.landKey];
+  const { xSc, ySc } = landScales(land);
+  const hist = S.history;
+
+  // Fading path segments
+  const SEG = 10;
+  const segLen = Math.ceil(Math.max(hist.length, 1) / SEG);
+  const segments = [];
+  for (let s = 0; s < SEG; s++) {
+    const start = s * segLen;
+    const end = Math.min((s + 1) * segLen + 1, hist.length);
+    if (end - start >= 2) segments.push({ pts: hist.slice(start, end), alpha: 0.15 + 0.85 * (s + 1) / SEG });
+  }
+
+  const lineGen = d3.line()
+    .x(d => xSc(d[0])).y(d => ySc(d[1]))
+    .curve(d3.curveCatmullRom);
+
+  const pathG = d3.select('#g-path');
+  pathG.selectAll('path.seg').data(segments).join('path').classed('seg', true)
+    .attr('d', d => lineGen(d.pts))
+    .attr('fill', 'none')
+    .attr('stroke', d => `rgba(232,99,10,${d.alpha.toFixed(2)})`)
+    .attr('stroke-width', 2);
+
+  // Step dots (for SGD zig-zag visibility)
+  let dotData = [];
+  if ((S.mode !== 'batch' || hist.length <= 80) && hist.length > 0) {
+    const step = Math.max(1, Math.floor(hist.length / 60));
+    for (let i = 0; i < hist.length; i += step) {
+      dotData.push({ x: hist[i][0], y: hist[i][1], alpha: 0.25 + 0.75 * i / hist.length });
+    }
+  }
+  pathG.selectAll('circle.dot').data(dotData).join('circle').classed('dot', true)
+    .attr('cx', d => xSc(d.x)).attr('cy', d => ySc(d.y))
+    .attr('r', 2)
+    .attr('fill', d => `rgba(232,99,10,${d.alpha.toFixed(2)})`);
+
+  // Ball at lerped position
+  const [bx, by] = S.renderPos;
+  d3.select('#ball-circle').attr('cx', xSc(bx)).attr('cy', ySc(by));
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   RENDER — LOSS CURVE SVG
+═══════════════════════════════════════════════════════════════════ */
+
+function renderCurve() {
+  const lh = S.lossHistory;
+  const { l, r, t, b } = C_PAD;
+  const pw = CW - l - r, ph = CH - t - b;
 
   if (lh.length < 2) return;
 
   const maxStep = Math.max(lh.length, 30);
-  const rawMin = Math.min(...lh), rawMax = Math.max(...lh);
-  const pad = (rawMax - rawMin) * 0.1 || 0.5;
-  const minL = Math.max(0, rawMin - pad), maxL = rawMax + pad;
+  const rawMin = d3.min(lh), rawMax = d3.max(lh);
+  const padV = (rawMax - rawMin) * 0.1 || 0.5;
+  const minL = Math.max(0, rawMin - padV), maxL = rawMax + padV;
 
-  const toX = i => PAD.l + (i / (maxStep - 1)) * pw;
-  const toY = v => PAD.t + ph - (v - minL) / (maxL - minL) * ph;
+  const xSc = d3.scaleLinear().domain([0, maxStep - 1]).range([l, l + pw]);
+  const ySc = d3.scaleLinear().domain([minL, maxL]).range([t + ph, t]);
+  const clampY = v => Math.max(t, Math.min(t + ph, ySc(v)));
 
-  // Y-axis labels
-  ctx.fillStyle = '#999';
-  ctx.font = '9px IBM Plex Mono, monospace';
-  ctx.textAlign = 'right';
-  for (let i = 0; i <= 4; i++) {
-    const v = minL + (maxL - minL) * (1 - i / 4);
-    ctx.fillText(v.toFixed(2), PAD.l - 4, PAD.t + ph * i / 4 + 3);
-  }
+  // Y-axis tick labels
+  d3.select('#c-yticks').selectAll('text').data(d3.range(5)).join('text')
+    .attr('x', l - 4).attr('y', i => t + ph * i / 4 + 3)
+    .attr('text-anchor', 'end').attr('fill', '#999')
+    .attr('font-size', 9).attr('font-family', 'IBM Plex Mono, monospace')
+    .text(i => (minL + (maxL - minL) * (1 - i / 4)).toFixed(2));
 
-  // X-axis labels
-  ctx.textAlign = 'center';
-  for (let i = 0; i <= 4; i++) {
-    const step = Math.round((lh.length - 1) * i / 4);
-    ctx.fillText(step, toX(step), PAD.t + ph + 14);
-  }
+  // X-axis tick labels
+  d3.select('#c-xticks').selectAll('text').data(d3.range(5)).join('text')
+    .attr('x', i => xSc(Math.round((lh.length - 1) * i / 4)))
+    .attr('y', t + ph + 14)
+    .attr('text-anchor', 'middle').attr('fill', '#999')
+    .attr('font-size', 9).attr('font-family', 'IBM Plex Mono, monospace')
+    .text(i => Math.round((lh.length - 1) * i / 4));
 
   // Loss line
-  ctx.beginPath();
-  ctx.strokeStyle = '#2D5A1B';
-  ctx.lineWidth = 2;
-  lh.forEach((v, i) => {
-    const px = toX(i), py = Math.max(PAD.t, Math.min(PAD.t + ph, toY(v)));
-    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-  });
-  ctx.stroke();
+  const lineGen = d3.line()
+    .x((_, i) => xSc(i)).y(v => clampY(v))
+    .curve(d3.curveMonotoneX);
+  d3.select('#c-line').attr('d', lineGen(lh));
 
-  // Current point
+  // Current point dot
   const n = lh.length - 1;
-  const cx = toX(n), cy = Math.max(PAD.t, Math.min(PAD.t + ph, toY(lh[n])));
-  ctx.beginPath();
-  ctx.arc(cx, cy, 4.5, 0, 2 * Math.PI);
-  ctx.fillStyle = '#E8630A';
-  ctx.fill();
-  ctx.strokeStyle = 'white';
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
+  d3.select('#c-dot').attr('cx', xSc(n)).attr('cy', clampY(lh[n]));
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -902,7 +888,7 @@ function setRunning(val) {
    RESET / SWITCH LANDSCAPE
 ═══════════════════════════════════════════════════════════════════ */
 
-function reset(switchLand) {
+function reset(isNewLand) {
   if (S.raf) { cancelAnimationFrame(S.raf); S.raf = null; }
   setRunning(false);
   const land = LANDS[S.landKey];
@@ -912,9 +898,7 @@ function reset(switchLand) {
   S.lossHistory = [land.fn(S.startPos[0], S.startPos[1])];
   S.step = 0;
 
-  if (switchLand || !S.heatCache[S.landKey]) {
-    S.heatCache[S.landKey] = buildHeat(land);
-  }
+  if (isNewLand) buildLandSVG(S.landKey);
 
   updateEquation();
   updateLrHint();
@@ -936,9 +920,9 @@ function switchLand(key) {
    CLICK ON LANDSCAPE — set start position
 ═══════════════════════════════════════════════════════════════════ */
 
-document.getElementById('canvas-land').addEventListener('pointerdown', e => {
-  const canvas = e.currentTarget;
-  const rect = canvas.getBoundingClientRect();
+document.getElementById('svg-land').addEventListener('pointerdown', e => {
+  const svgEl = e.currentTarget;
+  const rect = svgEl.getBoundingClientRect();
   const cx = (e.clientX - rect.left) / rect.width;
   const cy = (e.clientY - rect.top) / rect.height;
   const land = LANDS[S.landKey];
@@ -1003,10 +987,10 @@ window.addEventListener('resize', () => {
    INIT
 ═══════════════════════════════════════════════════════════════════ */
 
-// Start RAF loop immediately (renders even when paused)
-S.raf = requestAnimationFrame(tick);
-
-// First render after layout settles
+// Build SVG scaffolding, then trigger first landscape after layout settles
+// (reset() inside switchLand already starts the RAF loop)
+initLandSVG();
+initCurveSVG();
 requestAnimationFrame(() => requestAnimationFrame(() => {
   switchLand('mse');
 }));

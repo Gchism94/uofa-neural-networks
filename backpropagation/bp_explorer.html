@@ -127,6 +127,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 .pbtn.primary:hover{background:var(--g-dk);border-color:var(--g-dk)}
 .pbtn:disabled{opacity:.4;cursor:not-allowed}
 .pbtn:disabled:hover{background:var(--cream);border-color:var(--border)}
+.pbtn.playing{background:var(--orange);border-color:var(--orange-dk);color:white}
+.pbtn.playing:hover{background:var(--orange-dk);border-color:var(--orange-dk)}
 
 /* ── Equation / chain rule bar ───────────────────────────────────── */
 .eq-bar{
@@ -288,9 +290,14 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
       <div class="ctrl-btns">
         <button id="btn-prev" class="pbtn" disabled>← Prev</button>
         <button id="btn-next" class="pbtn primary">Next →</button>
+        <button id="btn-play" class="pbtn">▶ Play</button>
         <button id="btn-reset" class="pbtn">↺ Reset</button>
       </div>
-      <div style="margin-top:.5rem;font-size:.7rem;color:var(--text-muted)">Step through nodes one at a time</div>
+      <div class="srow" style="margin-top:.55rem">
+        <span class="slbl">Speed</span>
+        <input type="range" id="sld-speed" min="1" max="3" step="1" value="2">
+        <span class="sval" id="val-speed">Medium</span>
+      </div>
     </div>
 
     <!-- Annotation -->
@@ -372,7 +379,74 @@ const NETS = {
     params: { w1:0.50, w2:-0.30, b:0.10 },
     fwdOrder: ['x1','x2','w1','w2','b','mul1','mul2','add','sig'],
     bwdOrder: ['sig','add','mul1','mul2','b','w1','x1','w2','x2'],
-  }
+  },
+
+  xor: {
+    nodes: [
+      { id:'x1',   label:'x₁', type:'input',  nx:0.08, ny:0.28 },
+      { id:'x2',   label:'x₂', type:'input',  nx:0.08, ny:0.72 },
+      { id:'z1',   label:'Σ₁', type:'op',     nx:0.30, ny:0.22, op:'linear' },
+      { id:'z2',   label:'Σ₂', type:'op',     nx:0.30, ny:0.78, op:'linear' },
+      { id:'h1',   label:'σ',  type:'op',     nx:0.52, ny:0.22, op:'sigmoid' },
+      { id:'h2',   label:'σ',  type:'op',     nx:0.52, ny:0.78, op:'sigmoid' },
+      { id:'zout', label:'Σ',  type:'op',     nx:0.72, ny:0.50, op:'linear' },
+      { id:'y',    label:'σ',  type:'output', nx:0.91, ny:0.50, op:'sigmoid' },
+    ],
+    edges: [
+      ['x1','z1'],['x2','z1'],['z1','h1'],
+      ['x1','z2'],['x2','z2'],['z2','h2'],
+      ['h1','zout'],['h2','zout'],['zout','y'],
+    ],
+    params: {
+      z1:   { w:[ 0.80, -0.60], b: 0.20 },
+      z2:   { w:[-0.50,  0.90], b:-0.10 },
+      zout: { w:[ 1.20, -0.80], b: 0.30 },
+    },
+    nodeR:    { input:15, param:11, op:17, output:17 },
+    fwdOrder: ['x1','x2','z1','z2','h1','h2','zout','y'],
+    bwdOrder: ['y','zout','h1','h2','z1','z2','x1','x2'],
+  },
+
+  deep: {
+    nodes: [
+      { id:'x1',  label:'x₁', type:'input',  nx:0.06, ny:0.30 },
+      { id:'x2',  label:'x₂', type:'input',  nx:0.06, ny:0.70 },
+      { id:'z11', label:'Σ₁', type:'op',     nx:0.22, ny:0.15, op:'linear' },
+      { id:'z12', label:'Σ₂', type:'op',     nx:0.22, ny:0.50, op:'linear' },
+      { id:'z13', label:'Σ₃', type:'op',     nx:0.22, ny:0.85, op:'linear' },
+      { id:'h11', label:'σ',  type:'op',     nx:0.36, ny:0.15, op:'sigmoid' },
+      { id:'h12', label:'σ',  type:'op',     nx:0.36, ny:0.50, op:'sigmoid' },
+      { id:'h13', label:'σ',  type:'op',     nx:0.36, ny:0.85, op:'sigmoid' },
+      { id:'z21', label:'Σ₄', type:'op',     nx:0.55, ny:0.32, op:'linear' },
+      { id:'z22', label:'Σ₅', type:'op',     nx:0.55, ny:0.68, op:'linear' },
+      { id:'h21', label:'σ',  type:'op',     nx:0.69, ny:0.32, op:'sigmoid' },
+      { id:'h22', label:'σ',  type:'op',     nx:0.69, ny:0.68, op:'sigmoid' },
+      { id:'zout',label:'Σ',  type:'op',     nx:0.82, ny:0.50, op:'linear' },
+      { id:'y',   label:'σ',  type:'output', nx:0.94, ny:0.50, op:'sigmoid' },
+    ],
+    edges: [
+      ['x1','z11'],['x2','z11'],
+      ['x1','z12'],['x2','z12'],
+      ['x1','z13'],['x2','z13'],
+      ['z11','h11'],['z12','h12'],['z13','h13'],
+      ['h11','z21'],['h12','z21'],['h13','z21'],
+      ['h11','z22'],['h12','z22'],['h13','z22'],
+      ['z21','h21'],['z22','h22'],
+      ['h21','zout'],['h22','zout'],
+      ['zout','y'],
+    ],
+    params: {
+      z11:  { w:[ 0.50,  0.80], b: 0.10 },
+      z12:  { w:[-0.60,  0.40], b: 0.20 },
+      z13:  { w:[ 0.30, -0.70], b:-0.10 },
+      z21:  { w:[ 0.70,  0.50, -0.30], b: 0.00 },
+      z22:  { w:[-0.40,  0.60,  0.80], b:-0.20 },
+      zout: { w:[ 0.90, -0.50], b: 0.10 },
+    },
+    nodeR:    { input:13, param:10, op:13, output:13 },
+    fwdOrder: ['x1','x2','z11','z12','z13','h11','h12','h13','z21','z22','h21','h22','zout','y'],
+    bwdOrder: ['y','zout','h21','h22','z21','z22','h11','h12','h13','z11','z12','z13','x1','x2'],
+  },
 };
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -390,6 +464,9 @@ const S = {
   nodeGrads:  {},      // id → number (backward pass gradients)
   bwdStepIdx: 0,
   inBwdPass:  false,
+  autoPlay:   'stopped',  // 'stopped' | 'playing' | 'paused'
+  autoTimer:  null,
+  autoSpeed:  500,        // ms between auto-steps
 };
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -417,22 +494,157 @@ function computeNode(node) {
   if (node.op === 'mul')     return ins[0] * ins[1];
   if (node.op === 'add')     return ins.reduce((a, b) => a + b, 0);
   if (node.op === 'sigmoid') return 1 / (1 + Math.exp(-ins[0]));
+  if (node.op === 'linear') {
+    const p = net().params[node.id];
+    return ins.reduce((s, v, i) => s + v * p.w[i], 0) + p.b;
+  }
   return NaN;
 }
 
-function computeGrad(nodeId) {
-  const yhat    = S.nodeVals['sig'];
-  const sigLoc  = yhat * (1 - yhat);   // σ(z)(1−σ(z))
-  if (nodeId === 'sig')  return 1;
-  if (nodeId === 'add')  return (S.nodeGrads['sig']  || 0) * sigLoc;
-  if (nodeId === 'mul1') return (S.nodeGrads['add']  || 0);
-  if (nodeId === 'mul2') return (S.nodeGrads['add']  || 0);
-  if (nodeId === 'b')    return (S.nodeGrads['add']  || 0);
-  if (nodeId === 'w1')   return (S.nodeGrads['mul1'] || 0) * S.nodeVals['x1'];
-  if (nodeId === 'x1')   return (S.nodeGrads['mul1'] || 0) * S.nodeVals['w1'];
-  if (nodeId === 'w2')   return (S.nodeGrads['mul2'] || 0) * S.nodeVals['x2'];
-  if (nodeId === 'x2')   return (S.nodeGrads['mul2'] || 0) * S.nodeVals['w2'];
+// Local derivative of childId's output w.r.t. inputId's output
+function localDeriv(childId, inputId) {
+  const nm   = nodeMap();
+  const node = nm[childId];
+  const ins  = incomingIds(childId);
+  if (node.op === 'sigmoid') return S.nodeVals[childId] * (1 - S.nodeVals[childId]);
+  if (node.op === 'add')     return 1;
+  if (node.op === 'mul') {
+    const otherIdx = ins.indexOf(inputId) === 0 ? 1 : 0;
+    return S.nodeVals[ins[otherIdx]];
+  }
+  if (node.op === 'linear') {
+    return net().params[childId].w[ins.indexOf(inputId)];
+  }
   return 0;
+}
+
+// Generic backward pass: accumulate upstream gradient × local derivative from all children
+function computeGrad(nodeId) {
+  const children = net().edges.filter(([f]) => f === nodeId).map(([, t]) => t);
+  if (children.length === 0) return 1;   // output node seed
+  let grad = 0;
+  for (const cId of children) {
+    const cg = S.nodeGrads[cId];
+    if (cg !== undefined) grad += cg * localDeriv(cId, nodeId);
+  }
+  return grad;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   GENERIC ANNOTATIONS  (for XOR and 3-Layer networks)
+═══════════════════════════════════════════════════════════════════ */
+
+function genericFwdAnnotation(nodeId) {
+  const nm   = nodeMap();
+  const node = nm[nodeId];
+  const v    = S.nodeVals[nodeId];
+  const f3   = n => (+n).toFixed(3);
+  const fv   = id => S.nodeVals[id] !== undefined ? f3(S.nodeVals[id]) : '?';
+  const ins  = incomingIds(nodeId);
+
+  if (node.type === 'input') {
+    return {
+      eq:   node.label + '  →  input leaf node',
+      detail: node.label + ' = ' + f3(v),
+      text: node.label + ' is an input leaf. All forward computation originates from inputs — no calculation here, just the raw feature value flowing into the network.',
+      cls:  'neutral',
+    };
+  }
+  if (node.type === 'output') {
+    return {
+      eq:     'ŷ = σ(z) = 1 / (1 + e⁻ᶻ)',
+      detail: 'ŷ = σ(' + fv(ins[0]) + ') = ' + f3(v),
+      text:   'Output sigmoid squashes the final pre-activation into (0, 1). Its derivative σ\'(z) = σ(z)(1−σ(z)) = ' + f3(v*(1-v)) + ' seeds the backward pass. Forward pass complete — switch to Backward Pass.',
+      cls:    'good',
+    };
+  }
+  if (node.op === 'linear') {
+    const p     = net().params[nodeId];
+    const terms = ins.map((id, i) => f3(p.w[i]) + '·' + fv(id)).join(' + ');
+    return {
+      eq:     'z = Σ wᵢ·xᵢ + b',
+      detail: nodeId + ' = ' + terms + ' + ' + f3(p.b) + ' = ' + f3(v),
+      text:   'Weighted sum: each input is scaled by its weight and summed with a bias. The local derivative w.r.t. input xᵢ is wᵢ, and w.r.t. wᵢ is xᵢ — these swap roles during backpropagation.',
+      cls:    'good',
+    };
+  }
+  if (node.op === 'sigmoid') {
+    return {
+      eq:     'h = σ(z) = 1 / (1 + e⁻ᶻ)',
+      detail: nodeId + ' = σ(' + fv(ins[0]) + ') = ' + f3(v),
+      text:   'Sigmoid squashes z ∈ ℝ into (0, 1). Its derivative σ\'(z) = σ(z)(1−σ(z)) = ' + f3(v*(1-v)) + ' will scale gradients in the backward pass. Since σ\'(z) ≤ 0.25, repeated layers shrink gradients (vanishing gradient).',
+      cls:    'good',
+    };
+  }
+  return { eq: nodeId, detail: f3(v), text: '', cls: 'neutral' };
+}
+
+function genericBwdAnnotation(nodeId) {
+  const nm   = nodeMap();
+  const node = nm[nodeId];
+  const v    = S.nodeVals[nodeId];
+  const g    = S.nodeGrads[nodeId];
+  const f4   = n => (+n).toFixed(4);
+  const f3   = n => (+n).toFixed(3);
+  const children = net().edges.filter(([f]) => f === nodeId).map(([, t]) => t);
+
+  if (children.length === 0) {
+    const sl = v * (1 - v);
+    return {
+      label: '∂L/∂ŷ',
+      eq:    '∂L/∂ŷ = 1  (output seed)',
+      detail:'σ\'(z) = ŷ·(1−ŷ) = ' + f4(v) + '·(1−' + f4(v) + ') = ' + f4(sl),
+      text:  'Output node seeds the backward pass with gradient 1. Its sigmoid derivative ' + f4(sl) + ' flows to the pre-activation node next.',
+      cls:   'warn',
+    };
+  }
+
+  if (node.type === 'input') {
+    const parts = children.map(cId => {
+      const cg = S.nodeGrads[cId];
+      const w  = localDeriv(cId, nodeId);
+      return (cg !== undefined ? f4(cg) : '?') + '×' + f3(w);
+    }).join(' + ');
+    return {
+      label: '∂L/∂' + node.label,
+      eq:    '∂L/∂x = Σⱼ ∂L/∂zⱼ × wⱼ  (sum over downstream neurons)',
+      detail:'∂L/∂' + nodeId + ' = ' + parts + ' = ' + f4(g),
+      text:  node.label + '\'s gradient accumulates from every neuron it feeds, scaled by the corresponding weight. In a deeper architecture, this gradient would propagate further back.',
+      cls:   'warn',
+    };
+  }
+
+  if (node.op === 'linear') {
+    const sigCId  = children[0];
+    const cg      = S.nodeGrads[sigCId] !== undefined ? f4(S.nodeGrads[sigCId]) : '?';
+    const cval    = S.nodeVals[sigCId];
+    const sl      = cval * (1 - cval);
+    return {
+      label: '∂L/∂' + nodeId,
+      eq:    '∂L/∂z = ∂L/∂h × ∂h/∂z  =  upstream × σ\'(z)',
+      detail:'∂L/∂' + nodeId + ' = ' + cg + ' × ' + f4(sl) + ' = ' + f4(g),
+      text:  'Chain rule: the gradient from the sigmoid scales by σ\'(z) = ' + f4(sl) + '. This gradient then distributes to each input weighted by wᵢ, and to each weight by the input value — the hallmark of backprop through a linear-sigmoid pair.',
+      cls:   'warn',
+    };
+  }
+
+  if (node.op === 'sigmoid') {
+    const sl    = v * (1 - v);
+    const parts = children.map(cId => {
+      const cg = S.nodeGrads[cId];
+      const w  = localDeriv(cId, nodeId);
+      return (cg !== undefined ? f4(cg) : '?') + '×' + f3(w);
+    }).join(' + ');
+    return {
+      label: '∂L/∂' + nodeId,
+      eq:    '∂L/∂' + nodeId + ' = Σⱼ ∂L/∂zⱼ × wⱼ  (weighted sum from downstream)',
+      detail:'∂L/∂' + nodeId + ' = ' + parts + ' = ' + f4(g),
+      text:  'This hidden unit receives gradient contributions from each downstream neuron it feeds, scaled by the connecting weight. Its sigmoid derivative σ\'(z) = ' + f4(sl) + ' multiplies this when the gradient passes to the pre-activation next.',
+      cls:   'warn',
+    };
+  }
+
+  return { label: '∂L/∂' + nodeId, eq: '—', detail: f4(g), text: '—', cls: 'neutral' };
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -440,6 +652,7 @@ function computeGrad(nodeId) {
 ═══════════════════════════════════════════════════════════════════ */
 
 function fwdAnnotation(nodeId) {
+  if (S.netKey !== 'neuron') return genericFwdAnnotation(nodeId);
   const v = S.nodeVals[nodeId];
   const f = id => S.nodeVals[id] !== undefined ? fmt(S.nodeVals[id]) : '?';
 
@@ -507,6 +720,7 @@ function fwdAnnotation(nodeId) {
 ═══════════════════════════════════════════════════════════════════ */
 
 function bwdAnnotation(nodeId) {
+  if (S.netKey !== 'neuron') return genericBwdAnnotation(nodeId);
   const f4 = v => (+v).toFixed(4);
   const f3 = v => (+v).toFixed(3);
   const yhat   = S.nodeVals['sig'];
@@ -601,9 +815,11 @@ function renderGraph() {
   ctx.fillStyle = '#111C0F';
   ctx.fillRect(0, 0, W, H);
 
-  const nm  = nodeMap();
-  const toP = (nx, ny) => [nx * W, ny * H];
-  const nr  = n => NODE_R[n.type] || 18;
+  const nm    = nodeMap();
+  const toP   = (nx, ny) => [nx * W, ny * H];
+  const NR    = net().nodeR || NODE_R;
+  const nr    = n => NR[n.type] || 18;
+  const showEdgeLabels = net().nodes.length <= 9;
 
   /* ── Edges ─────────────────────────────────────────────────── */
   net().edges.forEach(([fId, tId]) => {
@@ -645,7 +861,7 @@ function renderGraph() {
     const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
 
     // Forward value label (one side of edge, dimmed when bwd active)
-    if (fFwdLive && S.nodeVals[fId] !== undefined) {
+    if (showEdgeLabels && fFwdLive && S.nodeVals[fId] !== undefined) {
       ctx.save();
       ctx.font = '500 8.5px "IBM Plex Mono", monospace';
       ctx.fillStyle = hasBwd ? 'rgba(100,200,80,0.45)' : 'rgba(180,230,150,0.9)';
@@ -655,7 +871,7 @@ function renderGraph() {
     }
 
     // Gradient label (other side of edge, shown during backward pass)
-    if (hasBwd) {
+    if (showEdgeLabels && hasBwd) {
       ctx.save();
       ctx.font = '600 8px "IBM Plex Mono", monospace';
       ctx.fillStyle = 'rgba(255,165,50,0.95)';
@@ -799,12 +1015,13 @@ function resetBwdPanels() {
 }
 
 function updateButtons() {
+  const playing = S.autoPlay === 'playing';
   if (S.inBwdPass) {
-    document.getElementById('btn-prev').disabled = S.bwdStepIdx === 0;
-    document.getElementById('btn-next').disabled = S.bwdStepIdx >= net().bwdOrder.length;
+    document.getElementById('btn-prev').disabled = playing || S.bwdStepIdx === 0;
+    document.getElementById('btn-next').disabled = playing || S.bwdStepIdx >= net().bwdOrder.length;
   } else {
-    document.getElementById('btn-prev').disabled = S.stepIdx === 0;
-    document.getElementById('btn-next').disabled = S.stepIdx >= net().fwdOrder.length;
+    document.getElementById('btn-prev').disabled = playing || S.stepIdx === 0;
+    document.getElementById('btn-next').disabled = playing || S.stepIdx >= net().fwdOrder.length;
   }
 }
 
@@ -908,6 +1125,7 @@ function stepBwdBack() {
 }
 
 function reset() {
+  stopPlay();
   S.mode = 'forward'; S.inBwdPass = false;
   document.querySelectorAll('#mode-btns .kbtn').forEach(b =>
     b.classList.toggle('active', b.dataset.mode === 'forward')
@@ -924,11 +1142,99 @@ function reset() {
 ═══════════════════════════════════════════════════════════════════ */
 
 function refreshWeightDisplay() {
+  const card = document.getElementById('card-weights');
+  if (card) card.style.display = S.netKey === 'neuron' ? '' : 'none';
+  if (S.netKey !== 'neuron') return;
   const p = net().params;
   ['w1','w2','b'].forEach(id => {
     const el = document.getElementById('wv-' + id);
     if (el) el.textContent = fmt(p[id]);
   });
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   AUTO-PLAY
+═══════════════════════════════════════════════════════════════════ */
+
+const SPEED_MS    = { 1:1000, 2:500, 3:200 };
+const SPEED_LABEL = { 1:'Slow', 2:'Medium', 3:'Fast' };
+
+function transitionToBwd() {
+  net().fwdOrder.forEach(id => { S.nodeState[id] = 'done'; });
+  S.mode       = 'backward';
+  S.inBwdPass  = true;
+  S.bwdStepIdx = 0;
+  S.nodeGrads  = {};
+  document.querySelectorAll('#mode-btns .kbtn').forEach(b =>
+    b.classList.toggle('active', b.dataset.mode === 'backward')
+  );
+  document.getElementById('mode-hint').textContent = 'computing gradients right → left';
+  resetBwdPanels();
+  updateButtons();
+  renderGraph();
+}
+
+function updatePlayButton() {
+  const btn = document.getElementById('btn-play');
+  if (!btn) return;
+  if (S.autoPlay === 'playing') {
+    btn.textContent = '⏸ Pause';
+    btn.classList.add('playing');
+  } else if (S.autoPlay === 'paused') {
+    btn.textContent = '▶ Resume';
+    btn.classList.remove('playing');
+  } else {
+    btn.textContent = '▶ Play';
+    btn.classList.remove('playing');
+  }
+}
+
+function stopPlay() {
+  if (S.autoTimer) { clearTimeout(S.autoTimer); S.autoTimer = null; }
+  S.autoPlay = 'stopped';
+  updatePlayButton();
+  updateButtons();
+}
+
+function pausePlay() {
+  if (S.autoTimer) { clearTimeout(S.autoTimer); S.autoTimer = null; }
+  S.autoPlay = 'paused';
+  updatePlayButton();
+  updateButtons();
+}
+
+function autoStep() {
+  S.autoTimer = null;
+  const fwdLen = net().fwdOrder.length;
+  const bwdLen = net().bwdOrder.length;
+
+  if (!S.inBwdPass && S.stepIdx < fwdLen) {
+    stepForward();
+  } else if (!S.inBwdPass) {
+    transitionToBwd();
+  } else if (S.bwdStepIdx < bwdLen) {
+    stepBwdPass();
+  } else {
+    stopPlay();
+    return;
+  }
+
+  // Check if backward pass just completed
+  if (S.inBwdPass && S.bwdStepIdx >= bwdLen) {
+    stopPlay();
+    return;
+  }
+
+  if (S.autoPlay === 'playing') {
+    S.autoTimer = setTimeout(autoStep, S.autoSpeed);
+  }
+}
+
+function startPlay() {
+  S.autoPlay = 'playing';
+  updatePlayButton();
+  updateButtons();
+  S.autoTimer = setTimeout(autoStep, S.autoSpeed);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -958,10 +1264,11 @@ document.getElementById('sld-x2').addEventListener('input', function() {
 document.getElementById('mode-btns').addEventListener('click', e => {
   const btn = e.target.closest('[data-mode]');
   if (!btn) return;
+  stopPlay();
   const m = btn.dataset.mode;
 
   if (m === 'forward') {
-    reset();   // reset() always goes back to forward mode
+    reset();
 
   } else if (m === 'backward') {
     if (S.stepIdx < net().fwdOrder.length) {
@@ -970,35 +1277,36 @@ document.getElementById('mode-btns').addEventListener('click', e => {
       box.className   = 'anno-box warn';
       return;
     }
-    // Finalize forward pass (last fwd node may still be 'active')
-    net().fwdOrder.forEach(id => { S.nodeState[id] = 'done'; });
-    S.mode       = 'backward';
-    S.inBwdPass  = true;
-    S.bwdStepIdx = 0;
-    S.nodeGrads  = {};
-    document.querySelectorAll('#mode-btns .kbtn').forEach(b =>
-      b.classList.toggle('active', b.dataset.mode === 'backward')
-    );
-    document.getElementById('mode-hint').textContent = 'computing gradients right → left';
-    resetBwdPanels();
-    updateButtons();
-    renderGraph();
+    transitionToBwd();
   }
+});
+
+document.getElementById('btn-play').addEventListener('click', () => {
+  if (S.autoPlay === 'playing') {
+    pausePlay();
+  } else {
+    // If everything is already done, reset first so Play starts fresh
+    const fwdDone = S.stepIdx >= net().fwdOrder.length;
+    const bwdDone = S.inBwdPass && S.bwdStepIdx >= net().bwdOrder.length;
+    if (fwdDone && bwdDone) reset();
+    startPlay();
+  }
+});
+
+document.getElementById('sld-speed').addEventListener('input', function() {
+  const v = +this.value;
+  S.autoSpeed = SPEED_MS[v];
+  document.getElementById('val-speed').textContent = SPEED_LABEL[v];
 });
 
 document.getElementById('tab-bar').addEventListener('click', e => {
   const btn = e.target.closest('[data-net]');
-  if (!btn) return;
-  if (btn.dataset.net !== 'neuron') {
-    const box = document.getElementById('anno-box');
-    box.textContent = 'XOR Network and 3-Layer Network are coming in a later stage — try Simple Neuron for now.';
-    box.className   = 'anno-box neutral';
-    return;
-  }
+  if (!btn || !NETS[btn.dataset.net]) return;
   document.querySelectorAll('#tab-bar button').forEach(b =>
-    b.classList.toggle('active', b.dataset.net === 'neuron')
+    b.classList.toggle('active', b.dataset.net === btn.dataset.net)
   );
-  S.netKey = 'neuron';
+  S.netKey = btn.dataset.net;
+  refreshWeightDisplay();
   reset();
 });
 

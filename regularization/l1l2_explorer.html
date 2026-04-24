@@ -1,0 +1,2253 @@
+<!DOCTYPE html>
+<!-- Copyright © 2026 Greg Chism. University of Arizona, College of Information Science.
+     INFO 557: Neural Networks. MIT License. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>L1 &amp; L2 Regularization — Interactive Explorer | INFO 557: Neural Networks</title>
+<meta name="description" content="Explore how L1 (Lasso) and L2 (Ridge) regularization shape weight distributions, induce sparsity, and shift decision boundaries — adjust λ and watch the effect on weights and loss in real time.">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="L1 &amp; L2 Regularization — Interactive Explorer">
+<meta property="og:description" content="Explore how L1 (Lasso) and L2 (Ridge) regularization shape weight distributions, induce sparsity, and shift decision boundaries — adjust λ and watch the effect on weights and loss in real time.">
+<meta property="og:image" content="https://gchism94.github.io/uofa-neural-networks/regularization/l1l2_explorer-preview.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="600">
+<meta property="og:url" content="https://gchism94.github.io/uofa-neural-networks/regularization/l1l2_explorer.html">
+<meta property="fb:app_id" content="2385695445236853">
+
+<!-- Twitter/X card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="L1 &amp; L2 Regularization — Interactive Explorer">
+<meta name="twitter:description" content="Explore how L1 (Lasso) and L2 (Ridge) regularization shape weight distributions, induce sparsity, and shift decision boundaries — adjust λ and watch the effect on weights and loss in real time.">
+<meta name="twitter:image" content="https://gchism94.github.io/uofa-neural-networks/regularization/l1l2_explorer-preview.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+
+<style>
+:root{
+  --cream:#FAF7F0;--cream-mid:#F0EBE0;--cream-dk:#E2D9C5;
+  --g-dk:#1C3A0E;--g-mid:#2D5A1B;--g-lt:#4A8C2F;--g-pale:#C8E6A8;
+  --orange:#E8630A;--orange-lt:#F08C50;--orange-dk:#C0500A;
+  --blue:#1A56A0;--blue-pale:#D0E4F8;
+  --red:#B0321D;--red-pale:#F8DDD8;
+  --purple:#6A1B9A;--purple-pale:#E8D5F5;
+  --text:#1A1A1A;--text-muted:#888;--text-soft:#555;
+  --border:#C8BE9A;--border-lt:#DDD6BE;--shadow:rgba(44,90,27,.10);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:'Outfit',sans-serif;background:var(--cream);color:var(--text);
+  padding:1.25rem 1rem 2rem;min-height:100vh;line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:.85rem}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+.hdr{display:flex;justify-content:space-between;align-items:flex-start;column-gap:1rem;row-gap:.35rem;flex-wrap:wrap}
+.hdr>div:first-child{flex:1 1 auto;min-width:0}
+.hdr h1{font-size:clamp(1.25rem,2.2vw,1.6rem);font-weight:700;color:var(--g-dk);letter-spacing:-.02em;line-height:1.2}
+.hdr p.subtitle{font-size:.86rem;color:var(--text-muted);margin-top:.18rem}
+.hdr-rule{border:none;border-top:2.5px solid var(--g-dk);margin-top:.55rem}
+
+/* ── Fixed copyright ─────────────────────────────────────────────── */
+.cr-top{
+  position:fixed;top:.75rem;right:1rem;z-index:1000;
+  font-size:.72rem;color:var(--text-muted);text-align:right;
+  background:rgba(250,247,240,.92);padding:.2rem 1.5rem .2rem .5rem;
+  border-radius:5px;backdrop-filter:blur(4px);
+  border:1px solid var(--border-lt);white-space:nowrap;min-width:max-content;
+}
+.cr-top a{color:var(--orange);text-decoration:none}
+.cr-top a:hover{text-decoration:underline}
+
+/* ── Tab bar ─────────────────────────────────────────────────────── */
+.tab-bar{
+  display:flex;flex-wrap:wrap;gap:.3rem;background:white;
+  border:1px solid var(--border);border-radius:8px;
+  padding:.35rem;box-shadow:0 2px 8px var(--shadow);
+}
+.tab-bar button{
+  font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:500;
+  padding:.42rem .85rem;border:1px solid transparent;background:transparent;
+  color:var(--text-soft);border-radius:6px;cursor:pointer;
+  transition:background .12s,color .12s;white-space:nowrap;
+}
+.tab-bar button:hover{background:var(--cream-mid);color:var(--g-dk)}
+.tab-bar button.active{background:var(--g-dk);color:white;border-color:var(--g-dk)}
+.tab-bar button .n{
+  font-family:'IBM Plex Mono',monospace;font-size:.76em;
+  color:var(--orange);font-weight:500;margin-right:.35rem;
+}
+.tab-bar button.active .n{color:var(--orange-lt)}
+
+/* ── Explorer grid — three columns ───────────────────────────────── */
+.explorer-grid{
+  display:grid;
+  grid-template-columns:260px 1fr 260px;
+  gap:.85rem;
+  align-items:start;
+}
+@media(max-width:960px){
+  .explorer-grid{grid-template-columns:1fr}
+  .right-col{display:none}
+}
+.left-col{display:flex;flex-direction:column;gap:.75rem}
+.center-col{display:flex;flex-direction:column;gap:.75rem}
+.right-col{display:flex;flex-direction:column;gap:.75rem}
+
+/* ── Cards ───────────────────────────────────────────────────────── */
+.card{background:white;border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem;box-shadow:0 2px 8px var(--shadow)}
+.card-title{font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--g-dk);margin-bottom:.55rem}
+
+/* ── Sliders ─────────────────────────────────────────────────────── */
+.srow{display:flex;align-items:center;gap:.45rem;margin-bottom:.2rem}
+.slbl{font-family:'IBM Plex Mono',monospace;font-size:.82rem;font-weight:500;color:var(--g-dk);min-width:22px}
+input[type=range]{flex:1;appearance:none;-webkit-appearance:none;height:4px;background:var(--cream-dk);border-radius:2px;cursor:pointer;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--g-mid);border:2.5px solid white;box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:pointer}
+.sval{font-family:'IBM Plex Mono',monospace;font-size:.76rem;color:var(--text-muted);min-width:44px;text-align:right}
+.hint-txt{font-size:.7rem;color:var(--text-muted);font-style:italic;margin-top:.15rem;padding-left:1.6rem}
+
+/* ── Buttons ─────────────────────────────────────────────────────── */
+.btn-group{display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:.35rem}
+.kbtn{
+  font-family:'Outfit',sans-serif;font-size:.78rem;font-weight:500;
+  padding:.26rem .7rem;border-radius:16px;cursor:pointer;
+  border:1.5px solid var(--border);background:var(--cream);color:var(--g-dk);
+  transition:all .12s;
+}
+.kbtn:hover{background:var(--g-pale);border-color:var(--g-lt)}
+.kbtn.active{background:var(--g-dk);border-color:var(--g-dk);color:white}
+.kbtn.l1-active{background:var(--orange);border-color:var(--orange-dk);color:white}
+.kbtn.l2-active{background:var(--blue);border-color:var(--blue);color:white}
+.ctrl-btns{display:flex;gap:.45rem;flex-wrap:wrap}
+.pbtn{
+  font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:600;
+  padding:.35rem .9rem;border-radius:6px;cursor:pointer;
+  border:1.5px solid var(--border);background:var(--cream);color:var(--g-dk);
+  transition:all .12s;
+}
+.pbtn:hover{background:var(--g-pale);border-color:var(--g-lt)}
+.pbtn.primary{background:var(--g-mid);border-color:var(--g-mid);color:white}
+.pbtn.primary:hover{background:var(--g-dk);border-color:var(--g-dk)}
+.pbtn.playing{background:var(--orange);border-color:var(--orange-dk);color:white}
+.pbtn.playing:hover{background:var(--orange-dk);border-color:var(--orange-dk)}
+
+/* ── Accuracy chart (boundary tab) ──────────────────────────────── */
+.acc-chart-wrap{width:100%;aspect-ratio:12/7;margin-top:.55rem}
+.acc-chart-wrap svg{width:100%;height:100%;display:block;border-radius:4px}
+.acc-chart-legend{display:flex;gap:.5rem;flex-wrap:wrap;font-size:.66rem;color:var(--text-soft);margin-top:.28rem;align-items:center}
+
+/* ── CV curve (boundary tab, center col) ─────────────────────────── */
+.cv-chart-wrap{width:100%;aspect-ratio:16/5;position:relative}
+.cv-chart-wrap svg{width:100%;height:100%;display:block;border-radius:6px}
+.cv-legend{display:flex;gap:.6rem;flex-wrap:wrap;font-size:.66rem;color:var(--text-soft);margin-top:.28rem;align-items:center}
+
+/* ── Equation / penalty bar ──────────────────────────────────────── */
+.eq-bar{
+  background:var(--g-dk);color:white;border-radius:8px;
+  padding:.6rem 1rem;
+}
+.eq-name{font-size:.62rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:.2rem}
+.eq-text{font-family:'IBM Plex Mono',monospace;font-size:.82rem;line-height:1.55}
+
+/* ── Annotation box ──────────────────────────────────────────────── */
+.anno-box{
+  border-radius:6px;padding:.55rem .75rem;font-size:.78rem;line-height:1.55;
+  background:var(--blue-pale);color:var(--blue);border-left:3px solid var(--blue);
+  min-height:4rem;
+}
+.anno-box.warn{background:var(--red-pale);color:var(--red);border-color:var(--red)}
+.anno-box.good{background:var(--g-pale);color:var(--g-dk);border-color:var(--g-mid)}
+.anno-box.neutral{background:var(--cream-mid);color:var(--text-soft);border-color:var(--border)}
+.anno-box.l1{background:#FFF3E0;color:#E65100;border-color:var(--orange)}
+.anno-box.l2{background:var(--blue-pale);color:var(--blue);border-color:var(--blue)}
+
+/* ── Status bar ──────────────────────────────────────────────────── */
+.status-bar{
+  display:flex;gap:.5rem;flex-wrap:wrap;font-family:'IBM Plex Mono',monospace;
+  font-size:.72rem;color:var(--text-muted);
+}
+.stat-pill{
+  background:var(--cream-mid);border:1px solid var(--border-lt);
+  border-radius:12px;padding:.15rem .55rem;
+}
+.stat-pill span{color:var(--g-dk);font-weight:600}
+
+/* ── Plot labels ─────────────────────────────────────────────────── */
+.plot-label{
+  font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--text-muted);text-align:center;margin-bottom:.35rem;
+}
+
+/* ── Main visualization wrapper ──────────────────────────────────── */
+.main-viz-wrap{
+  width:100%;aspect-ratio:4/3;position:relative;cursor:default;
+}
+.main-viz-wrap svg{
+  width:100%;height:100%;display:block;border-radius:6px;
+}
+
+/* ── Histogram wrapper ───────────────────────────────────────────── */
+.hist-wrap{
+  width:100%;aspect-ratio:3/4;position:relative;
+}
+.hist-wrap svg{
+  width:100%;height:100%;display:block;border-radius:6px;
+}
+
+/* ── Legend ──────────────────────────────────────────────────────── */
+.legend{
+  display:flex;gap:.75rem;flex-wrap:wrap;font-size:.73rem;
+  color:var(--text-soft);margin-top:.45rem;align-items:center;
+}
+.legend-dot{width:10px;height:10px;border-radius:50%;display:inline-block;vertical-align:middle;margin-right:.3rem}
+.legend-line{width:18px;height:3px;border-radius:2px;display:inline-block;vertical-align:middle;margin-right:.3rem}
+
+/* ── Mini stats card (right column) ─────────────────────────────── */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:.45rem;margin-top:.1rem}
+.stat-block{
+  background:var(--cream-mid);border:1px solid var(--border-lt);
+  border-radius:6px;padding:.35rem .5rem;text-align:center;
+}
+.stat-block .sb-val{
+  font-family:'IBM Plex Mono',monospace;font-size:1.05rem;font-weight:600;
+  color:var(--g-dk);display:block;
+}
+.stat-block .sb-lbl{font-size:.62rem;color:var(--text-muted);margin-top:.05rem}
+
+/* ── Sparsity bar ────────────────────────────────────────────────── */
+.sparsity-bar-wrap{margin-top:.6rem}
+.sparsity-bar-lbl{font-size:.68rem;color:var(--text-muted);margin-bottom:.2rem;display:flex;justify-content:space-between}
+.sparsity-bar-track{height:8px;background:var(--cream-dk);border-radius:4px;overflow:hidden}
+.sparsity-bar-fill{height:100%;border-radius:4px;background:var(--orange);width:0%;transition:width .35s}
+</style>
+</head>
+<body>
+
+<div class="cr-top">© 2026 Greg T. Chism · <a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a></div>
+
+<div class="wrap">
+
+<header>
+  <div class="hdr">
+    <div>
+      <h1>L1 &amp; L2 Regularization — Interactive Explorer</h1>
+      <p class="subtitle">Explore how regularization strength shapes weight distributions, sparsity, and decision boundaries</p>
+    </div>
+  </div>
+  <hr class="hdr-rule">
+</header>
+
+<!-- Tab bar -->
+<nav class="tab-bar" id="tab-bar">
+  <button class="active" data-tab="weights"><span class="n">1</span>Weight Distribution</button>
+  <button data-tab="boundary"><span class="n">2</span>Decision Boundary</button>
+  <button data-tab="landscape"><span class="n">3</span>Loss Landscape</button>
+</nav>
+
+<!-- Main explorer -->
+<div class="explorer-grid">
+
+  <!-- LEFT: Controls -->
+  <div class="left-col">
+
+    <div class="card">
+      <div class="card-title">Regularization Type</div>
+      <div class="btn-group" id="reg-btns">
+        <button class="kbtn active" data-reg="none">None</button>
+        <button class="kbtn" data-reg="l1">L1 (Lasso)</button>
+        <button class="kbtn" data-reg="l2">L2 (Ridge)</button>
+      </div>
+      <div class="hint-txt" id="reg-hint">no penalty — weights unconstrained</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Regularization Strength λ</div>
+      <div class="srow">
+        <span class="slbl">λ</span>
+        <input type="range" id="sld-lambda" min="0.001" max="1.0" step="0.001" value="0.01">
+        <span class="sval" id="val-lambda">0.010</span>
+      </div>
+      <div class="hint-txt" id="lambda-hint">very weak — nearly unregularized</div>
+      <div id="cv-optimize-wrap" style="display:none;margin-top:.55rem">
+        <button id="btn-cv-optimize" class="pbtn primary" style="width:100%;font-size:.78rem">⚡ Optimize λ</button>
+        <div class="hint-txt" id="cv-sweep-status" style="margin-top:.22rem;padding-left:0;text-align:center"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Network Complexity</div>
+      <div class="btn-group" id="complexity-btns">
+        <button class="kbtn active" data-complexity="simple">Simple</button>
+        <button class="kbtn" data-complexity="medium">Medium</button>
+        <button class="kbtn" data-complexity="complex">Complex</button>
+      </div>
+      <div class="hint-txt" id="complexity-hint">few weights — minimal overfitting risk</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Simulation</div>
+      <div class="ctrl-btns">
+        <button id="btn-train" class="pbtn primary">▶ Train</button>
+        <button id="btn-step" class="pbtn">Step</button>
+        <button id="btn-reset" class="pbtn">↺ Reset</button>
+      </div>
+    </div>
+
+    <div class="card" id="card-bnd-controls" style="display:none">
+      <div class="card-title">Animation</div>
+      <div class="ctrl-btns" style="margin-bottom:.4rem">
+        <button id="btn-bnd-play" class="pbtn primary">▶ Play</button>
+        <button id="btn-bnd-step" class="pbtn">Step</button>
+        <button id="btn-bnd-reset" class="pbtn">↺ Reset</button>
+      </div>
+      <div class="srow">
+        <span class="slbl" style="font-size:.72rem;min-width:42px">Speed</span>
+        <input type="range" id="sld-speed" min="0" max="2" step="1" value="1">
+        <span class="sval" id="val-speed">Med</span>
+      </div>
+      <div class="status-bar" style="margin-top:.5rem">
+        <div class="stat-pill">Epoch <span id="stat-bnd-epoch">0</span> / <span id="stat-bnd-maxepoch">100</span></div>
+      </div>
+    </div>
+
+    <div class="card" id="card-land-controls" style="display:none">
+      <div class="card-title">Animation</div>
+      <div class="ctrl-btns" style="margin-bottom:.4rem">
+        <button id="btn-land-play" class="pbtn primary">▶ Play</button>
+        <button id="btn-land-step" class="pbtn">Step</button>
+        <button id="btn-land-reset" class="pbtn">↺ Reset</button>
+      </div>
+      <div class="srow">
+        <span class="slbl" style="font-size:.72rem;min-width:42px">Speed</span>
+        <input type="range" id="sld-land-speed" min="0" max="2" step="1" value="1">
+        <span class="sval" id="val-land-speed">Med</span>
+      </div>
+      <div class="status-bar" style="margin-top:.5rem">
+        <div class="stat-pill">Step <span id="stat-land-step">0</span> / 80</div>
+      </div>
+      <div style="margin-top:.55rem">
+        <button id="btn-land-optimize" class="pbtn primary" style="width:100%;font-size:.78rem">⚡ Optimize λ</button>
+        <div class="hint-txt" id="land-sweep-status" style="margin-top:.22rem;padding-left:0;text-align:center"></div>
+      </div>
+    </div>
+
+    <div class="eq-bar" id="eq-bar">
+      <div class="eq-name">Penalty Term</div>
+      <div class="eq-text" id="eq-text">—</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">What's happening?</div>
+      <div class="anno-box neutral" id="anno-box">Select a regularization type and press Train to begin.</div>
+    </div>
+
+    <div class="status-bar">
+      <div class="stat-pill">Epoch <span id="stat-epoch">0</span></div>
+      <div class="stat-pill">Loss <span id="stat-loss">—</span></div>
+      <div class="stat-pill">‖w‖ <span id="stat-wnorm">—</span></div>
+    </div>
+
+  </div>
+
+  <!-- CENTER: Main visualization -->
+  <div class="center-col">
+
+    <div class="card">
+      <div class="plot-label" id="center-label">Weight magnitudes — sorted by |wᵢ|</div>
+      <div class="main-viz-wrap">
+        <svg id="svg-main" viewBox="0 0 640 480" preserveAspectRatio="none">
+          <rect width="640" height="480" fill="#1A2A1A"/>
+          <text x="320" y="240" text-anchor="middle" dominant-baseline="middle"
+                fill="rgba(255,255,255,0.3)" font-family="Outfit, sans-serif"
+                font-size="14">Visualization loads after Stage 2</text>
+        </svg>
+      </div>
+      <div class="legend" id="main-legend">
+        <span><span class="legend-dot" style="background:var(--g-mid)"></span>No Reg</span>
+        <span><span class="legend-dot" style="background:var(--orange)"></span>L1 weights</span>
+        <span><span class="legend-dot" style="background:var(--blue)"></span>L2 weights</span>
+      </div>
+    </div>
+
+    <div class="card" id="card-cv" style="display:none">
+      <div class="plot-label">λ Cross-Validation Curve — Train &amp; Val Accuracy vs λ</div>
+      <div class="cv-chart-wrap">
+        <svg id="svg-cv" viewBox="0 0 640 200" preserveAspectRatio="none"></svg>
+      </div>
+      <div class="cv-legend">
+        <span><span class="legend-line" style="background:#2e7d32"></span>Train Acc</span>
+        <span><span class="legend-line" style="background:var(--orange)"></span>Val Acc</span>
+        <span style="color:#2e7d32">— Optimal λ</span>
+        <span style="color:rgba(176,50,29,.55);font-size:.63rem">▓ Overfit zone</span>
+        <span style="color:rgba(26,86,160,.55);font-size:.63rem">▓ Underfit zone</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- RIGHT: Weight histogram + stats -->
+  <div class="right-col">
+
+    <div class="card">
+      <div class="plot-label">Weight Histogram</div>
+      <div class="hist-wrap">
+        <svg id="svg-hist" viewBox="0 0 240 320" preserveAspectRatio="none">
+          <rect width="240" height="320" fill="#FDFAF5"/>
+          <text x="120" y="160" text-anchor="middle" dominant-baseline="middle"
+                fill="rgba(0,0,0,0.2)" font-family="Outfit, sans-serif"
+                font-size="11">Histogram</text>
+        </svg>
+      </div>
+    </div>
+
+    <div class="card" id="card-land-info" style="display:none">
+      <div class="card-title">Constraint Shapes</div>
+      <div style="font-size:.72rem;color:var(--text-soft);line-height:1.65">
+        <div style="margin-bottom:.55rem">
+          <span style="display:inline-block;width:20px;height:0;border-top:2px dashed var(--orange);vertical-align:middle;margin-right:.35rem"></span>
+          <strong style="color:var(--orange)">L1 diamond</strong><br>
+          Corners on the axes — the constrained minimum falls at a corner, zeroing one weight. This is why L1 produces sparsity.
+        </div>
+        <div>
+          <span style="display:inline-block;width:20px;height:0;border-top:2px dashed #2e7d32;vertical-align:middle;margin-right:.35rem"></span>
+          <strong style="color:#2e7d32">L2 circle</strong><br>
+          Smooth boundary with no corners — the minimum is almost never on an axis. All weights shrink but none reach exactly zero.
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="card-wgt-stats">
+      <div class="card-title">Weight Statistics</div>
+      <div class="stat-grid">
+        <div class="stat-block">
+          <span class="sb-val" id="sb-nonzero">—</span>
+          <div class="sb-lbl">Non-zero</div>
+        </div>
+        <div class="stat-block">
+          <span class="sb-val" id="sb-zeros">—</span>
+          <div class="sb-lbl">Zeros (≈0)</div>
+        </div>
+        <div class="stat-block">
+          <span class="sb-val" id="sb-maxw">—</span>
+          <div class="sb-lbl">Max |w|</div>
+        </div>
+        <div class="stat-block">
+          <span class="sb-val" id="sb-meanw">—</span>
+          <div class="sb-lbl">Mean |w|</div>
+        </div>
+      </div>
+      <div class="sparsity-bar-wrap">
+        <div class="sparsity-bar-lbl">
+          <span>Sparsity</span>
+          <span id="sparsity-pct">0%</span>
+        </div>
+        <div class="sparsity-bar-track">
+          <div class="sparsity-bar-fill" id="sparsity-fill"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="card-bnd-stats" style="display:none">
+      <div class="card-title">Accuracy</div>
+      <div class="stat-grid">
+        <div class="stat-block">
+          <span class="sb-val" id="sb-train-acc">—</span>
+          <div class="sb-lbl">Train Acc</div>
+        </div>
+        <div class="stat-block">
+          <span class="sb-val" id="sb-val-acc">—</span>
+          <div class="sb-lbl">Val Acc</div>
+        </div>
+      </div>
+      <div class="sparsity-bar-wrap" style="margin-top:.5rem">
+        <div class="sparsity-bar-lbl">
+          <span>Overfit gap</span>
+          <span id="bv-pct">—</span>
+        </div>
+        <div class="sparsity-bar-track">
+          <div class="sparsity-bar-fill" id="bv-fill"></div>
+        </div>
+      </div>
+      <div class="acc-chart-wrap">
+        <svg id="svg-acc" viewBox="0 0 240 140" preserveAspectRatio="none"></svg>
+      </div>
+      <div class="acc-chart-legend">
+        <span><span class="legend-line" style="background:#2e7d32"></span>Train</span>
+        <span><span class="legend-line" style="background:#1A56A0;opacity:.7"></span>Val</span>
+        <span style="color:#2e7d32;font-size:.65rem">⋮ best val</span>
+      </div>
+      <div class="anno-box neutral" id="bv-box" style="margin-top:.6rem;min-height:2rem;font-size:.71rem">—</div>
+    </div>
+
+  </div>
+
+</div>
+</div>
+
+<footer id="course-nav-footer" style="margin-top:1.5rem;padding:0.75rem 0 0 1rem;border-top:1px solid #E0DAC0;font-size:0.8rem;color:#78786A;text-align:left;">
+  <a href="../" style="color:#2e7d32;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">&larr; All course visualizations</a>
+</footer>
+<script>
+if (window.self !== window.top) { var f = document.getElementById('course-nav-footer'); if (f) { f.style.display = 'none'; } }
+</script>
+
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════════════════════ */
+
+const S = {
+  regType: 'none',
+  lambda: 0.01,
+  complexity: 'simple',
+  baseWeights: [],
+  weights: [],
+  tab: 'weights',
+};
+
+const REG_COLOR = { none: '#888888', l1: '#E8630A', l2: '#2e7d32' };
+const ZERO_CLR  = '#999';
+const TRANS_DUR = 380;
+
+/* ═══════════════════════════════════════════════════════════════════
+   WEIGHT MATH
+═══════════════════════════════════════════════════════════════════ */
+
+function randn() {
+  return Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(2 * Math.PI * Math.random());
+}
+
+function nWeights() {
+  return S.complexity === 'simple' ? 20 : S.complexity === 'medium' ? 50 : 100;
+}
+
+function applyReg(base, reg, lam) {
+  if (reg === 'l1') return base.map(w => Math.sign(w) * Math.max(Math.abs(w) - lam, 0));
+  if (reg === 'l2') return base.map(w => w / (1 + lam));
+  return base.slice();
+}
+
+function isZero(w) { return Math.abs(w) < 1e-9; }
+
+function generateWeights() {
+  S.baseWeights = Array.from({ length: nWeights() }, randn);
+  S.weights     = applyReg(S.baseWeights, S.regType, S.lambda);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SVG CONSTANTS
+═══════════════════════════════════════════════════════════════════ */
+
+const MW = 640, MH = 480, MPAD = { l: 58, r: 22, t: 36, b: 52 };
+const HW = 240, HH = 320, HPAD = { l: 38, r: 10, t: 18, b: 44 };
+
+/* ═══════════════════════════════════════════════════════════════════
+   INIT — MAIN SVG  (dark, 640×480)
+═══════════════════════════════════════════════════════════════════ */
+
+function initMainSVG() {
+  const svg = d3.select('#svg-main');
+  svg.selectAll('*').remove();
+  svg.attr('viewBox', `0 0 ${MW} ${MH}`);
+
+  svg.append('rect').attr('width', MW).attr('height', MH).attr('fill', '#1A2A1A');
+  svg.append('g').attr('id', 'g-mgrid');
+  svg.append('g').attr('id', 'g-stems');
+  svg.append('g').attr('id', 'g-dots');
+  svg.append('g').attr('id', 'g-mxax');
+  svg.append('g').attr('id', 'g-myax');
+
+  const mw = MW - MPAD.l - MPAD.r, mh = MH - MPAD.t - MPAD.b;
+  const labs = svg.append('g');
+  labs.append('text')
+    .attr('x', MPAD.l + mw / 2).attr('y', MH - 8)
+    .attr('text-anchor', 'middle').attr('fill', 'rgba(255,255,255,0.6)')
+    .attr('font-size', 11).attr('font-family', 'Outfit, sans-serif')
+    .text('Weight index (sorted by |wᵢ|, ascending)');
+  labs.append('text')
+    .attr('transform', `translate(14,${MPAD.t + mh / 2}) rotate(-90)`)
+    .attr('text-anchor', 'middle').attr('fill', 'rgba(255,255,255,0.6)')
+    .attr('font-size', 11).attr('font-family', 'Outfit, sans-serif')
+    .text('|wᵢ|');
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   RENDER — WEIGHT MAGNITUDE LOLLIPOP PLOT
+═══════════════════════════════════════════════════════════════════ */
+
+function renderMagnitudePlot() {
+  const mw = MW - MPAD.l - MPAD.r, mh = MH - MPAD.t - MPAD.b;
+  const n  = S.weights.length;
+
+  // Sort by |w| ascending; preserve origIdx as key
+  const sorted = S.weights
+    .map((w, i) => ({ w, absW: Math.abs(w), origIdx: i, zero: isZero(w) }))
+    .sort((a, b) => a.absW - b.absW);
+
+  // Keep y-scale stable relative to unregularized weights
+  const yMax = Math.max(d3.max(S.baseWeights.map(Math.abs)), 0.1) * 1.08;
+  const xSc  = d3.scaleLinear().domain([0, n - 1]).range([MPAD.l, MPAD.l + mw]);
+  const ySc  = d3.scaleLinear().domain([0, yMax]).range([MPAD.t + mh, MPAD.t]);
+  const base = ySc(0);
+
+  // Horizontal grid lines
+  d3.select('#g-mgrid').selectAll('line').data(ySc.ticks(5)).join('line')
+    .attr('x1', MPAD.l).attr('x2', MPAD.l + mw)
+    .attr('y1', d => ySc(d)).attr('y2', d => ySc(d))
+    .attr('stroke', 'rgba(255,255,255,0.07)').attr('stroke-width', 1);
+
+  const stemW = Math.max(1.2, mw / n * 0.55);
+  const dotR  = Math.max(2.2, Math.min(5.5, mw / n * 0.42));
+  const clr   = d => (d.zero && S.regType === 'l1') ? ZERO_CLR : REG_COLOR[S.regType];
+
+  // Stems
+  d3.select('#g-stems').selectAll('line.stem')
+    .data(sorted, d => d.origIdx)
+    .join(
+      enter => enter.append('line').classed('stem', true)
+        .attr('x1', (_, i) => xSc(i)).attr('x2', (_, i) => xSc(i))
+        .attr('y1', base).attr('y2', base)
+        .attr('stroke', clr).attr('stroke-width', stemW).attr('opacity', 0.75)
+        .call(s => s.transition().duration(TRANS_DUR)
+          .attr('y1', d => ySc(d.absW)).attr('stroke', clr)),
+      update => update.transition().duration(TRANS_DUR)
+        .attr('x1', (_, i) => xSc(i)).attr('x2', (_, i) => xSc(i))
+        .attr('y1', d => ySc(d.absW)).attr('y2', base)
+        .attr('stroke', clr).attr('stroke-width', stemW),
+      exit => exit.transition().duration(TRANS_DUR)
+        .attr('y1', base).attr('opacity', 0).remove()
+    );
+
+  // Dots
+  d3.select('#g-dots').selectAll('circle.dot')
+    .data(sorted, d => d.origIdx)
+    .join(
+      enter => enter.append('circle').classed('dot', true)
+        .attr('cx', (_, i) => xSc(i)).attr('cy', base)
+        .attr('r', dotR).attr('fill', clr).attr('opacity', 0)
+        .call(s => s.transition().duration(TRANS_DUR)
+          .attr('cy', d => ySc(d.absW)).attr('fill', clr).attr('opacity', 1)),
+      update => update.transition().duration(TRANS_DUR)
+        .attr('cx', (_, i) => xSc(i)).attr('cy', d => ySc(d.absW))
+        .attr('fill', clr).attr('r', dotR),
+      exit => exit.transition().duration(TRANS_DUR)
+        .attr('cy', base).attr('opacity', 0).remove()
+    );
+
+  // X axis (show up to 10 tick labels)
+  d3.select('#g-mxax').attr('transform', `translate(0,${MPAD.t + mh})`)
+    .call(d3.axisBottom(xSc).ticks(Math.min(n, 10)).tickFormat(d3.format('d')))
+    .call(g => {
+      g.select('.domain').attr('stroke', 'rgba(255,255,255,0.25)');
+      g.selectAll('text').attr('fill', 'rgba(255,255,255,0.55)').attr('font-size', 9);
+      g.selectAll('.tick line').attr('stroke', 'rgba(255,255,255,0.25)');
+    });
+
+  // Y axis
+  d3.select('#g-myax').attr('transform', `translate(${MPAD.l},0)`)
+    .call(d3.axisLeft(ySc).ticks(5).tickFormat(d3.format('.2f')))
+    .call(g => {
+      g.select('.domain').attr('stroke', 'rgba(255,255,255,0.25)');
+      g.selectAll('text').attr('fill', 'rgba(255,255,255,0.55)').attr('font-size', 9);
+      g.selectAll('.tick line').attr('stroke', 'rgba(255,255,255,0.25)');
+    });
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   INIT — HISTOGRAM SVG  (light, 240×320)
+═══════════════════════════════════════════════════════════════════ */
+
+function initHistSVG() {
+  const svg = d3.select('#svg-hist');
+  svg.selectAll('*').remove();
+  svg.attr('viewBox', `0 0 ${HW} ${HH}`);
+
+  svg.append('rect').attr('width', HW).attr('height', HH).attr('fill', '#FDFAF5');
+  svg.append('g').attr('id', 'g-hbars');
+  svg.append('g').attr('id', 'g-hzero');
+  svg.append('g').attr('id', 'g-hxax');
+  svg.append('g').attr('id', 'g-hyax');
+
+  const hw = HW - HPAD.l - HPAD.r, hh = HH - HPAD.t - HPAD.b;
+  svg.append('text').attr('x', HPAD.l + hw / 2).attr('y', HH - 6)
+    .attr('text-anchor', 'middle').attr('fill', '#888')
+    .attr('font-size', 9).attr('font-family', 'IBM Plex Mono, monospace')
+    .text('Weight Value');
+  svg.append('text')
+    .attr('transform', `translate(10,${HPAD.t + hh / 2}) rotate(-90)`)
+    .attr('text-anchor', 'middle').attr('fill', '#888')
+    .attr('font-size', 9).attr('font-family', 'IBM Plex Mono, monospace')
+    .text('Count');
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   RENDER — WEIGHT HISTOGRAM
+═══════════════════════════════════════════════════════════════════ */
+
+function renderHistogram() {
+  if (!S.weights || !S.weights.length) return;
+  if (!d3.select('#g-hbars').node()) initHistSVG();
+  const hw = HW - HPAD.l - HPAD.r, hh = HH - HPAD.t - HPAD.b;
+  const DOMAIN = [-3.5, 3.5];
+  const xSc = d3.scaleLinear().domain(DOMAIN).range([HPAD.l, HPAD.l + hw]);
+
+  const bins = d3.bin().domain(DOMAIN).thresholds(20)(S.weights);
+  const maxCnt = Math.max(d3.max(bins, d => d.length), 1);
+  const ySc = d3.scaleLinear().domain([0, maxCnt * 1.12]).range([HPAD.t + hh, HPAD.t]);
+  const base = HPAD.t + hh;
+  const barClr = REG_COLOR[S.regType];
+
+  // Bars
+  d3.select('#g-hbars').selectAll('rect.hbar')
+    .data(bins)
+    .join(
+      enter => enter.append('rect').classed('hbar', true)
+        .attr('x', d => xSc(d.x0) + 0.5)
+        .attr('width', d => Math.max(0, xSc(d.x1) - xSc(d.x0) - 1))
+        .attr('y', base).attr('height', 0)
+        .attr('fill', barClr).attr('opacity', 0.82)
+        .call(s => s.transition().duration(TRANS_DUR)
+          .attr('y', d => ySc(d.length))
+          .attr('height', d => base - ySc(d.length))),
+      update => update.transition().duration(TRANS_DUR)
+        .attr('x', d => xSc(d.x0) + 0.5)
+        .attr('width', d => Math.max(0, xSc(d.x1) - xSc(d.x0) - 1))
+        .attr('y', d => ySc(d.length))
+        .attr('height', d => base - ySc(d.length))
+        .attr('fill', barClr),
+      exit => exit.remove()
+    );
+
+  // Zero-line + count badge
+  const zeroX = xSc(0);
+  const zeroCount = S.weights.filter(isZero).length;
+  const zeroG = d3.select('#g-hzero');
+  zeroG.selectAll('*').remove();
+  zeroG.append('line')
+    .attr('x1', zeroX).attr('x2', zeroX)
+    .attr('y1', HPAD.t).attr('y2', HPAD.t + hh)
+    .attr('stroke', ZERO_CLR).attr('stroke-width', 1.5)
+    .attr('stroke-dasharray', '3,3').attr('opacity', 0.8);
+  if (zeroCount > 0) {
+    const badgeW = zeroCount >= 10 ? 48 : 40;
+    zeroG.append('rect')
+      .attr('x', zeroX + 3).attr('y', HPAD.t + 4)
+      .attr('width', badgeW).attr('height', 14).attr('rx', 3)
+      .attr('fill', 'rgba(200,200,200,0.85)').attr('opacity', 0.95);
+    zeroG.append('text')
+      .attr('x', zeroX + 6).attr('y', HPAD.t + 14)
+      .attr('fill', '#777').attr('font-size', 9)
+      .attr('font-family', 'IBM Plex Mono, monospace')
+      .text(zeroCount + ' zeros');
+  }
+
+  // X axis
+  d3.select('#g-hxax').attr('transform', `translate(0,${HPAD.t + hh})`)
+    .call(d3.axisBottom(xSc).ticks(7).tickFormat(d3.format('.1f')))
+    .call(g => {
+      g.select('.domain').attr('stroke', '#C8BE9A');
+      g.selectAll('text').attr('fill', '#888').attr('font-size', 8);
+      g.selectAll('.tick line').attr('stroke', '#C8BE9A');
+    });
+
+  // Y axis
+  d3.select('#g-hyax').attr('transform', `translate(${HPAD.l},0)`)
+    .call(d3.axisLeft(ySc).ticks(4).tickFormat(d3.format('d')))
+    .call(g => {
+      g.select('.domain').attr('stroke', '#C8BE9A');
+      g.selectAll('text').attr('fill', '#888').attr('font-size', 8);
+      g.selectAll('.tick line').attr('stroke', '#C8BE9A');
+    });
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   STATS PANEL
+═══════════════════════════════════════════════════════════════════ */
+
+function updateStats() {
+  const w     = S.weights;
+  const absW  = w.map(Math.abs);
+  const zeros = w.filter(isZero).length;
+  const spPct = Math.round(zeros / w.length * 100);
+  const wnorm = Math.sqrt(d3.sum(w, v => v * v));
+
+  document.getElementById('sb-nonzero').textContent = w.length - zeros;
+  document.getElementById('sb-zeros').textContent   = zeros;
+  document.getElementById('sb-maxw').textContent    = (d3.max(absW) || 0).toFixed(3);
+  document.getElementById('sb-meanw').textContent   = (d3.mean(absW) || 0).toFixed(3);
+  document.getElementById('sparsity-pct').textContent = spPct + '%';
+  const fill = document.getElementById('sparsity-fill');
+  fill.style.width      = spPct + '%';
+  fill.style.background = S.regType === 'l1' ? REG_COLOR.l1 : '#888';
+  document.getElementById('stat-wnorm').textContent = wnorm.toFixed(3);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   EQUATION BAR
+═══════════════════════════════════════════════════════════════════ */
+
+const EQ_TEXT = {
+  none: 'L_total = L_data',
+  l1:   'L_total = L_data + λ·Σᵢ|wᵢ|',
+  l2:   'L_total = L_data + λ·Σᵢwᵢ²',
+};
+
+function updateEquation() {
+  document.getElementById('eq-text').textContent = EQ_TEXT[S.regType];
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ANNOTATION
+═══════════════════════════════════════════════════════════════════ */
+
+function updateAnnotation() {
+  const box = document.getElementById('anno-box');
+  const lam = S.lambda;
+  const zeros = S.weights.filter(isZero).length;
+  const pct   = Math.round(zeros / S.weights.length * 100);
+  let cls = 'neutral', text = '';
+
+  if (S.regType === 'none') {
+    text = 'No regularization. Weights are unconstrained and take any value needed to minimize training loss. With enough model complexity this leads to overfitting — the model memorizes training data rather than learning generalizable patterns.';
+  } else if (S.regType === 'l1') {
+    cls = 'l1';
+    if (lam >= 0.5) {
+      text = 'Strong L1 (λ=' + lam.toFixed(3) + '): ' + pct + '% of weights are exactly zero. L1 performs automatic feature selection — the optimizer discards any weight whose contribution cannot offset its constant penalty cost. This is the "corner effect" of the L1 ball meeting coordinate axes.';
+    } else if (lam >= 0.15) {
+      text = 'Moderate L1 (λ=' + lam.toFixed(3) + '): ' + zeros + ' weight(s) collapsed to exactly zero via soft-thresholding wᵢ → sign(wᵢ)·max(|wᵢ|−λ, 0). Notice red dots at zero on the plot. Increase λ to drive more weights to zero.';
+    } else if (lam >= 0.04) {
+      text = 'L1 (Lasso): small weights are snapping to zero (red dots). Soft-thresholding pulls each weight toward zero by exactly λ — if |wᵢ| < λ, the weight collapses completely. This is fundamentally different from L2, which only scales weights down proportionally.';
+    } else {
+      text = 'Weak L1 (λ=' + lam.toFixed(3) + '): effect is subtle. Increase λ to watch soft-thresholding push small weights to exactly zero, creating a sparse weight vector. L1 sparsity is valuable for high-dimensional data where most features are irrelevant.';
+    }
+  } else {
+    cls = 'l2';
+    const shrink = (1 / (1 + lam)).toFixed(3);
+    if (lam >= 0.5) {
+      text = 'Strong L2 (λ=' + lam.toFixed(3) + '): all weights shrunk by factor ' + shrink + '. Notice that no weight is exactly zero — the L2 penalty ball is smooth (a sphere), so the minimum almost never falls on a coordinate axis. L2 retains all features but keeps weights small.';
+    } else if (lam >= 0.1) {
+      text = 'Moderate L2 (λ=' + lam.toFixed(3) + '): proportional shrinkage wᵢ → wᵢ/(1+λ) = wᵢ×' + shrink + '. Every weight shrinks by the same factor. Large weights shrink more in absolute terms but none reach zero. This prevents any single feature from dominating predictions.';
+    } else {
+      text = 'L2 (Ridge): shrinks all weights proportionally by factor wᵢ/(1+λ). Compare with L1: the histogram narrows and shifts toward zero but no bar sits exactly at zero. L2 is preferred when all features contribute — L1 when you want automatic feature selection.';
+    }
+  }
+
+  box.textContent = text;
+  box.className   = 'anno-box ' + cls;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   LEGEND + HINT TEXTS
+═══════════════════════════════════════════════════════════════════ */
+
+function updateLegend() {
+  const el = document.getElementById('main-legend');
+  if (S.regType === 'l1') {
+    el.innerHTML = '<span><span class="legend-dot" style="background:#E8630A"></span>L1-shrunk</span>'
+      + '<span><span class="legend-dot" style="background:#C0392B"></span>Zeroed (sparse)</span>';
+  } else if (S.regType === 'l2') {
+    el.innerHTML = '<span><span class="legend-dot" style="background:#2e7d32"></span>L2-shrunk weights</span>';
+  } else {
+    el.innerHTML = '<span><span class="legend-dot" style="background:#888"></span>Unregularized weights</span>';
+  }
+}
+
+function updateCenterLabel() {
+  document.getElementById('center-label').textContent =
+    'Weight magnitudes — sorted by |wᵢ| ascending, colored by regularization effect';
+}
+
+function updateRegHint() {
+  const h = { none: 'no penalty — weights unconstrained',
+    l1: 'Lasso — soft-threshold → exact zeros (sparsity)', l2: 'Ridge — proportional shrinkage → no zeros' };
+  document.getElementById('reg-hint').textContent = h[S.regType];
+}
+
+function updateLambdaHint() {
+  const lam = S.lambda;
+  document.getElementById('lambda-hint').textContent =
+    lam < 0.02 ? 'very weak — nearly unregularized'
+    : lam < 0.1  ? 'weak — mild weight shrinkage'
+    : lam < 0.3  ? 'moderate — noticeable sparsity / shrinkage'
+    : lam < 0.6  ? 'strong — significant regularization'
+    : 'very strong — heavy penalty on all weights';
+}
+
+function updateComplexityHint() {
+  const h = { simple: 'few weights — minimal overfitting risk',
+    medium: 'moderate weights — standard network', complex: 'many weights — high overfitting potential' };
+  document.getElementById('complexity-hint').textContent = h[S.complexity];
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   LOSS LANDSCAPE TAB
+═══════════════════════════════════════════════════════════════════ */
+
+const LL = {
+  paths: { none: [], l1: [], l2: [] },
+  step: 0, maxSteps: 80,
+  playState: 'stopped', playTimer: null, playSpeed: 400,
+};
+const LL_START  = { w1: -1.0, w2: -0.8 };
+const LL_LR     = 0.06;
+const LL_DOMAIN = [-2.4, 2.4];
+let   llContourCache = null;
+const LO = { sweepState: 'idle', sweepTimer: null };
+
+// Data loss: elliptical bowl, minimum at (1.6, 1.2)
+function lossData(w1, w2) { return (w1-1.6)**2 + 1.5*(w2-1.2)**2; }
+function gradData(w1, w2) { return { g1: 2*(w1-1.6), g2: 3*(w2-1.2) }; }
+
+function stepLandGD(w1, w2, regType) {
+  const { g1, g2 } = gradData(w1, w2);
+  const lam = S.lambda;
+  if (regType === 'l2') {
+    w1 -= LL_LR * (g1 + 2*lam*w1);
+    w2 -= LL_LR * (g2 + 2*lam*w2);
+  } else {
+    w1 -= LL_LR * g1;
+    w2 -= LL_LR * g2;
+    if (regType === 'l1') {
+      const s = LL_LR * lam;
+      w1 = Math.sign(w1) * Math.max(Math.abs(w1) - s, 0);
+      w2 = Math.sign(w2) * Math.max(Math.abs(w2) - s, 0);
+    }
+  }
+  return { w1, w2 };
+}
+
+// Compute radius of L1/L2 constraint ball that would contain the regularized optimum
+function constraintRadius(regType) {
+  const lam = S.lambda;
+  if (regType === 'l1') {
+    const ow1 = Math.max(0, 1.6 - lam/2);
+    const ow2 = Math.max(0, 1.2 - lam/3);
+    return Math.max(0.08, ow1 + ow2);
+  }
+  const ow1 = 1.6 / (1 + lam);
+  const ow2 = 3.6 / (3 + 2*lam);
+  return Math.max(0.08, Math.sqrt(ow1*ow1 + ow2*ow2));
+}
+
+function getLandContours() {
+  if (llContourCache) return llContourCache;
+  const N = 80;
+  const vals = new Float64Array(N * N);
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const w1 = LL_DOMAIN[0] + (i/(N-1))*(LL_DOMAIN[1]-LL_DOMAIN[0]);
+    const w2 = LL_DOMAIN[0] + (j/(N-1))*(LL_DOMAIN[1]-LL_DOMAIN[0]);
+    vals[j*N+i] = lossData(w1, w2);
+  }
+  const sorted = Float64Array.from(vals).sort();
+  const lo = sorted[Math.floor(sorted.length * 0.01)];
+  const hi = sorted[Math.floor(sorted.length * 0.92)];
+  const mw = MW-MPAD.l-MPAD.r, mh = MH-MPAD.t-MPAD.b;
+  const proj = d3.geoTransform({ point: function(gx,gy) {
+    this.stream.point(MPAD.l+(gx/N)*mw, MPAD.t+((N-gy)/N)*mh);
+  }});
+  llContourCache = {
+    fillCts: d3.contours().size([N,N]).thresholds(d3.range(lo,hi,(hi-lo)/18))(vals),
+    colorSc: d3.scaleSequential(d3.interpolateRdYlBu).domain([hi,lo]),
+    pathGen: d3.geoPath(proj),
+  };
+  return llContourCache;
+}
+
+function initLandscapeSVG() {
+  const svg = d3.select('#svg-main');
+  svg.selectAll('*').remove();
+  svg.attr('viewBox', `0 0 ${MW} ${MH}`);
+  svg.append('rect').attr('width',MW).attr('height',MH).attr('fill','#1A2A1A');
+  svg.append('g').attr('id','g-lcontours');
+  svg.append('g').attr('id','g-lconstraints');
+  svg.append('g').attr('id','g-lpaths');
+  svg.append('g').attr('id','g-ldots');
+  svg.append('g').attr('id','g-lxax');
+  svg.append('g').attr('id','g-lyax');
+  const mw = MW-MPAD.l-MPAD.r, mh = MH-MPAD.t-MPAD.b;
+  const labs = svg.append('g');
+  labs.append('text').attr('x',MPAD.l+mw/2).attr('y',MH-8)
+    .attr('text-anchor','middle').attr('fill','rgba(255,255,255,.55)')
+    .attr('font-size',11).attr('font-family','Outfit,sans-serif').text('w₁');
+  labs.append('text').attr('transform',`translate(14,${MPAD.t+mh/2}) rotate(-90)`)
+    .attr('text-anchor','middle').attr('fill','rgba(255,255,255,.55)')
+    .attr('font-size',11).attr('font-family','Outfit,sans-serif').text('w₂');
+}
+
+function renderLandscapeContours() {
+  if (!d3.select('#g-lcontours').node()) initLandscapeSVG();
+  const { fillCts, colorSc, pathGen } = getLandContours();
+  d3.select('#g-lcontours').selectAll('path').data(fillCts).join('path')
+    .attr('d', pathGen)
+    .attr('fill', d => colorSc(d.value))
+    .attr('stroke', d => colorSc(d.value)).attr('stroke-width', 0.3);
+
+  const mw = MW-MPAD.l-MPAD.r, mh = MH-MPAD.t-MPAD.b;
+  const xSc = d3.scaleLinear().domain(LL_DOMAIN).range([MPAD.l, MPAD.l+mw]);
+  const ySc = d3.scaleLinear().domain(LL_DOMAIN).range([MPAD.t+mh, MPAD.t]);
+  d3.select('#g-lxax').attr('transform',`translate(0,${MPAD.t+mh})`)
+    .call(d3.axisBottom(xSc).ticks(5).tickFormat(d3.format('.1f')))
+    .call(g => {
+      g.select('.domain').attr('stroke','rgba(255,255,255,.3)');
+      g.selectAll('text').attr('fill','rgba(255,255,255,.5)').attr('font-size',9);
+      g.selectAll('.tick line').attr('stroke','rgba(255,255,255,.2)');
+    });
+  d3.select('#g-lyax').attr('transform',`translate(${MPAD.l},0)`)
+    .call(d3.axisLeft(ySc).ticks(5).tickFormat(d3.format('.1f')))
+    .call(g => {
+      g.select('.domain').attr('stroke','rgba(255,255,255,.3)');
+      g.selectAll('text').attr('fill','rgba(255,255,255,.5)').attr('font-size',9);
+      g.selectAll('.tick line').attr('stroke','rgba(255,255,255,.2)');
+    });
+}
+
+function renderLandscapeConstraints() {
+  const mw = MW-MPAD.l-MPAD.r, mh = MH-MPAD.t-MPAD.b;
+  const xSc = d3.scaleLinear().domain(LL_DOMAIN).range([MPAD.l, MPAD.l+mw]);
+  const ySc = d3.scaleLinear().domain(LL_DOMAIN).range([MPAD.t+mh, MPAD.t]);
+  const g = d3.select('#g-lconstraints'); g.selectAll('*').remove();
+
+  // L1 diamond: vertices at (±r, 0), (0, ±r)
+  const r1 = constraintRadius('l1');
+  const diamond = [
+    [xSc(r1), ySc(0)], [xSc(0), ySc(r1)],
+    [xSc(-r1), ySc(0)], [xSc(0), ySc(-r1)], [xSc(r1), ySc(0)],
+  ];
+  g.append('path').attr('d', d3.line()(diamond))
+    .attr('fill','none').attr('stroke','#E8630A')
+    .attr('stroke-width',1.8).attr('stroke-dasharray','6,3').attr('opacity',.75);
+
+  // L2 circle (ellipse in SVG space due to different x/y pixel densities)
+  const r2 = constraintRadius('l2');
+  const cx = xSc(0), cy = ySc(0);
+  const rx = Math.abs(xSc(r2)-xSc(0)), ry = Math.abs(ySc(0)-ySc(r2));
+  g.append('ellipse').attr('cx',cx).attr('cy',cy).attr('rx',rx).attr('ry',ry)
+    .attr('fill','none').attr('stroke','#2e7d32')
+    .attr('stroke-width',1.8).attr('stroke-dasharray','6,3').attr('opacity',.75);
+}
+
+function renderLandscapePaths() {
+  const mw = MW-MPAD.l-MPAD.r, mh = MH-MPAD.t-MPAD.b;
+  const xSc = d3.scaleLinear().domain(LL_DOMAIN).range([MPAD.l, MPAD.l+mw]);
+  const ySc = d3.scaleLinear().domain(LL_DOMAIN).range([MPAD.t+mh, MPAD.t]);
+  const defs = [
+    { key:'none', color:'#aaaaaa', opacity:.8 },
+    { key:'l1',   color:'#E8630A', opacity:.95 },
+    { key:'l2',   color:'#4caf50', opacity:.95 },
+  ];
+  const lineGen = d3.line().x(d=>xSc(d.w1)).y(d=>ySc(d.w2)).curve(d3.curveCatmullRom);
+  d3.select('#g-lpaths').selectAll('path.trail').data(defs, d=>d.key)
+    .join('path').classed('trail',true)
+    .attr('d', d => lineGen(LL.paths[d.key]))
+    .attr('fill','none').attr('stroke',d=>d.color)
+    .attr('stroke-width',2.4).attr('opacity',d=>d.opacity)
+    .attr('stroke-linejoin','round');
+  d3.select('#g-ldots').selectAll('circle.lldot').data(defs, d=>d.key)
+    .join('circle').classed('lldot',true)
+    .attr('cx', d=>{ const p=LL.paths[d.key]; return xSc(p[p.length-1].w1); })
+    .attr('cy', d=>{ const p=LL.paths[d.key]; return ySc(p[p.length-1].w2); })
+    .attr('r',5.5).attr('fill',d=>d.color).attr('stroke','white').attr('stroke-width',1.5);
+}
+
+function renderLandscape() {
+  renderLandscapeContours();
+  renderLandscapeConstraints();
+  renderLandscapePaths();
+}
+
+function updateLandscapeStepDisplay() {
+  document.getElementById('stat-land-step').textContent = LL.step;
+  document.getElementById('stat-epoch').textContent     = LL.step;
+}
+
+function stopLandscapePlay() {
+  LL.playState = 'stopped';
+  if (LL.playTimer) { clearTimeout(LL.playTimer); LL.playTimer = null; }
+  const btn = document.getElementById('btn-land-play');
+  if (!btn) return;
+  btn.textContent = '▶ Play'; btn.classList.remove('playing'); btn.classList.add('primary');
+}
+
+function pauseLandscape() {
+  LL.playState = 'paused';
+  if (LL.playTimer) { clearTimeout(LL.playTimer); LL.playTimer = null; }
+  const btn = document.getElementById('btn-land-play');
+  if (!btn) return;
+  btn.textContent = '▶ Resume'; btn.classList.remove('playing'); btn.classList.add('primary');
+}
+
+function resetLandscape() {
+  stopLandscapePlay();
+  stopLandscapeOptimize();
+  LL.step = 0;
+  LL.paths.none = [{ ...LL_START }];
+  LL.paths.l1   = [{ ...LL_START }];
+  LL.paths.l2   = [{ ...LL_START }];
+  initLandscapeSVG();
+  renderLandscape();
+  updateLandscapeAnnotation();
+  updateLandscapeStepDisplay();
+}
+
+function stepLandscapeAnim() {
+  if (LL.step >= LL.maxSteps) { stopLandscapePlay(); return; }
+  LL.step++;
+  ['none','l1','l2'].forEach(r => {
+    const last = LL.paths[r][LL.paths[r].length - 1];
+    LL.paths[r].push(stepLandGD(last.w1, last.w2, r));
+  });
+  renderLandscapeConstraints();
+  renderLandscapePaths();
+  updateLandscapeAnnotation();
+  updateLandscapeStepDisplay();
+  if (LL.step >= LL.maxSteps) stopLandscapePlay();
+}
+
+function playLandscape() {
+  if (LL.step >= LL.maxSteps) resetLandscape();
+  LL.playState = 'playing';
+  const btn = document.getElementById('btn-land-play');
+  btn.textContent = '⏸ Pause'; btn.classList.add('playing'); btn.classList.remove('primary');
+  function tick() {
+    if (LL.playState !== 'playing') return;
+    stepLandscapeAnim();
+    if (LL.step < LL.maxSteps) LL.playTimer = setTimeout(tick, LL.playSpeed);
+  }
+  LL.playTimer = setTimeout(tick, 0);
+}
+
+function updateLandscapeAnnotation() {
+  const box   = document.getElementById('anno-box');
+  const step  = LL.step;
+  const lam   = S.lambda;
+  const lastL1 = LL.paths.l1[LL.paths.l1.length - 1];
+  const lastL2 = LL.paths.l2[LL.paths.l2.length - 1];
+  const l1Sparse = Math.abs(lastL1.w1) < 0.025 || Math.abs(lastL1.w2) < 0.025;
+  let cls = 'neutral', text = '';
+
+  if (step === 0) {
+    text = 'Step 0 — all three paths share the same start. Press Play to watch gradient descent reach different solutions depending on the regularization shape. Watch the dashed constraint shapes for clues.';
+  } else if (step < 10) {
+    text = `Step ${step} — early descent. All paths follow the data gradient. The penalty shapes haven't yet dominated the trajectory — divergence starts soon.`;
+  } else if (step >= LL.maxSteps) {
+    if (l1Sparse) {
+      cls = 'l1';
+      text = `Converged — L1 (orange) landed at (${lastL1.w1.toFixed(3)}, ${lastL1.w2.toFixed(3)}): a sparse solution. The diamond corner on the w${Math.abs(lastL1.w1)<0.025?'₁':'₂'} axis is where the data-loss contour first touches the L1 ball. L2 (green) settled at (${lastL2.w1.toFixed(2)}, ${lastL2.w2.toFixed(2)}) — off-axis, no zeros.`;
+    } else {
+      cls = 'good';
+      text = `Converged. None (grey) at data minimum (1.6, 1.2). L2 (green) at (${lastL2.w1.toFixed(2)}, ${lastL2.w2.toFixed(2)}) — smoothly shrunk. L1 (orange) at (${lastL1.w1.toFixed(2)}, ${lastL1.w2.toFixed(2)}) — increase λ to push it to an axis corner for sparsity.`;
+    }
+  } else if (l1Sparse) {
+    cls = 'l1';
+    text = `Step ${step} — L1 (orange) hit an axis: a weight collapsed to exactly zero via soft-thresholding. The diamond constraint corner is on the axis — this is why L1 produces sparsity. L2 (green) is still curving smoothly.`;
+  } else {
+    const note = lam > 0.4 ? `Strong λ=${lam.toFixed(2)} is pulling all paths hard toward origin.` :
+                 lam < 0.04 ? `Weak λ=${lam.toFixed(3)} — paths stay near the unregularized optimum (1.6, 1.2).` :
+                 `Notice L1 (orange) trending toward an axis corner while L2 (green) curves smoothly. The dashed constraint shapes explain why.`;
+    text = `Step ${step} — ${note}`;
+  }
+
+  box.textContent = text;
+  box.className   = 'anno-box ' + cls;
+}
+
+function updateLandscapeLegend() {
+  document.getElementById('main-legend').innerHTML =
+    '<span><span class="legend-dot" style="background:#aaa"></span>No reg path</span>' +
+    '<span><span class="legend-dot" style="background:#E8630A"></span>L1 path</span>' +
+    '<span><span class="legend-dot" style="background:#4caf50"></span>L2 path</span>' +
+    '<span style="font-size:.68rem;color:#888">Dashed shapes = constraint balls at current λ</span>';
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   LANDSCAPE OPTIMIZE λ (CV sweep on landscape tab)
+═══════════════════════════════════════════════════════════════════ */
+
+function stopLandscapeOptimize() {
+  if (LO.sweepTimer) { clearTimeout(LO.sweepTimer); LO.sweepTimer = null; }
+  if (LO.sweepState !== 'sweeping') return;
+  LO.sweepState = 'idle';
+  const btn = document.getElementById('btn-land-optimize');
+  if (btn) { btn.textContent = '⚡ Optimize λ'; btn.classList.add('primary'); btn.classList.remove('playing'); }
+  const status = document.getElementById('land-sweep-status');
+  if (status) status.textContent = '';
+}
+
+function finishLandscapeOptimize() {
+  LO.sweepState = 'done';
+  const optLam      = CV_LAMBDAS[CV.optIdx];
+  const optValAcc   = CV.valAccs[CV.optIdx];
+  const optTrainAcc = CV.trainAccs[CV.optIdx];
+
+  S.lambda = optLam;
+  document.getElementById('sld-lambda').value = optLam;
+  document.getElementById('val-lambda').textContent = optLam.toFixed(3);
+  updateLambdaHint();
+
+  resetLandscape();   // resets paths at optimal λ (calls stopLandscapeOptimize which returns early since state is 'done')
+
+  const btn = document.getElementById('btn-land-optimize');
+  if (btn) { btn.textContent = '⚡ Optimize λ'; btn.classList.add('primary'); btn.classList.remove('playing'); }
+  document.getElementById('land-sweep-status').textContent = `Optimal: λ = ${optLam.toFixed(3)}`;
+
+  const box = document.getElementById('anno-box');
+  box.textContent = `Cross-validation selected λ = ${optLam.toFixed(3)} — val accuracy ${(optValAcc*100).toFixed(0)}% vs train ${(optTrainAcc*100).toFixed(0)}%. Constraint shapes now reflect this strength. Press Play to watch L1 (orange) and L2 (green) converge to different solutions at the optimal regularization.`;
+  box.className   = 'anno-box good';
+}
+
+function startLandscapeOptimize() {
+  stopLandscapeOptimize();
+  stopLandscapePlay();
+  computeCV();   // synchronous: pre-compute all 30 CV values
+
+  let revealIdx = 0;
+  LO.sweepState = 'sweeping';
+  const sweepSpeed = LL.playSpeed;
+
+  const btn = document.getElementById('btn-land-optimize');
+  btn.textContent = '⏹ Stop'; btn.classList.remove('primary'); btn.classList.add('playing');
+
+  function tick() {
+    if (LO.sweepState !== 'sweeping') return;
+    const lam = CV_LAMBDAS[revealIdx];
+
+    S.lambda = lam;
+    document.getElementById('sld-lambda').value = lam;
+    document.getElementById('val-lambda').textContent = lam.toFixed(3);
+    updateLambdaHint();
+
+    renderLandscapeConstraints();  // only animate constraint shapes, leave GD paths frozen
+
+    document.getElementById('land-sweep-status').textContent =
+      `${revealIdx + 1}/${CV_N}: λ = ${lam.toFixed(3)}`;
+
+    revealIdx++;
+    if (revealIdx < CV_N) {
+      LO.sweepTimer = setTimeout(tick, sweepSpeed);
+    } else {
+      finishLandscapeOptimize();
+    }
+  }
+  LO.sweepTimer = setTimeout(tick, 0);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   TAB SWITCHING
+═══════════════════════════════════════════════════════════════════ */
+
+function switchTab(tab) {
+  S.tab = tab;
+  stopLandscapeOptimize();
+  document.querySelectorAll('#tab-bar button').forEach(b =>
+    b.classList.toggle('active', b.dataset.tab === tab));
+
+  updateEquation();
+
+  if (tab === 'weights') {
+    document.getElementById('center-label').textContent =
+      'Weight magnitudes — sorted by |wᵢ| ascending, colored by regularization effect';
+    showBoundaryCards(false);
+    initMainSVG();
+    renderMagnitudePlot();
+    renderHistogram();
+    updateStats();
+    updateAnnotation();
+    updateLegend();
+  } else if (tab === 'boundary') {
+    document.getElementById('center-label').textContent =
+      'Decision boundary — probability map with regularized logistic regression';
+    showBoundaryCards(true);
+    initBoundarySVG();
+    renderHistogram();
+    updateStats();
+    updateBoundaryLegend();
+    resetBoundaryTrain();
+    recomputeCV();
+  } else {
+    document.getElementById('center-label').textContent =
+      'Loss landscape — gradient descent paths for no reg (grey), L1 (orange), L2 (green)';
+    setTabCards('landscape');
+    llContourCache = null;
+    resetLandscape();
+    updateLandscapeLegend();
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   UPDATE CYCLE (λ or reg-type change while tab is active)
+═══════════════════════════════════════════════════════════════════ */
+
+function update() {
+  S.weights = applyReg(S.baseWeights, S.regType, S.lambda);
+  updateEquation();
+  renderHistogram();
+  updateStats();
+
+  if (S.tab === 'weights') {
+    renderMagnitudePlot();
+    updateAnnotation();
+    updateLegend();
+  } else if (S.tab === 'boundary') {
+    if (CV.sweepState === 'sweeping') return;
+    resetBoundaryTrain();
+    updateBoundaryLegend();
+    if (CV.trainAccs.length) {
+      if (S.regType !== CV._regType) recomputeCV();
+      else updateCVDot();
+    }
+  } else if (S.tab === 'landscape') {
+    llContourCache = null;
+    resetLandscape();
+    updateLandscapeLegend();
+  }
+}
+
+function fullReset() {
+  stopCVSweep();
+  stopLandscapeOptimize();
+  generateBoundaryData();
+  generateWeights();
+  initHistSVG();
+  switchTab(S.tab);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   DECISION BOUNDARY — SEEDED PRNG
+═══════════════════════════════════════════════════════════════════ */
+
+function mulberry32(seed) {
+  let s = seed >>> 0;
+  return function() {
+    s = (s + 0x6D2B79F5) >>> 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   DECISION BOUNDARY — LOGISTIC REGRESSION
+═══════════════════════════════════════════════════════════════════ */
+
+// Degree-2 polynomial features scaled by domain half-width 3:
+// [1, x/3, y/3, (x/3)², (x/3)(y/3), (y/3)²]
+function polyFeat(x, y) {
+  const s = 3;
+  return [1, x/s, y/s, (x*x)/(s*s), (x*y)/(s*s), (y*y)/(s*s)];
+}
+
+function sigmoid(z) { return 1 / (1 + Math.exp(-Math.max(-30, Math.min(30, z)))); }
+
+function predictLR(w, x, y) {
+  const f = polyFeat(x, y);
+  return sigmoid(f.reduce((sum, fi, i) => sum + w[i] * fi, 0));
+}
+
+function trainLR(trainData, regType, lambda, nIter) {
+  const nFeat = 6, lr = 0.8;
+  nIter = (nIter !== undefined) ? nIter : 500;
+  const w = new Array(nFeat).fill(0);
+  const n = trainData.length;
+
+  for (let iter = 0; iter < nIter; iter++) {
+    const grad = new Array(nFeat).fill(0);
+    for (const pt of trainData) {
+      const err = predictLR(w, pt.x, pt.y) - pt.label;
+      const f   = polyFeat(pt.x, pt.y);
+      for (let i = 0; i < nFeat; i++) grad[i] += err * f[i];
+    }
+    if (regType === 'l2') {
+      for (let i = 0; i < nFeat; i++)
+        w[i] -= lr * (grad[i] / n + (i > 0 ? 2 * lambda * w[i] : 0));
+    } else {
+      for (let i = 0; i < nFeat; i++) w[i] -= lr * (grad[i] / n);
+      // L1: proximal soft-threshold on non-bias weights
+      if (regType === 'l1') {
+        for (let i = 1; i < nFeat; i++)
+          w[i] = Math.sign(w[i]) * Math.max(Math.abs(w[i]) - lr * lambda, 0);
+      }
+    }
+  }
+  return w;
+}
+
+function classAccuracy(model, data) {
+  let ok = 0;
+  for (const pt of data) ok += ((predictLR(model, pt.x, pt.y) >= 0.5 ? 1 : 0) === pt.label) ? 1 : 0;
+  return ok / data.length;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   DECISION BOUNDARY — DATASET (seeded, fixed per page load)
+═══════════════════════════════════════════════════════════════════ */
+
+const BD = {
+  trainData: null, valData: null, model: null, probGrid: null,
+  modelWeights: null,
+  epoch: 0, maxEpochs: 100,
+  trainHistory: [], valHistory: [],
+  bestValEpoch: 0, bestValAcc: 0,
+  playState: 'stopped', playTimer: null, playSpeed: 400,
+};
+
+function generateBoundaryData() {
+  const rng = mulberry32(42);
+  const norm = () => {
+    const u = 1 - rng(), v = rng();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  };
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const pts = [];
+
+  // Class 0: cluster near (-1.2, -0.8) and secondary cluster near (0.9, 0.4)
+  for (let i = 0; i < 26; i++)
+    pts.push({ x: clamp(-1.2 + norm() * 0.55, -3, 3), y: clamp(-0.8 + norm() * 0.55, -3, 3), label: 0 });
+  for (let i = 0; i < 16; i++)
+    pts.push({ x: clamp( 0.9 + norm() * 0.42, -3, 3), y: clamp( 0.4 + norm() * 0.42, -3, 3), label: 0 });
+
+  // Class 1: cluster near (1.2, 1.0) and secondary cluster near (-0.5, -1.5)
+  for (let i = 0; i < 26; i++)
+    pts.push({ x: clamp( 1.2 + norm() * 0.55, -3, 3), y: clamp( 1.0 + norm() * 0.55, -3, 3), label: 1 });
+  for (let i = 0; i < 16; i++)
+    pts.push({ x: clamp(-0.5 + norm() * 0.42, -3, 3), y: clamp(-1.5 + norm() * 0.42, -3, 3), label: 1 });
+
+  // Fisher-Yates shuffle with rng
+  for (let i = pts.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [pts[i], pts[j]] = [pts[j], pts[i]];
+  }
+
+  const splitIdx = Math.round(pts.length * 0.75);
+  BD.trainData = pts.slice(0, splitIdx);
+  BD.valData   = pts.slice(splitIdx);
+}
+
+// 64×64 probability grid over [-3, 3]²
+const BGRID_N = 64, BDOMAIN = [-3, 3];
+
+function computeProbGrid(model) {
+  const N = BGRID_N, grid = new Float32Array(N * N);
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) {
+      const x = BDOMAIN[0] + (i / (N - 1)) * (BDOMAIN[1] - BDOMAIN[0]);
+      const y = BDOMAIN[0] + (j / (N - 1)) * (BDOMAIN[1] - BDOMAIN[0]);
+      grid[j * N + i] = predictLR(model, x, y);
+    }
+  }
+  return grid;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   DECISION BOUNDARY — SVG RENDERING
+═══════════════════════════════════════════════════════════════════ */
+
+const BW = 640, BH = 480, BPAD = { l: 44, r: 18, t: 22, b: 40 };
+
+// Diverging color: blue (class 0 confident) → cream → orange (class 1 confident)
+function boundaryClr(t) {
+  if (t < 0.5) return d3.interpolateRgb('#1A56A0', '#F2EDE3')(t * 2);
+  return d3.interpolateRgb('#F2EDE3', '#E8630A')((t - 0.5) * 2);
+}
+
+function initBoundarySVG() {
+  const svg = d3.select('#svg-main');
+  svg.selectAll('*').remove();
+  svg.attr('viewBox', `0 0 ${BW} ${BH}`);
+
+  svg.append('rect').attr('width', BW).attr('height', BH).attr('fill', '#F2EDE3');
+  svg.append('g').attr('id', 'g-bfill');
+  svg.append('g').attr('id', 'g-bline');
+  svg.append('g').attr('id', 'g-bpts');
+  svg.append('g').attr('id', 'g-bxax');
+  svg.append('g').attr('id', 'g-byax');
+
+  const bw = BW - BPAD.l - BPAD.r, bh = BH - BPAD.t - BPAD.b;
+  const labs = svg.append('g');
+  labs.append('text').attr('x', BPAD.l + bw / 2).attr('y', BH - 5)
+    .attr('text-anchor', 'middle').attr('fill', '#666')
+    .attr('font-size', 11).attr('font-family', 'Outfit, sans-serif').text('x₁');
+  labs.append('text')
+    .attr('transform', `translate(12,${BPAD.t + bh / 2}) rotate(-90)`)
+    .attr('text-anchor', 'middle').attr('fill', '#666')
+    .attr('font-size', 11).attr('font-family', 'Outfit, sans-serif').text('x₂');
+}
+
+function renderBoundary(fadeDur) {
+  const N   = BGRID_N;
+  const bw  = BW - BPAD.l - BPAD.r, bh = BH - BPAD.t - BPAD.b;
+  const xSc = d3.scaleLinear().domain(BDOMAIN).range([BPAD.l, BPAD.l + bw]);
+  const ySc = d3.scaleLinear().domain(BDOMAIN).range([BPAD.t + bh, BPAD.t]);
+
+  // Geo projection: grid coords [0..N] × [0..N] → SVG (y-flipped so j=0 ↔ ymin ↔ SVG bottom)
+  const proj = d3.geoTransform({
+    point: function(gx, gy) {
+      this.stream.point(
+        BPAD.l + (gx / N) * bw,
+        BPAD.t + ((N - gy) / N) * bh
+      );
+    }
+  });
+  const pathGen = d3.geoPath(proj);
+
+  // Filled probability contours (21 bands from 0→1)
+  const fillLevels = d3.range(0, 1.05, 0.05);
+  const fillCts = d3.contours().size([N, N]).thresholds(fillLevels)(BD.probGrid);
+  const fillG = d3.select('#g-bfill');
+  fillG.selectAll('path').data(fillCts).join('path')
+    .attr('d', pathGen)
+    .attr('fill', d => boundaryClr(d.value))
+    .attr('stroke', 'none');
+  // Subtle fade-in on update
+  fillG.attr('opacity', 0.55).transition().duration(fadeDur || 300).attr('opacity', 1);
+
+  // Decision boundary line (p=0.5 contour)
+  const boundaryCt = d3.contours().size([N, N]).thresholds([0.5])(BD.probGrid);
+  d3.select('#g-bline').selectAll('path').data(boundaryCt).join('path')
+    .attr('d', pathGen)
+    .attr('fill', 'none')
+    .attr('stroke', '#1C3A0E')
+    .attr('stroke-width', 2.5)
+    .attr('stroke-linejoin', 'round');
+
+  // Data points (train: solid stroke; val: dimmed, thinner stroke)
+  const allData = [...BD.trainData, ...BD.valData];
+  const isTrain = pt => BD.trainData.includes(pt);
+  d3.select('#g-bpts').selectAll('circle.bpt').data(allData).join('circle').classed('bpt', true)
+    .attr('cx', d => xSc(d.x)).attr('cy', d => ySc(d.y))
+    .attr('r', d => isTrain(d) ? 4.5 : 3.5)
+    .attr('fill', d => d.label === 0 ? '#1A56A0' : '#E8630A')
+    .attr('stroke', d => isTrain(d) ? 'white' : '#888')
+    .attr('stroke-width', d => isTrain(d) ? 1.5 : 1)
+    .attr('opacity', d => isTrain(d) ? 0.9 : 0.5);
+
+  // Axes
+  d3.select('#g-bxax').attr('transform', `translate(0,${BPAD.t + bh})`)
+    .call(d3.axisBottom(xSc).ticks(7))
+    .call(g => {
+      g.select('.domain').attr('stroke', '#C8BE9A');
+      g.selectAll('text').attr('fill', '#666').attr('font-size', 9);
+      g.selectAll('.tick line').attr('stroke', '#C8BE9A');
+    });
+  d3.select('#g-byax').attr('transform', `translate(${BPAD.l},0)`)
+    .call(d3.axisLeft(ySc).ticks(7))
+    .call(g => {
+      g.select('.domain').attr('stroke', '#C8BE9A');
+      g.selectAll('text').attr('fill', '#666').attr('font-size', 9);
+      g.selectAll('.tick line').attr('stroke', '#C8BE9A');
+    });
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   DECISION BOUNDARY — STATS & ANNOTATION
+═══════════════════════════════════════════════════════════════════ */
+
+function updateBoundaryStats() {
+  const trainAcc = classAccuracy(BD.model, BD.trainData);
+  const valAcc   = classAccuracy(BD.model, BD.valData);
+  const gap      = Math.max(0, trainAcc - valAcc);
+  const gapPct   = Math.min(100, Math.round(gap * 200));
+
+  document.getElementById('sb-train-acc').textContent = (trainAcc * 100).toFixed(1) + '%';
+  document.getElementById('sb-val-acc').textContent   = (valAcc   * 100).toFixed(1) + '%';
+  document.getElementById('bv-pct').textContent       = (gap * 100).toFixed(1) + '%';
+
+  const bvFill = document.getElementById('bv-fill');
+  bvFill.style.width      = gapPct + '%';
+  bvFill.style.background = gap > 0.12 ? '#E8630A' : gap > 0.05 ? '#F9A825' : '#2e7d32';
+
+  const bvBox = document.getElementById('bv-box');
+  if (valAcc < 0.62 && trainAcc < 0.70) {
+    bvBox.textContent = 'High bias — model too simple to fit the data';
+    bvBox.className   = 'anno-box warn';
+  } else if (gap > 0.12) {
+    bvBox.textContent = 'High variance — overfitting the training set';
+    bvBox.className   = 'anno-box l1';
+  } else if (gap > 0.05) {
+    bvBox.textContent = 'Mild overfit — some gap between train and val';
+    bvBox.className   = 'anno-box neutral';
+  } else {
+    bvBox.textContent = 'Good generalization — train ≈ val accuracy';
+    bvBox.className   = 'anno-box good';
+  }
+
+  // Mirror into status bar
+  document.getElementById('stat-loss').textContent  = valAcc.toFixed(3);
+  document.getElementById('stat-wnorm').textContent = trainAcc.toFixed(3);
+  document.getElementById('stat-epoch').textContent = BD.trainData.length;
+}
+
+function updateBoundaryAnnotation() {
+  const box      = document.getElementById('anno-box');
+  const trainAcc = classAccuracy(BD.model, BD.trainData);
+  const valAcc   = classAccuracy(BD.model, BD.valData);
+  const gap      = trainAcc - valAcc;
+  const lam      = S.lambda;
+  const regName  = S.regType === 'l1' ? 'L1' : 'L2';
+  let cls = 'neutral', text = '';
+
+  if (S.regType === 'none' || lam < 0.03) {
+    if (gap > 0.10) {
+      cls  = 'warn';
+      text = 'Overfitting detected — the boundary memorizes training points (train ' + (trainAcc * 100).toFixed(0) + '% vs val ' + (valAcc * 100).toFixed(0) + '%). A complex boundary that fits noise generalizes poorly. Increase λ to constrain it.';
+    } else {
+      text = 'Minimal regularization. The degree-2 boundary fits the training distribution. Increase λ to observe how ' + (S.regType === 'none' ? 'L1 or L2' : regName) + ' regularization simplifies and smooths the boundary.';
+    }
+  } else if (lam > 0.45) {
+    cls  = 'warn';
+    text = 'Underfitting — λ=' + lam.toFixed(3) + ' penalizes weights so heavily that only a near-linear boundary survives. The model cannot capture the curved class structure. Both train and val accuracy suffer.';
+  } else if (gap < 0.07 && valAcc > 0.72) {
+    cls  = 'good';
+    text = '✓ Good generalization — ' + regName + ' regularization is working. Val accuracy ' + (valAcc * 100).toFixed(0) + '% ≈ train accuracy ' + (trainAcc * 100).toFixed(0) + '%. The boundary captures class structure without fitting noise.';
+  } else {
+    if (S.regType === 'l1') {
+      text = 'L1 (λ=' + lam.toFixed(3) + '): soft-thresholding zeros out small polynomial coefficients — the boundary simplifies by dropping terms like xy or x². This is L1\'s automatic feature selection at work: irrelevant curvature terms are pruned.';
+    } else {
+      text = 'L2 (λ=' + lam.toFixed(3) + '): shrinks all polynomial coefficients by factor 1/(1+λ). The boundary smooths out uniformly — no term is zeroed, but all curvature is suppressed. The sweet spot balances fit and smoothness.';
+    }
+  }
+
+  box.textContent = text;
+  box.className   = 'anno-box ' + cls;
+}
+
+function updateBoundaryLegend() {
+  document.getElementById('main-legend').innerHTML =
+    '<span><span class="legend-dot" style="background:#1A56A0"></span>Class 0 (train)</span>' +
+    '<span><span class="legend-dot" style="background:#E8630A"></span>Class 1 (train)</span>' +
+    '<span style="font-size:.68rem;color:#888">Dimmed = validation</span>' +
+    '<span><span class="legend-line" style="background:#1C3A0E"></span>p=0.5 boundary</span>';
+}
+
+function setTabCards(tab) {
+  document.getElementById('card-wgt-stats').style.display     = tab==='weights'   ? '' : 'none';
+  document.getElementById('card-bnd-stats').style.display     = tab==='boundary'  ? '' : 'none';
+  document.getElementById('card-bnd-controls').style.display  = tab==='boundary'  ? '' : 'none';
+  document.getElementById('card-land-info').style.display     = tab==='landscape' ? '' : 'none';
+  document.getElementById('card-land-controls').style.display = tab==='landscape' ? '' : 'none';
+  document.getElementById('card-cv').style.display            = tab==='boundary'  ? '' : 'none';
+  document.getElementById('cv-optimize-wrap').style.display   = tab==='boundary'  ? '' : 'none';
+}
+// Backward-compat alias used in the code below
+function showBoundaryCards(show) { setTabCards(show ? 'boundary' : 'weights'); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   DECISION BOUNDARY — STEP-THROUGH ANIMATION
+═══════════════════════════════════════════════════════════════════ */
+
+const SPEED_VALUES = [800, 400, 100];
+const SPEED_LABELS = ['Slow', 'Med', 'Fast'];
+const ACC_W = 240, ACC_H = 140, APAD = { l: 32, r: 10, t: 10, b: 28 };
+
+function stepEpochLR(w) {
+  const nFeat = 6, lr = 0.8, n = BD.trainData.length;
+  const grad = new Array(nFeat).fill(0);
+  for (const pt of BD.trainData) {
+    const err = predictLR(w, pt.x, pt.y) - pt.label;
+    const f   = polyFeat(pt.x, pt.y);
+    for (let i = 0; i < nFeat; i++) grad[i] += err * f[i];
+  }
+  if (S.regType === 'l2') {
+    for (let i = 0; i < nFeat; i++)
+      w[i] -= lr * (grad[i] / n + (i > 0 ? 2 * S.lambda * w[i] : 0));
+  } else {
+    for (let i = 0; i < nFeat; i++) w[i] -= lr * (grad[i] / n);
+    if (S.regType === 'l1') {
+      for (let i = 1; i < nFeat; i++)
+        w[i] = Math.sign(w[i]) * Math.max(Math.abs(w[i]) - lr * S.lambda, 0);
+    }
+  }
+}
+
+function updateBoundaryEpochDisplay() {
+  document.getElementById('stat-bnd-epoch').textContent = BD.epoch;
+  document.getElementById('stat-epoch').textContent     = BD.epoch;
+}
+
+function stopBoundaryPlay() {
+  BD.playState = 'stopped';
+  if (BD.playTimer) { clearTimeout(BD.playTimer); BD.playTimer = null; }
+  const btn = document.getElementById('btn-bnd-play');
+  if (!btn) return;
+  btn.textContent = '▶ Play';
+  btn.classList.remove('playing');
+  btn.classList.add('primary');
+}
+
+function pauseBoundary() {
+  BD.playState = 'paused';
+  if (BD.playTimer) { clearTimeout(BD.playTimer); BD.playTimer = null; }
+  const btn = document.getElementById('btn-bnd-play');
+  if (!btn) return;
+  btn.textContent = '▶ Resume';
+  btn.classList.remove('playing');
+  btn.classList.add('primary');
+}
+
+function resetBoundaryTrain() {
+  stopBoundaryPlay();
+  const rng = mulberry32(77);
+  const norm = () => {
+    const u = 1 - rng(), v = rng();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  };
+  BD.modelWeights = Array.from({ length: 6 }, () => norm() * 0.25);
+  BD.epoch        = 0;
+  BD.trainHistory = [];
+  BD.valHistory   = [];
+  BD.bestValEpoch = 0;
+  BD.bestValAcc   = 0;
+  BD.model        = BD.modelWeights.slice();
+  BD.probGrid     = computeProbGrid(BD.model);
+  renderBoundary(200);
+  updateBoundaryStats();
+  updateBoundaryEpochDisplay();
+  updateBoundaryAnnotationEpoch();
+  initAccuracyChart();
+  renderAccuracyChart();
+}
+
+function stepBoundaryEpoch() {
+  if (!BD.modelWeights || BD.epoch >= BD.maxEpochs) { stopBoundaryPlay(); return; }
+  BD.epoch++;
+  stepEpochLR(BD.modelWeights);
+  BD.model    = BD.modelWeights.slice();
+  BD.probGrid = computeProbGrid(BD.model);
+
+  const trainAcc = classAccuracy(BD.model, BD.trainData);
+  const valAcc   = classAccuracy(BD.model, BD.valData);
+  BD.trainHistory.push(trainAcc);
+  BD.valHistory.push(valAcc);
+  if (valAcc > BD.bestValAcc) { BD.bestValAcc = valAcc; BD.bestValEpoch = BD.epoch; }
+
+  const fadeDur = Math.max(60, BD.playSpeed * 0.7);
+  renderBoundary(fadeDur);
+  updateBoundaryStats();
+  updateBoundaryEpochDisplay();
+  updateBoundaryAnnotationEpoch();
+  renderAccuracyChart();
+
+  if (BD.epoch >= BD.maxEpochs) stopBoundaryPlay();
+}
+
+function playBoundary() {
+  if (BD.epoch >= BD.maxEpochs) resetBoundaryTrain();
+  BD.playState = 'playing';
+  const btn = document.getElementById('btn-bnd-play');
+  btn.textContent = '⏸ Pause';
+  btn.classList.add('playing');
+  btn.classList.remove('primary');
+
+  function tick() {
+    if (BD.playState !== 'playing') return;
+    stepBoundaryEpoch();
+    if (BD.epoch < BD.maxEpochs) BD.playTimer = setTimeout(tick, BD.playSpeed);
+  }
+  BD.playTimer = setTimeout(tick, 0);
+}
+
+function updateBoundaryAnnotationEpoch() {
+  const box      = document.getElementById('anno-box');
+  const epoch    = BD.epoch;
+  const n        = BD.trainHistory.length;
+  const trainAcc = n > 0 ? BD.trainHistory[n - 1] : 0;
+  const valAcc   = n > 0 ? BD.valHistory[n - 1]   : 0;
+  const gap      = trainAcc - valAcc;
+  let cls = 'neutral', text = '';
+
+  if (epoch === 0) {
+    text = 'Epoch 0 — random initial weights. Press Play or Step to begin training and watch the boundary evolve.';
+  } else if (epoch <= 8) {
+    text = `Epoch ${epoch} — early training. Gradient descent is discovering basic class structure. Train: ${(trainAcc*100).toFixed(0)}%, Val: ${(valAcc*100).toFixed(0)}%.`;
+  } else if (epoch >= BD.maxEpochs) {
+    updateBoundaryAnnotation();
+    return;
+  } else if (gap > 0.12) {
+    cls  = 'warn';
+    text = `Epoch ${epoch} — overfitting emerging. Train: ${(trainAcc*100).toFixed(0)}%, Val: ${(valAcc*100).toFixed(0)}% (gap ${(gap*100).toFixed(0)}%). The boundary is fitting training noise — increase λ to constrain it.`;
+  } else if (gap < 0.05 && valAcc > 0.72) {
+    cls  = 'good';
+    text = `Epoch ${epoch} — good generalization. Train: ${(trainAcc*100).toFixed(0)}% ≈ Val: ${(valAcc*100).toFixed(0)}%.${S.regType !== 'none' ? ' Regularization is keeping the boundary smooth.' : ''}`;
+  } else {
+    const regNote = S.regType === 'l1' ? ' L1 is soft-thresholding small polynomial coefficients.' :
+                    S.regType === 'l2' ? ' L2 is shrinking all coefficients proportionally.' : '';
+    text = `Epoch ${epoch} / ${BD.maxEpochs}. Train: ${(trainAcc*100).toFixed(0)}%, Val: ${(valAcc*100).toFixed(0)}%.${regNote}`;
+  }
+
+  box.textContent = text;
+  box.className   = 'anno-box ' + cls;
+}
+
+/* ── Accuracy chart ──────────────────────────────────────────────── */
+
+function initAccuracyChart() {
+  const svg = d3.select('#svg-acc');
+  svg.selectAll('*').remove();
+  svg.attr('viewBox', `0 0 ${ACC_W} ${ACC_H}`);
+  svg.append('rect').attr('width', ACC_W).attr('height', ACC_H).attr('fill', '#FDFAF5');
+  svg.append('g').attr('id', 'g-acc-grid');
+  svg.append('g').attr('id', 'g-acc-train');
+  svg.append('g').attr('id', 'g-acc-val');
+  svg.append('g').attr('id', 'g-acc-best');
+  svg.append('g').attr('id', 'g-acc-xax');
+  svg.append('g').attr('id', 'g-acc-yax');
+  const aw = ACC_W - APAD.l - APAD.r, ah = ACC_H - APAD.t - APAD.b;
+  svg.append('text').attr('x', APAD.l + aw / 2).attr('y', ACC_H - 2)
+    .attr('text-anchor', 'middle').attr('fill', '#888')
+    .attr('font-size', 8).attr('font-family', 'IBM Plex Mono, monospace').text('Epoch');
+}
+
+function renderAccuracyChart() {
+  const aw  = ACC_W - APAD.l - APAD.r;
+  const ah  = ACC_H - APAD.t - APAD.b;
+  const xSc = d3.scaleLinear().domain([0, BD.maxEpochs]).range([APAD.l, APAD.l + aw]);
+  const ySc = d3.scaleLinear().domain([0.4, 1.02]).range([APAD.t + ah, APAD.t]);
+  const n   = BD.trainHistory.length;
+
+  // Grid
+  d3.select('#g-acc-grid').selectAll('line').data(ySc.ticks(4)).join('line')
+    .attr('x1', APAD.l).attr('x2', APAD.l + aw)
+    .attr('y1', d => ySc(d)).attr('y2', d => ySc(d))
+    .attr('stroke', '#E2D9C5').attr('stroke-width', 0.7);
+
+  const lineGen = d3.line().x((_, i) => xSc(i + 1)).y(d => ySc(Math.max(0.4, d)))
+    .curve(d3.curveMonotoneX);
+
+  // Overfitting: val dropped while train rose over last 5 epochs
+  const overfit = n >= 5 &&
+    (BD.valHistory[n - 1] - BD.valHistory[n - 5]) < -0.01 &&
+    (BD.trainHistory[n - 1] - BD.trainHistory[n - 5]) > 0.005;
+
+  if (n > 0) {
+    d3.select('#g-acc-train').selectAll('path').data([BD.trainHistory]).join('path')
+      .attr('d', lineGen).attr('fill', 'none')
+      .attr('stroke', '#2e7d32').attr('stroke-width', 1.8);
+
+    const valClr = overfit ? '#B0321D' : '#1A56A0';
+    d3.select('#g-acc-val').selectAll('path').data([BD.valHistory]).join('path')
+      .attr('d', lineGen).attr('fill', 'none')
+      .attr('stroke', valClr).attr('stroke-width', 1.8)
+      .attr('stroke-dasharray', '4,2');
+  }
+
+  // Best val epoch marker
+  const bestG = d3.select('#g-acc-best');
+  bestG.selectAll('*').remove();
+  if (BD.bestValEpoch > 0) {
+    const bx = xSc(BD.bestValEpoch);
+    bestG.append('line')
+      .attr('x1', bx).attr('x2', bx).attr('y1', APAD.t).attr('y2', APAD.t + ah)
+      .attr('stroke', '#2e7d32').attr('stroke-width', 1.2)
+      .attr('stroke-dasharray', '3,3').attr('opacity', 0.75);
+  }
+
+  // Axes
+  d3.select('#g-acc-xax').attr('transform', `translate(0,${APAD.t + ah})`)
+    .call(d3.axisBottom(xSc).ticks(5).tickFormat(d3.format('d')))
+    .call(g => {
+      g.select('.domain').attr('stroke', '#C8BE9A');
+      g.selectAll('text').attr('fill', '#888').attr('font-size', 7);
+      g.selectAll('.tick line').attr('stroke', '#C8BE9A');
+    });
+  d3.select('#g-acc-yax').attr('transform', `translate(${APAD.l},0)`)
+    .call(d3.axisLeft(ySc).ticks(4).tickFormat(d => d3.format('.0%')(d)))
+    .call(g => {
+      g.select('.domain').attr('stroke', '#C8BE9A');
+      g.selectAll('text').attr('fill', '#888').attr('font-size', 7);
+      g.selectAll('.tick line').attr('stroke', '#C8BE9A');
+    });
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   CROSS-VALIDATION CURVE (boundary tab)
+═══════════════════════════════════════════════════════════════════ */
+
+const CV_N = 30;
+const CV_LAMBDAS = Array.from({ length: CV_N }, (_, i) =>
+  Math.exp(Math.log(0.001) + (i / (CV_N - 1)) * Math.log(1.0 / 0.001))
+);
+const CVW = 640, CVH = 200, CVPAD = { l: 52, r: 20, t: 18, b: 36 };
+const CV = {
+  trainAccs: [], valAccs: [],
+  optIdx: -1,
+  revealIdx: CV_N,
+  sweepState: 'idle',   // 'idle' | 'sweeping' | 'done'
+  sweepTimer: null,
+  sweepSpeed: 400,
+  _regType: null,       // cached regType when curve was last computed
+};
+
+function computeCV() {
+  CV.trainAccs = [];
+  CV.valAccs   = [];
+  for (let i = 0; i < CV_N; i++) {
+    const m = trainLR(BD.trainData, S.regType, CV_LAMBDAS[i], 400);
+    CV.trainAccs.push(classAccuracy(m, BD.trainData));
+    CV.valAccs.push(classAccuracy(m, BD.valData));
+  }
+  CV.optIdx   = CV.valAccs.indexOf(Math.max(...CV.valAccs));
+  CV.revealIdx = CV_N;
+  CV._regType  = S.regType;
+}
+
+function initCVChart() {
+  const svg = d3.select('#svg-cv');
+  svg.selectAll('*').remove();
+  svg.attr('viewBox', `0 0 ${CVW} ${CVH}`);
+  svg.append('rect').attr('width', CVW).attr('height', CVH).attr('fill', '#FDFAF5');
+  svg.append('g').attr('id', 'g-cv-shade');
+  svg.append('g').attr('id', 'g-cv-grid');
+  svg.append('g').attr('id', 'g-cv-train');
+  svg.append('g').attr('id', 'g-cv-val');
+  svg.append('g').attr('id', 'g-cv-optline');
+  svg.append('g').attr('id', 'g-cv-dot');
+  svg.append('g').attr('id', 'g-cv-xax');
+  svg.append('g').attr('id', 'g-cv-yax');
+  const cw = CVW - CVPAD.l - CVPAD.r, ch = CVH - CVPAD.t - CVPAD.b;
+  svg.append('text').attr('x', CVPAD.l + cw / 2).attr('y', CVH - 2)
+    .attr('text-anchor', 'middle').attr('fill', '#888')
+    .attr('font-size', 9).attr('font-family', 'IBM Plex Mono,monospace').text('λ (log scale)');
+  svg.append('text')
+    .attr('transform', `translate(11,${CVPAD.t + ch / 2}) rotate(-90)`)
+    .attr('text-anchor', 'middle').attr('fill', '#888')
+    .attr('font-size', 9).attr('font-family', 'IBM Plex Mono,monospace').text('Accuracy');
+}
+
+function renderCVChart() {
+  const n   = CV.revealIdx;
+  const cw  = CVW - CVPAD.l - CVPAD.r, ch = CVH - CVPAD.t - CVPAD.b;
+  const xSc = d3.scaleLog().domain([0.001, 1.0]).range([CVPAD.l, CVPAD.l + cw]);
+  const ySc = d3.scaleLinear().domain([0.4, 1.02]).range([CVPAD.t + ch, CVPAD.t]);
+
+  // Grid
+  d3.select('#g-cv-grid').selectAll('line').data(ySc.ticks(4)).join('line')
+    .attr('x1', CVPAD.l).attr('x2', CVPAD.l + cw)
+    .attr('y1', d => ySc(d)).attr('y2', d => ySc(d))
+    .attr('stroke', '#E2D9C5').attr('stroke-width', .7);
+
+  // Shaded regions (only when full curve is shown)
+  const shadeG = d3.select('#g-cv-shade'); shadeG.selectAll('*').remove();
+  if (n >= CV_N && CV.optIdx >= 0) {
+    const optX = xSc(CV_LAMBDAS[CV.optIdx]);
+    shadeG.append('rect').attr('x', CVPAD.l).attr('y', CVPAD.t)
+      .attr('width', Math.max(0, optX - CVPAD.l)).attr('height', ch)
+      .attr('fill', 'rgba(176,50,29,0.07)');
+    shadeG.append('rect').attr('x', optX).attr('y', CVPAD.t)
+      .attr('width', Math.max(0, CVPAD.l + cw - optX)).attr('height', ch)
+      .attr('fill', 'rgba(26,86,160,0.07)');
+    if (optX - CVPAD.l > 55) {
+      shadeG.append('text').attr('x', CVPAD.l + 5).attr('y', CVPAD.t + 12)
+        .attr('fill', '#888').attr('font-size', 8)
+        .attr('font-family', 'Outfit,sans-serif').text('High Variance / Overfit');
+    }
+    if (CVPAD.l + cw - optX > 65) {
+      shadeG.append('text').attr('x', optX + 5).attr('y', CVPAD.t + 12)
+        .attr('fill', '#888').attr('font-size', 8)
+        .attr('font-family', 'Outfit,sans-serif').text('High Bias / Underfit');
+    }
+  }
+
+  // Lines (revealed up to n)
+  const lineGen = d3.line()
+    .x((_, i) => xSc(CV_LAMBDAS[i]))
+    .y(d => ySc(Math.max(0.4, d)))
+    .curve(d3.curveCatmullRom.alpha(0.5));
+
+  d3.select('#g-cv-train').selectAll('path').data([CV.trainAccs.slice(0, n)]).join('path')
+    .attr('d', lineGen).attr('fill', 'none')
+    .attr('stroke', '#2e7d32').attr('stroke-width', 1.8);
+  d3.select('#g-cv-val').selectAll('path').data([CV.valAccs.slice(0, n)]).join('path')
+    .attr('d', lineGen).attr('fill', 'none')
+    .attr('stroke', '#E8630A').attr('stroke-width', 1.8);
+
+  // Optimal λ line + label
+  const optG = d3.select('#g-cv-optline'); optG.selectAll('*').remove();
+  if (n >= CV_N && CV.optIdx >= 0) {
+    const optX    = xSc(CV_LAMBDAS[CV.optIdx]);
+    const labelX  = optX > CVPAD.l + cw * 0.75 ? optX - 4 : optX + 3;
+    const anchor  = optX > CVPAD.l + cw * 0.75 ? 'end' : 'start';
+    optG.append('line')
+      .attr('x1', optX).attr('x2', optX).attr('y1', CVPAD.t).attr('y2', CVPAD.t + ch)
+      .attr('stroke', '#2e7d32').attr('stroke-width', 1.6)
+      .attr('stroke-dasharray', '4,3').attr('opacity', .85);
+    optG.append('text')
+      .attr('x', labelX).attr('y', CVPAD.t + 26)
+      .attr('text-anchor', anchor)
+      .attr('fill', '#2e7d32').attr('font-size', 8)
+      .attr('font-family', 'IBM Plex Mono,monospace')
+      .text('Optimal λ = ' + CV_LAMBDAS[CV.optIdx].toFixed(3));
+  }
+
+  // Axes
+  d3.select('#g-cv-xax').attr('transform', `translate(0,${CVPAD.t + ch})`)
+    .call(d3.axisBottom(xSc)
+      .tickValues([0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0])
+      .tickFormat(d => d < 0.01 ? d.toFixed(3) : d < 0.1 ? d.toFixed(2) : d.toFixed(1)))
+    .call(g => {
+      g.select('.domain').attr('stroke', '#C8BE9A');
+      g.selectAll('text').attr('fill', '#888').attr('font-size', 8);
+      g.selectAll('.tick line').attr('stroke', '#C8BE9A');
+    });
+  d3.select('#g-cv-yax').attr('transform', `translate(${CVPAD.l},0)`)
+    .call(d3.axisLeft(ySc).ticks(4).tickFormat(d3.format('.0%')))
+    .call(g => {
+      g.select('.domain').attr('stroke', '#C8BE9A');
+      g.selectAll('text').attr('fill', '#888').attr('font-size', 8);
+      g.selectAll('.tick line').attr('stroke', '#C8BE9A');
+    });
+}
+
+function updateCVDot() {
+  if (!CV.trainAccs.length) return;
+  const cw  = CVW - CVPAD.l - CVPAD.r, ch = CVH - CVPAD.t - CVPAD.b;
+  const xSc = d3.scaleLog().domain([0.001, 1.0]).range([CVPAD.l, CVPAD.l + cw]);
+  const ySc = d3.scaleLinear().domain([0.4, 1.02]).range([CVPAD.t + ch, CVPAD.t]);
+
+  // Nearest pre-computed λ
+  const logLam = Math.log(Math.max(0.001, S.lambda));
+  let closest = 0, minD = Infinity;
+  CV_LAMBDAS.forEach((l, i) => {
+    const d = Math.abs(Math.log(l) - logLam);
+    if (d < minD) { minD = d; closest = i; }
+  });
+
+  const valAcc = CV.valAccs[closest] || 0;
+  const optAcc = CV.optIdx >= 0 ? CV.valAccs[CV.optIdx] : valAcc;
+  const gap    = optAcc - valAcc;
+  const dotClr = gap < 0.015 ? '#2e7d32' : gap < 0.06 ? '#F9A825' : '#B0321D';
+
+  const dotG = d3.select('#g-cv-dot'); dotG.selectAll('*').remove();
+  dotG.append('circle')
+    .attr('cx', xSc(Math.max(0.001, S.lambda)))
+    .attr('cy', ySc(Math.max(0.4, valAcc)))
+    .attr('r', 5.5).attr('fill', dotClr)
+    .attr('stroke', 'white').attr('stroke-width', 1.5);
+
+  // Annotation — only update when not sweeping and epoch 0 or paused
+  if (CV.sweepState !== 'sweeping' && CV.optIdx >= 0) {
+    const optLam = CV_LAMBDAS[CV.optIdx];
+    const box    = document.getElementById('anno-box');
+    if (gap < 0.015) {
+      box.textContent = `Current λ ≈ optimal (${optLam.toFixed(3)}). Val accuracy ${(valAcc*100).toFixed(0)}% — at the cross-validation sweet spot.`;
+      box.className   = 'anno-box good';
+    } else if (gap < 0.06) {
+      box.textContent = `Current λ = ${S.lambda.toFixed(3)} — close to optimal (λ = ${optLam.toFixed(3)}). Val: ${(valAcc*100).toFixed(0)}% vs peak ${(optAcc*100).toFixed(0)}%.`;
+      box.className   = 'anno-box neutral';
+    } else {
+      const dir = S.lambda < optLam ? 'Increase' : 'Decrease';
+      box.textContent = `Current λ = ${S.lambda.toFixed(3)} — val accuracy ${(valAcc*100).toFixed(0)}% vs optimal ${(optAcc*100).toFixed(0)}% at λ = ${optLam.toFixed(3)}. ${dir} λ to improve generalization.`;
+      box.className   = 'anno-box warn';
+    }
+  }
+}
+
+function recomputeCV() {
+  if (!BD.trainData) return;
+  computeCV();
+  initCVChart();
+  renderCVChart();
+  updateCVDot();
+  // Set the "before optimization" annotation (sweep will override this)
+  if (CV.sweepState !== 'sweeping') {
+    const box = document.getElementById('anno-box');
+    box.textContent = 'Drag the λ slider to explore — or click ⚡ Optimize λ to find the best regularization strength automatically via cross-validation.';
+    box.className   = 'anno-box neutral';
+  }
+}
+
+function stopCVSweep() {
+  CV.sweepState = 'idle';
+  if (CV.sweepTimer) { clearTimeout(CV.sweepTimer); CV.sweepTimer = null; }
+  const btn = document.getElementById('btn-cv-optimize');
+  if (btn) { btn.textContent = '⚡ Optimize λ'; btn.classList.add('primary'); btn.classList.remove('playing'); }
+  const status = document.getElementById('cv-sweep-status');
+  if (status) status.textContent = '';
+}
+
+function finishCVSweep() {
+  CV.sweepState = 'done';
+  CV.revealIdx  = CV_N;
+  const optLam      = CV_LAMBDAS[CV.optIdx];
+  const optValAcc   = CV.valAccs[CV.optIdx];
+  const optTrainAcc = CV.trainAccs[CV.optIdx];
+
+  // Snap slider to optimal λ
+  S.lambda = optLam;
+  document.getElementById('sld-lambda').value = optLam;
+  document.getElementById('val-lambda').textContent = optLam.toFixed(3);
+  updateLambdaHint();
+
+  // Update boundary at optimal λ
+  const model = trainLR(BD.trainData, S.regType, optLam);
+  BD.model    = model; BD.probGrid = computeProbGrid(model);
+  renderBoundary(400);
+  updateBoundaryStats();
+
+  renderCVChart();  // full chart with shading + optimal line
+  updateCVDot();
+
+  const btn = document.getElementById('btn-cv-optimize');
+  btn.textContent = '⚡ Optimize λ'; btn.classList.add('primary'); btn.classList.remove('playing');
+  document.getElementById('cv-sweep-status').textContent = `Optimal: λ = ${optLam.toFixed(3)}`;
+
+  const box = document.getElementById('anno-box');
+  box.textContent = `Cross-validation selected λ = ${optLam.toFixed(3)} — highest val accuracy (${(optValAcc*100).toFixed(0)}%) with train ${(optTrainAcc*100).toFixed(0)}%. Arbitrary selection would likely miss this sweet spot. Left of the dashed line: overfitting (high variance). Right: underfitting (high bias).`;
+  box.className   = 'anno-box good';
+}
+
+function startCVSweep() {
+  stopCVSweep();
+  computeCV();         // pre-compute all 30 values synchronously (fast)
+  CV.revealIdx = 0;
+  CV.sweepState = 'sweeping';
+
+  const btn = document.getElementById('btn-cv-optimize');
+  btn.textContent = '⏹ Stop'; btn.classList.remove('primary'); btn.classList.add('playing');
+  initCVChart();       // clear chart for progressive reveal
+
+  function tick() {
+    if (CV.sweepState !== 'sweeping') return;
+    CV.revealIdx++;
+    const i   = CV.revealIdx - 1;
+    const lam = CV_LAMBDAS[i];
+
+    // Move λ slider
+    S.lambda = lam;
+    document.getElementById('sld-lambda').value = lam;
+    document.getElementById('val-lambda').textContent = lam.toFixed(3);
+    updateLambdaHint();
+
+    // Update boundary directly — bypass animation state
+    const model = trainLR(BD.trainData, S.regType, lam);
+    BD.model    = model; BD.probGrid = computeProbGrid(model);
+    renderBoundary(Math.max(50, CV.sweepSpeed * 0.85));
+
+    // Sweep annotation
+    const box = document.getElementById('anno-box');
+    box.textContent = `Cross-validation sweep — testing λ = ${lam.toFixed(3)} → val accuracy: ${(CV.valAccs[i]*100).toFixed(0)}%`;
+    box.className   = 'anno-box neutral';
+    document.getElementById('cv-sweep-status').textContent = `${i+1}/${CV_N}: λ=${lam.toFixed(3)}`;
+
+    renderCVChart();
+
+    if (CV.revealIdx < CV_N) {
+      CV.sweepTimer = setTimeout(tick, CV.sweepSpeed);
+    } else {
+      finishCVSweep();
+    }
+  }
+  CV.sweepTimer = setTimeout(tick, 0);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   EVENT HANDLERS
+═══════════════════════════════════════════════════════════════════ */
+
+document.getElementById('tab-bar').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-tab]');
+  if (btn) switchTab(btn.dataset.tab);
+});
+
+document.getElementById('reg-btns').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-reg]');
+  if (!btn) return;
+  S.regType = btn.dataset.reg;
+  document.querySelectorAll('#reg-btns button').forEach(b =>
+    b.classList.toggle('active', b.dataset.reg === S.regType));
+  updateRegHint();
+  stopCVSweep();
+  update();
+});
+
+document.getElementById('sld-lambda').addEventListener('input', function () {
+  S.lambda = +this.value;
+  document.getElementById('val-lambda').textContent = S.lambda.toFixed(3);
+  updateLambdaHint();
+  update();
+});
+
+document.getElementById('complexity-btns').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-complexity]');
+  if (!btn) return;
+  S.complexity = btn.dataset.complexity;
+  document.querySelectorAll('#complexity-btns button').forEach(b =>
+    b.classList.toggle('active', b.dataset.complexity === S.complexity));
+  updateComplexityHint();
+  fullReset();
+});
+
+document.getElementById('btn-train').addEventListener('click', () => fullReset());
+document.getElementById('btn-step').addEventListener('click', () => {
+  if (S.tab === 'boundary') stepBoundaryEpoch();
+  else if (S.tab === 'landscape') stepLandscapeAnim();
+  else update();
+});
+document.getElementById('btn-reset').addEventListener('click', () => {
+  if (S.tab === 'boundary') resetBoundaryTrain();
+  else if (S.tab === 'landscape') resetLandscape();
+  else fullReset();
+});
+
+document.getElementById('btn-bnd-play').addEventListener('click', () => {
+  if (BD.playState === 'playing') pauseBoundary();
+  else playBoundary();
+});
+document.getElementById('btn-bnd-step').addEventListener('click', () => {
+  if (BD.playState === 'playing') pauseBoundary();
+  stepBoundaryEpoch();
+});
+document.getElementById('btn-bnd-reset').addEventListener('click', () => { stopCVSweep(); resetBoundaryTrain(); });
+document.getElementById('sld-speed').addEventListener('input', function() {
+  const idx = +this.value;
+  BD.playSpeed = SPEED_VALUES[idx];
+  CV.sweepSpeed = SPEED_VALUES[idx];   // CV sweep shares the same speed slider
+  document.getElementById('val-speed').textContent = SPEED_LABELS[idx];
+});
+
+document.getElementById('btn-cv-optimize').addEventListener('click', () => {
+  if (CV.sweepState === 'sweeping') stopCVSweep();
+  else startCVSweep();
+});
+
+document.getElementById('btn-land-play').addEventListener('click', () => {
+  if (LL.playState === 'playing') pauseLandscape();
+  else playLandscape();
+});
+document.getElementById('btn-land-step').addEventListener('click', () => {
+  if (LL.playState === 'playing') pauseLandscape();
+  stepLandscapeAnim();
+});
+document.getElementById('btn-land-reset').addEventListener('click', () => resetLandscape());
+document.getElementById('sld-land-speed').addEventListener('input', function() {
+  const idx = +this.value;
+  LL.playSpeed = SPEED_VALUES[idx];
+  document.getElementById('val-land-speed').textContent = SPEED_LABELS[idx];
+});
+document.getElementById('btn-land-optimize').addEventListener('click', () => {
+  if (LO.sweepState === 'sweeping') stopLandscapeOptimize();
+  else startLandscapeOptimize();
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════════════════ */
+
+generateBoundaryData();   // seeded dataset — fixed for session, rebuilt on Train/Reset
+generateWeights();
+initHistSVG();
+updateRegHint();
+updateLambdaHint();
+updateComplexityHint();
+switchTab('weights');     // renders histogram, magnitude plot, annotation, legend
+</script>
+
+</body>
+</html>
