@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<!-- Copyright © 2026 Greg T. Chism. University of Arizona, College of Information Science.
+     INFO 557: Neural Networks. MIT License. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Early Stopping — Interactive Explorer | INFO 557: Neural Networks</title>
+<meta name="description" content="Watch training and validation loss diverge as a neural network overfits — find the optimal stopping point before generalization degrades. Explore how patience, learning rate, and model complexity interact.">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Early Stopping — Interactive Explorer">
+<meta property="og:description" content="Watch training and validation loss diverge as a neural network overfits — find the optimal stopping point before generalization degrades. Explore how patience, learning rate, and model complexity interact.">
+<meta property="og:image" content="https://gchism94.github.io/uofa-neural-networks/early_stopping/es_explorer-preview.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="600">
+<meta property="og:url" content="https://gchism94.github.io/uofa-neural-networks/early_stopping/es_explorer.html">
+<meta property="fb:app_id" content="2385695445236853">
+
+<!-- Twitter/X card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Early Stopping — Interactive Explorer">
+<meta name="twitter:description" content="Watch training and validation loss diverge as a neural network overfits — find the optimal stopping point before generalization degrades. Explore how patience, learning rate, and model complexity interact.">
+<meta name="twitter:image" content="https://gchism94.github.io/uofa-neural-networks/early_stopping/es_explorer-preview.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+
+<style>
+:root{
+  --cream:#FAF7F0;--cream-mid:#F0EBE0;--cream-dk:#E2D9C5;
+  --g-dk:#1C3A0E;--g-mid:#2D5A1B;--g-lt:#4A8C2F;--g-pale:#C8E6A8;
+  --orange:#E8630A;--orange-lt:#F08C50;--orange-dk:#C0500A;
+  --blue:#1A56A0;--blue-pale:#D0E4F8;
+  --red:#B0321D;--red-pale:#F8DDD8;
+  --text:#1A1A1A;--text-muted:#888;--text-soft:#555;
+  --border:#C8BE9A;--border-lt:#DDD6BE;--shadow:rgba(44,90,27,.10);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:'Outfit',sans-serif;background:var(--cream);color:var(--text);
+  padding:1.25rem 1rem 2rem;min-height:100vh;line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:.85rem}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+.hdr{display:flex;justify-content:space-between;align-items:flex-start;column-gap:1rem;row-gap:.35rem;flex-wrap:wrap}
+.hdr>div:first-child{flex:1 1 auto;min-width:0}
+.hdr h1{font-size:clamp(1.25rem,2.2vw,1.6rem);font-weight:700;color:var(--g-dk);letter-spacing:-.02em;line-height:1.2}
+.hdr p.subtitle{font-size:.86rem;color:var(--text-muted);margin-top:.18rem}
+.hdr-rule{border:none;border-top:2.5px solid var(--g-dk);margin-top:.55rem}
+
+/* ── Fixed copyright ─────────────────────────────────────────────── */
+.cr-top{
+  position:fixed;top:.75rem;right:1rem;z-index:1000;
+  font-size:.72rem;color:var(--text-muted);text-align:right;
+  background:rgba(250,247,240,.92);padding:.2rem 1.5rem .2rem .5rem;
+  border-radius:5px;backdrop-filter:blur(4px);
+  border:1px solid var(--border-lt);white-space:nowrap;min-width:max-content;
+}
+.cr-top a{color:var(--orange);text-decoration:none}
+.cr-top a:hover{text-decoration:underline}
+
+/* ── Explorer grid ───────────────────────────────────────────────── */
+.explorer-grid{
+  display:grid;
+  grid-template-columns:260px 1fr 220px;
+  gap:.85rem;
+  align-items:start;
+}
+@media(max-width:980px){
+  .explorer-grid{grid-template-columns:260px 1fr}
+  .right-col{display:none}
+}
+@media(max-width:680px){
+  .explorer-grid{grid-template-columns:1fr}
+}
+.left-col{display:flex;flex-direction:column;gap:.75rem}
+.center-col{display:flex;flex-direction:column;gap:.75rem}
+.right-col{display:flex;flex-direction:column;gap:.75rem}
+
+/* ── Cards ───────────────────────────────────────────────────────── */
+.card{background:white;border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem;box-shadow:0 2px 8px var(--shadow)}
+.card-title{font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--g-dk);margin-bottom:.55rem}
+
+/* ── Sliders ─────────────────────────────────────────────────────── */
+.srow{display:flex;align-items:center;gap:.45rem;margin-bottom:.2rem}
+.slbl{font-family:'IBM Plex Mono',monospace;font-size:.82rem;font-weight:500;color:var(--g-dk);min-width:22px}
+input[type=range]{flex:1;appearance:none;-webkit-appearance:none;height:4px;background:var(--cream-dk);border-radius:2px;cursor:pointer;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--g-mid);border:2.5px solid white;box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:pointer}
+.sval{font-family:'IBM Plex Mono',monospace;font-size:.76rem;color:var(--text-muted);min-width:40px;text-align:right}
+.hint-txt{font-size:.7rem;color:var(--text-muted);font-style:italic;margin-top:.15rem;padding-left:1.6rem}
+
+/* ── Buttons ─────────────────────────────────────────────────────── */
+.btn-group{display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:.35rem}
+.kbtn{
+  font-family:'Outfit',sans-serif;font-size:.78rem;font-weight:500;
+  padding:.26rem .7rem;border-radius:16px;cursor:pointer;
+  border:1.5px solid var(--border);background:var(--cream);color:var(--g-dk);
+  transition:all .12s;
+}
+.kbtn:hover{background:var(--g-pale);border-color:var(--g-lt)}
+.kbtn.active{background:var(--g-dk);border-color:var(--g-dk);color:white}
+.ctrl-btns{display:flex;gap:.45rem;flex-wrap:wrap}
+.pbtn{
+  font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:600;
+  padding:.35rem .9rem;border-radius:6px;cursor:pointer;
+  border:1.5px solid var(--border);background:var(--cream);color:var(--g-dk);
+  transition:all .12s;
+}
+.pbtn:hover{background:var(--g-pale);border-color:var(--g-lt)}
+.pbtn.primary{background:var(--g-mid);border-color:var(--g-mid);color:white}
+.pbtn.primary:hover{background:var(--g-dk);border-color:var(--g-dk)}
+.pbtn.playing{background:var(--orange);border-color:var(--orange-dk);color:white}
+.pbtn.playing:hover{background:var(--orange-dk);border-color:var(--orange-dk)}
+
+/* ── Equation bar ────────────────────────────────────────────────── */
+.eq-bar{
+  background:var(--g-dk);color:white;border-radius:8px;
+  padding:.6rem 1rem;
+}
+.eq-name{font-size:.62rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:.2rem}
+.eq-text{font-family:'IBM Plex Mono',monospace;font-size:.82rem;line-height:1.55}
+
+/* ── Annotation box ──────────────────────────────────────────────── */
+.anno-box{
+  border-radius:6px;padding:.55rem .75rem;font-size:.78rem;line-height:1.55;
+  background:var(--blue-pale);color:var(--blue);border-left:3px solid var(--blue);
+  min-height:3.5rem;
+}
+.anno-box.warn{background:var(--red-pale);color:var(--red);border-color:var(--red)}
+.anno-box.good{background:var(--g-pale);color:var(--g-dk);border-color:var(--g-mid)}
+.anno-box.neutral{background:var(--cream-mid);color:var(--text-soft);border-color:var(--border)}
+
+/* ── Key Concepts ────────────────────────────────────────────────── */
+.concepts-body{overflow:hidden;max-height:600px;transition:max-height .3s ease}
+.concepts-body.collapsed{max-height:0;margin-bottom:-.55rem}
+.concepts-item{font-size:.74rem;color:var(--text-soft);line-height:1.5;margin-bottom:.45rem;padding-left:.9rem;position:relative}
+.concepts-item:last-child{margin-bottom:0}
+.concepts-item::before{content:'●';color:#2e7d32;position:absolute;left:0;top:0}
+.concepts-item strong{color:#2e7d32;font-weight:600}
+
+/* ── Status bar ──────────────────────────────────────────────────── */
+.status-bar{
+  display:flex;gap:.6rem;flex-wrap:wrap;font-family:'IBM Plex Mono',monospace;
+  font-size:.72rem;color:var(--text-muted);
+}
+.stat-pill{
+  background:var(--cream-mid);border:1px solid var(--border-lt);
+  border-radius:12px;padding:.15rem .55rem;
+}
+.stat-pill span{color:var(--g-dk);font-weight:600}
+
+/* ── Loss chart ──────────────────────────────────────────────────── */
+.chart-wrap{width:100%;aspect-ratio:5/3}
+.chart-wrap svg{width:100%;height:100%;display:block;border-radius:5px}
+.mini-chart-wrap{width:100%}
+.mini-chart-wrap svg{width:100%;display:block;border-radius:5px}
+
+/* ── Plot label ──────────────────────────────────────────────────── */
+.plot-label{font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);text-align:center;margin-bottom:.35rem}
+
+/* ── Legend ──────────────────────────────────────────────────────── */
+.legend{display:flex;gap:.75rem;flex-wrap:wrap;font-size:.72rem;color:var(--text-soft);margin-top:.45rem;align-items:center}
+.legend-dot{width:11px;height:11px;border-radius:50%;display:inline-block;vertical-align:middle;margin-right:.2rem}
+.legend-line{width:18px;height:2.5px;display:inline-block;vertical-align:middle;margin-right:.2rem;border-radius:2px}
+.legend-dash{width:18px;height:0;display:inline-block;vertical-align:middle;margin-right:.2rem;border-top:2.5px dashed}
+
+/* ── Stat grid ───────────────────────────────────────────────────── */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.5rem}
+.stat-block{background:var(--cream);border:1px solid var(--border-lt);border-radius:6px;padding:.4rem .5rem;text-align:center}
+.sb-val{display:block;font-family:'IBM Plex Mono',monospace;font-size:1.05rem;font-weight:600;color:var(--g-dk);line-height:1.2}
+.sb-lbl{font-size:.6rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;margin-top:.1rem}
+
+/* ── Progress bars ───────────────────────────────────────────────── */
+.prop-bar{height:10px;border-radius:4px;overflow:hidden;background:var(--cream-mid);display:flex}
+</style>
+</head>
+<body>
+
+<div class="cr-top">© 2026 Greg T. Chism · <a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a></div>
+
+<div class="wrap">
+
+<header>
+  <div class="hdr">
+    <div>
+      <h1>Early Stopping — Interactive Explorer</h1>
+      <p class="subtitle">Watch training and validation loss diverge — find the optimal stopping point before overfitting takes hold</p>
+    </div>
+  </div>
+  <hr class="hdr-rule">
+</header>
+
+<!-- Main explorer -->
+<div class="explorer-grid">
+
+  <!-- LEFT: Controls -->
+  <div class="left-col">
+
+    <div class="card">
+      <div class="card-title">Model Complexity</div>
+      <div class="btn-group" id="complexity-btns">
+        <button class="kbtn active" data-complexity="simple">Simple</button>
+        <button class="kbtn" data-complexity="medium">Medium</button>
+        <button class="kbtn" data-complexity="over">Overparameterized</button>
+      </div>
+      <div class="hint-txt" id="complexity-hint">Low capacity — less prone to overfitting</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Training Parameters</div>
+      <div class="srow">
+        <span class="slbl">η</span>
+        <input type="range" id="sld-lr" min="0.001" max="0.1" step="0.001" value="0.01">
+        <span class="sval" id="val-lr">0.010</span>
+      </div>
+      <div class="hint-txt" id="lr-hint" style="margin-bottom:.65rem">Learning rate — controls weight update size</div>
+
+      <div class="card-title">Patience (epochs)</div>
+      <div class="srow">
+        <span class="slbl">P</span>
+        <input type="range" id="sld-patience" min="1" max="20" step="1" value="5">
+        <span class="sval" id="val-patience">5</span>
+      </div>
+      <div class="hint-txt" id="patience-hint" style="margin-bottom:.65rem">Stop after 5 epochs without val improvement</div>
+
+      <div class="card-title">Dataset Noise</div>
+      <div class="btn-group" id="noise-btns">
+        <button class="kbtn" data-noise="low">Low</button>
+        <button class="kbtn active" data-noise="medium">Medium</button>
+        <button class="kbtn" data-noise="high">High</button>
+      </div>
+      <div class="hint-txt" id="noise-hint">Label noise in the training set</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Simulation</div>
+      <div class="ctrl-btns" style="margin-bottom:.45rem">
+        <button id="btn-play" class="pbtn primary" style="flex:1">⏵ Play</button>
+        <button id="btn-step" class="pbtn">⏭ Step</button>
+      </div>
+      <div class="ctrl-btns">
+        <button id="btn-reset" class="pbtn" style="flex:1">↺ Reset</button>
+      </div>
+      <div class="srow" style="margin-top:.5rem">
+        <span class="slbl" style="font-size:.72rem;min-width:42px">Speed</span>
+        <input type="range" id="sld-speed" min="0" max="2" step="1" value="1">
+        <span class="sval" id="val-speed">Med</span>
+      </div>
+    </div>
+
+    <div class="eq-bar">
+      <div class="eq-name" id="eq-name">Early Stopping Criterion</div>
+      <div class="eq-text" id="eq-text">stop if e − e* ≥ P</div>
+    </div>
+
+    <div class="card" id="card-concepts">
+      <div class="card-title" style="cursor:pointer;user-select:none" id="concepts-toggle">Key Concepts <span id="concepts-arrow">▾</span></div>
+      <div class="concepts-body" id="concepts-body">
+        <div class="concepts-item"><strong>What early stopping is:</strong> A regularization technique that halts training when the model begins to overfit — validation loss stops improving while training loss keeps falling. The weights at the best validation epoch are restored.</div>
+        <div class="concepts-item"><strong>What patience means:</strong> The number of consecutive epochs without validation improvement before training stops. Higher patience tolerates longer plateaus; lower patience halts sooner and risks underfitting.</div>
+        <div class="concepts-item"><strong>Why val loss diverges:</strong> Once a model memorizes training noise, its weights no longer generalize. Training loss keeps falling (fitting noise), but validation loss rises. The widening gap is the generalization error.</div>
+        <div class="concepts-item"><strong>When to stop:</strong> At the epoch where validation loss is lowest — marked by the vertical line. More patience gives the model more chances to escape temporary plateaus before deciding to stop.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">What's happening?</div>
+      <div class="anno-box neutral" id="anno-box">Press Play or Step to begin training. Watch training loss (green) and validation loss (orange) — when they diverge, overfitting has begun.</div>
+    </div>
+
+    <div class="status-bar">
+      <div class="stat-pill">Epoch <span id="stat-epoch">0</span></div>
+      <div class="stat-pill">Phase <span id="stat-phase">—</span></div>
+    </div>
+
+  </div>
+
+  <!-- CENTER: Loss curve chart -->
+  <div class="center-col">
+
+    <div class="card">
+      <div class="plot-label" id="center-label">Training — epoch 0</div>
+      <div class="chart-wrap">
+        <svg id="svg-chart" viewBox="0 0 700 420" preserveAspectRatio="none">
+          <rect width="700" height="420" fill="#FDFAF5"/>
+          <text x="350" y="196" text-anchor="middle" dominant-baseline="middle"
+                fill="rgba(0,0,0,.2)" font-family="Outfit, sans-serif"
+                font-size="15">Loss curve renders here</text>
+          <text x="350" y="224" text-anchor="middle" dominant-baseline="middle"
+                fill="rgba(0,0,0,.12)" font-family="Outfit, sans-serif"
+                font-size="11">Press Play to begin training</text>
+        </svg>
+      </div>
+      <div class="legend" id="chart-legend">
+        <span><span class="legend-line" style="background:#2e7d32"></span>Train loss</span>
+        <span><span class="legend-line" style="background:var(--orange)"></span>Val loss</span>
+        <span><span class="legend-dash" style="border-color:var(--blue)"></span>Stop point</span>
+        <span><span class="legend-dot" style="background:var(--orange-lt);border:1.5px dashed var(--orange-dk)"></span>Best val epoch</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- RIGHT: Statistics panel -->
+  <div class="right-col">
+
+    <div class="card" id="card-training-stats">
+      <div class="card-title">Training Status</div>
+      <div class="stat-grid">
+        <div class="stat-block">
+          <span class="sb-val" id="sb-epoch">0</span>
+          <div class="sb-lbl">Epoch</div>
+        </div>
+        <div class="stat-block">
+          <span class="sb-val" id="sb-best-epoch">—</span>
+          <div class="sb-lbl">Best Val Epoch</div>
+        </div>
+        <div class="stat-block">
+          <span class="sb-val" id="sb-train-loss">—</span>
+          <div class="sb-lbl">Train Loss</div>
+        </div>
+        <div class="stat-block">
+          <span class="sb-val" id="sb-val-loss">—</span>
+          <div class="sb-lbl">Val Loss</div>
+        </div>
+      </div>
+
+      <div style="padding-top:.45rem;border-top:1px solid var(--border-lt)">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.2rem">
+          <span style="font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted)">Generalization Gap</span>
+          <span id="sb-gap" style="font-family:'IBM Plex Mono',monospace;font-size:.95rem;font-weight:600;color:var(--g-dk)">—</span>
+        </div>
+        <div style="font-size:.58rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.2rem">val − train (proportion)</div>
+        <div class="prop-bar">
+          <div id="gap-train" style="background:#2e7d32;height:100%;width:50%;transition:width .3s ease"></div>
+          <div id="gap-val" style="background:var(--orange);height:100%;width:50%;transition:width .3s ease"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:.58rem;color:var(--text-muted);margin-top:.15rem">
+          <span>Train</span><span>Val</span>
+        </div>
+      </div>
+
+      <div style="margin-top:.5rem;padding-top:.45rem;border-top:1px solid var(--border-lt)">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.2rem">
+          <span style="font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted)">Patience Counter</span>
+          <span id="sb-patience-ctr" style="font-family:'IBM Plex Mono',monospace;font-size:.95rem;font-weight:600;color:var(--g-dk)">0 / 5</span>
+        </div>
+        <div class="prop-bar" style="background:var(--cream-mid)">
+          <div id="patience-fill" style="background:var(--orange);height:100%;width:0%;transition:width .3s ease"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="card-weight-norm">
+      <div class="card-title">Weight Norm</div>
+      <div class="mini-chart-wrap">
+        <svg id="svg-wnorm" viewBox="0 0 200 120" preserveAspectRatio="none">
+          <rect width="200" height="120" fill="#FDFAF5"/>
+          <text x="100" y="55" text-anchor="middle" dominant-baseline="middle"
+                fill="rgba(0,0,0,.18)" font-family="Outfit, sans-serif"
+                font-size="10">Weight norm chart</text>
+          <text x="100" y="75" text-anchor="middle" dominant-baseline="middle"
+                fill="rgba(0,0,0,.10)" font-family="Outfit, sans-serif"
+                font-size="8">renders here</text>
+        </svg>
+      </div>
+      <div style="font-size:.67rem;color:var(--text-muted);margin-top:.35rem;font-style:italic;line-height:1.5">
+        Growing weight norms signal memorization — the model is fitting noise rather than signal.
+      </div>
+    </div>
+
+  </div>
+
+</div><!-- end .explorer-grid -->
+
+</div><!-- end .wrap -->
+
+<footer id="course-nav-footer" style="margin-top:1.5rem;padding:0.75rem 0 0 1rem;border-top:1px solid #E0DAC0;font-size:0.8rem;color:#78786A;text-align:left;">
+  <a href="../" style="color:#2e7d32;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">&larr; All course visualizations</a>
+</footer>
+<script>
+if (window.self !== window.top) { var f = document.getElementById('course-nav-footer'); if (f) { f.style.display = 'none'; } }
+</script>
+
+</body>
+</html>
