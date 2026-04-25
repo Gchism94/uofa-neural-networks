@@ -138,6 +138,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 .pbtn.primary:hover{background:var(--g-dk);border-color:var(--g-dk)}
 .pbtn.playing{background:var(--orange);border-color:var(--orange-dk);color:white}
 .pbtn.playing:hover{background:var(--orange-dk);border-color:var(--orange-dk)}
+@keyframes btn-pulse{
+  0%,100%{box-shadow:none}
+  50%{box-shadow:0 0 0 3px var(--orange),0 0 10px var(--orange-lt)}
+}
+.btn-pulse{animation:btn-pulse .5s ease 0s 2;}
 
 /* ── Equation bar ────────────────────────────────────────────────── */
 .eq-bar{
@@ -664,6 +669,7 @@ function setAnno(txt,cls){
 
 /* ── Training forward pass ── */
 function forwardPass(onDone){
+  if(currentTab!=='training'){if(onDone)onDone();return;}
   if(animating){if(onDone)onDone();return;}
   animating=true;
   document.getElementById('btn-forward').disabled=true;
@@ -808,58 +814,52 @@ function enterInferenceMode(){
   if(currentTab==='ensemble')exitEnsembleMode();
   stopPlay();
 
-  function _doEnter(){
-    currentTab='inference';
-    if(inferenceMark===null&&lossHist.length>0)inferenceMark=lossHist.length-1;
-    nodes.forEach(n=>{n.dropped=false;n.active=true;n.firing=false;});
-    document.getElementById('btn-forward').textContent='▶ Run Inference';
-    document.getElementById('btn-forward').classList.add('primary');
-    document.getElementById('btn-play').disabled=true;
-    document.getElementById('btn-play').style.opacity='0.38';
-    document.getElementById('eq-name').textContent='Inference — No Dropout';
-    document.getElementById('eq-text').textContent=
-      `ŷ = f(x; W·${(1-pVal).toFixed(2)})  — all nodes active`;
-    document.getElementById('center-label').textContent=
-      `Inference mode — all nodes active · weights ×${(1-pVal).toFixed(2)}`;
-    const hidden=nodes.filter(n=>n.type==='hidden');
-    setAnno(
-      `Switching to inference — activating all ${hidden.length} nodes and scaling weights by (1−p) = ${(1-pVal).toFixed(2)}.`,
-      'neutral'
-    );
-    renderNetInference();renderLoss();
-    document.getElementById('mini-compare').style.display='block';
-    renderMiniTrain();renderMiniInfer();
-    updateStats(0,hidden.length);
-    setTimeout(()=>{
-      inferencePass(()=>{
-        const scale=(1-pVal).toFixed(2);
-        const avgAct=((1-dropHist.reduce((a,b)=>a+b,0)/dropHist.length)*100).toFixed(0);
-        const cmpTxt=`During training, only ~${avgAct}% of hidden nodes were active on average. At inference, all ${hidden.length} nodes activate but weights are scaled by (1−p) = ${scale} to match expected activations.`;
-        document.getElementById('infer-compare-txt').textContent=cmpTxt;
-        setAnno(
-          `Inference mode — all ${hidden.length} hidden nodes active. Weights scaled by (1−p) = ${scale}. No randomness — same input always produces the same output. `+cmpTxt,
-          'good'
-        );
-      });
-    },300);
-  }
-
   if(passCount===0){
-    setAnno('Running training passes first so inference has something to compare against...','neutral');
-    const hidden=nodes.filter(n=>n.type==='hidden');
-    for(let i=0;i<5;i++){
-      passCount++;
-      hidden.forEach(n=>{n.dropped=Math.random()<pVal;n.active=!n.dropped;n.firing=false;});
-      const dn=hidden.filter(n=>n.dropped).length;
-      dropHist.push(dn/hidden.length);
-      const prev=lossHist.length?lossHist[lossHist.length-1]:1.0;
-      lossHist.push(Math.max(0.04,prev*0.97-0.008+(Math.random()-.5)*0.07));
-    }
-    updateStats(null,null);
-    setTimeout(_doEnter,600);
+    // Restore training tab as active — don't switch
+    document.querySelectorAll('#tab-bar button').forEach(b=>b.classList.remove('active'));
+    document.querySelector('[data-tab="training"]').classList.add('active');
+    setAnno('⚠ Run at least 10 training passes first — then switch to Inference Mode to see the comparison between sparse training and full inference.','warn');
+    ['btn-forward','btn-play'].forEach(id=>{
+      const el=document.getElementById(id);
+      el.classList.add('btn-pulse');
+      setTimeout(()=>el.classList.remove('btn-pulse'),1000);
+    });
     return;
   }
-  _doEnter();
+
+  currentTab='inference';
+  if(inferenceMark===null&&lossHist.length>0)inferenceMark=lossHist.length-1;
+  nodes.forEach(n=>{n.dropped=false;n.active=true;n.firing=false;});
+  document.getElementById('btn-forward').textContent='▶ Run Inference';
+  document.getElementById('btn-forward').classList.add('primary');
+  document.getElementById('btn-play').disabled=true;
+  document.getElementById('btn-play').style.opacity='0.38';
+  document.getElementById('eq-name').textContent='Inference — No Dropout';
+  document.getElementById('eq-text').textContent=
+    `ŷ = f(x; W·${(1-pVal).toFixed(2)})  — all nodes active`;
+  document.getElementById('center-label').textContent=
+    `Inference mode — all nodes active · weights ×${(1-pVal).toFixed(2)}`;
+  const hidden=nodes.filter(n=>n.type==='hidden');
+  const switchAnno=passCount<10
+    ?`Tip: More training passes give a clearer comparison — consider running at least 10 before switching. Activating all ${hidden.length} nodes and scaling weights by (1−p) = ${(1-pVal).toFixed(2)}.`
+    :`Switching to inference — activating all ${hidden.length} nodes and scaling weights by (1−p) = ${(1-pVal).toFixed(2)}.`;
+  setAnno(switchAnno,'neutral');
+  renderNetInference();renderLoss();
+  document.getElementById('mini-compare').style.display='block';
+  renderMiniTrain();renderMiniInfer();
+  updateStats(0,hidden.length);
+  setTimeout(()=>{
+    inferencePass(()=>{
+      const scale=(1-pVal).toFixed(2);
+      const avgAct=((1-dropHist.reduce((a,b)=>a+b,0)/dropHist.length)*100).toFixed(0);
+      const cmpTxt=`During training, only ~${avgAct}% of hidden nodes were active on average. At inference, all ${hidden.length} nodes activate but weights are scaled by (1−p) = ${scale} to match expected activations.`;
+      document.getElementById('infer-compare-txt').textContent=cmpTxt;
+      setAnno(
+        `Inference mode — all ${hidden.length} hidden nodes active. Weights scaled by (1−p) = ${scale}. No randomness — same input always produces the same output. `+cmpTxt,
+        'good'
+      );
+    });
+  },300);
 }
 
 function enterTrainingMode(){
