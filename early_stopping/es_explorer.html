@@ -381,6 +381,392 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 
 </div><!-- end .wrap -->
 
+<script>
+(function(){
+'use strict';
+
+/* ── Constants ── */
+const MAX_EPOCHS=100;
+const SPEED_MS=[900,380,80];
+const SPEED_LBL=['Slow','Med','Fast'];
+
+const COMPLEXITY={
+  simple:{ overfitMag:.14, trainBase:.88, lrScale:1.00 },
+  medium:{ overfitMag:.38, trainBase:1.00, lrScale:1.00 },
+  over:  { overfitMag:.72, trainBase:1.10, lrScale:.85  },
+};
+const NOISE={ low:.02, medium:.06, high:.15 };
+
+/* ── State ── */
+let complexityKey='simple', noiseKey='medium';
+let lrVal=0.01, patienceVal=5, speedIdx=1;
+let epoch=0, trainHist=[], valHist=[], normHist=[];
+let bestValLoss=Infinity, bestValEpoch=0, patienceCounter=0;
+let stopEpoch=null, stopped=false;
+let playing=false, playTimer=null;
+
+/* ── Chart layout constants ── */
+const C={W:700,H:420,ml:52,mr:24,mt:18,mb:42};
+C.iw=C.W-C.ml-C.mr; C.ih=C.H-C.mt-C.mb;
+const N={W:200,H:120,ml:32,mr:10,mt:8,mb:26};
+N.iw=N.W-N.ml-N.mr; N.ih=N.H-N.mt-N.mb;
+
+/* ── Scales (rebuilt on reset) ── */
+let xSc, ySc, xNSc, yNSc;
+function buildScales(){
+  xSc  = d3.scaleLinear().domain([0,MAX_EPOCHS]).range([0,C.iw]);
+  ySc  = d3.scaleLinear().domain([0,1.6]).range([C.ih,0]);
+  xNSc = d3.scaleLinear().domain([0,MAX_EPOCHS]).range([0,N.iw]);
+  yNSc = d3.scaleLinear().domain([0,1.5]).range([N.ih,0]);
+}
+
+/* ── Chart initialisation ── */
+function initChart(){
+  const svg=d3.select('#svg-chart');
+  svg.selectAll('*').remove();
+  const g=svg.append('g').attr('transform',`translate(${C.ml},${C.mt})`);
+  g.append('rect').attr('class','chart-bg').attr('width',C.iw).attr('height',C.ih).attr('fill','#FDFAF5').attr('rx',3);
+  g.append('g').attr('class','grid-y');
+  g.append('g').attr('class','grid-x');
+  // x grid (static)
+  xSc.ticks(10).forEach(v=>{
+    g.select('.grid-x').append('line')
+      .attr('x1',xSc(v)).attr('x2',xSc(v)).attr('y1',0).attr('y2',C.ih)
+      .attr('stroke','#EBE6DB').attr('stroke-width',.8);
+  });
+  // Axes
+  g.append('g').attr('class','x-axis').attr('transform',`translate(0,${C.ih})`);
+  g.append('g').attr('class','y-axis');
+  _drawAxes(g);
+  // Axis labels
+  g.append('text').attr('x',C.iw/2).attr('y',C.ih+35)
+    .attr('text-anchor','middle').attr('font-family','Outfit,sans-serif').attr('font-size',10).attr('fill','#888').text('Epoch');
+  g.append('text').attr('transform','rotate(-90)').attr('x',-C.ih/2).attr('y',-40)
+    .attr('text-anchor','middle').attr('font-family','Outfit,sans-serif').attr('font-size',10).attr('fill','#888').text('Loss');
+  // Curve paths (drawn on top of axes)
+  g.append('path').attr('class','area-train').attr('fill','#2e7d32').attr('fill-opacity',.08);
+  g.append('path').attr('class','area-val').attr('fill','#E8630A').attr('fill-opacity',.08);
+  g.append('path').attr('class','line-train').attr('fill','none').attr('stroke','#2e7d32').attr('stroke-width',2);
+  g.append('path').attr('class','line-val').attr('fill','none').attr('stroke','#E8630A').attr('stroke-width',2);
+  g.append('g').attr('class','stop-marker-g');
+  g.append('g').attr('class','best-marker-g');
+}
+
+function _drawAxes(g){
+  const xFn=d3.axisBottom(xSc).ticks(10).tickSize(4);
+  const yFn=d3.axisLeft(ySc).ticks(6).tickSize(4);
+  const style=ag=>{
+    ag.select('.domain').attr('stroke','#C8BE9A');
+    ag.selectAll('.tick line').attr('stroke','#C8BE9A');
+    ag.selectAll('.tick text').attr('font-family','IBM Plex Mono,monospace').attr('font-size',9).attr('fill','#888');
+  };
+  g.select('.x-axis').call(xFn).call(style);
+  g.select('.y-axis').call(yFn).call(style);
+}
+
+function initWnorm(){
+  const svg=d3.select('#svg-wnorm');
+  svg.selectAll('*').remove();
+  const g=svg.append('g').attr('transform',`translate(${N.ml},${N.mt})`);
+  g.append('rect').attr('width',N.iw).attr('height',N.ih).attr('fill','#FDFAF5').attr('rx',2);
+  const xFn=d3.axisBottom(xNSc).ticks(5).tickSize(3);
+  const yFn=d3.axisLeft(yNSc).ticks(4).tickSize(3);
+  const style=ag=>{
+    ag.select('.domain').attr('stroke','#C8BE9A');
+    ag.selectAll('.tick line').attr('stroke','#C8BE9A');
+    ag.selectAll('.tick text').attr('font-family','IBM Plex Mono,monospace').attr('font-size',7).attr('fill','#888');
+  };
+  g.append('g').attr('class','xn-axis').attr('transform',`translate(0,${N.ih})`).call(xFn).call(style);
+  g.append('g').attr('class','yn-axis').call(yFn).call(style);
+  g.append('text').attr('x',N.iw/2).attr('y',N.ih+21)
+    .attr('text-anchor','middle').attr('font-family','Outfit,sans-serif').attr('font-size',7).attr('fill','#888').text('Epoch');
+  g.append('path').attr('class','line-wnorm').attr('fill','none').attr('stroke','#1A56A0').attr('stroke-width',1.5);
+}
+
+/* ── Render (called each step) ── */
+function renderChart(){
+  const g=d3.select('#svg-chart').select('g');
+  // Auto-scale y
+  const maxL=Math.max(d3.max(trainHist)||0,d3.max(valHist)||0,.5);
+  ySc.domain([0,Math.min(2.2,maxL*1.22)]);
+  // Redraw y-grid
+  g.select('.grid-y').selectAll('line').remove();
+  ySc.ticks(6).forEach(v=>{
+    g.select('.grid-y').append('line')
+      .attr('x1',0).attr('x2',C.iw).attr('y1',ySc(v)).attr('y2',ySc(v))
+      .attr('stroke','#EBE6DB').attr('stroke-width',.8);
+  });
+  // Re-draw y-axis
+  const style=ag=>{
+    ag.select('.domain').attr('stroke','#C8BE9A');
+    ag.selectAll('.tick line').attr('stroke','#C8BE9A');
+    ag.selectAll('.tick text').attr('font-family','IBM Plex Mono,monospace').attr('font-size',9).attr('fill','#888');
+  };
+  g.select('.y-axis').call(d3.axisLeft(ySc).ticks(6).tickSize(4)).call(style);
+  // Line generators
+  const mkLine=()=>d3.line().x((_,i)=>xSc(i+1)).y(d=>ySc(d)).curve(d3.curveCatmullRom.alpha(.5));
+  const mkArea=(base)=>d3.area().x((_,i)=>xSc(i+1)).y0(ySc(base)).y1(d=>ySc(d)).curve(d3.curveCatmullRom.alpha(.5));
+  const tBase=Math.max(d3.min(trainHist)||0,0);
+  const vBase=Math.max(d3.min(valHist)||0,0);
+  g.select('.line-train').attr('d',mkLine()(trainHist));
+  g.select('.line-val').attr('d',mkLine()(valHist));
+  g.select('.area-train').attr('d',mkArea(tBase)(trainHist));
+  g.select('.area-val').attr('d',mkArea(vBase)(valHist));
+  // Stop marker
+  const sm=g.select('.stop-marker-g');
+  sm.selectAll('*').remove();
+  if(stopEpoch!==null){
+    const sx=xSc(stopEpoch);
+    sm.append('line').attr('x1',sx).attr('x2',sx).attr('y1',0).attr('y2',C.ih)
+      .attr('stroke','#1A56A0').attr('stroke-width',1.5).attr('stroke-dasharray','5,3');
+    sm.append('text').attr('x',sx+4).attr('y',14)
+      .attr('font-family','IBM Plex Mono,monospace').attr('font-size',8).attr('fill','#1A56A0')
+      .text(`stop e=${stopEpoch}`);
+  }
+  // Best val epoch marker
+  const bm=g.select('.best-marker-g');
+  bm.selectAll('*').remove();
+  if(bestValEpoch>0&&bestValEpoch<=valHist.length){
+    bm.append('circle')
+      .attr('cx',xSc(bestValEpoch)).attr('cy',ySc(valHist[bestValEpoch-1])).attr('r',5)
+      .attr('fill','#F08C50').attr('stroke','#C0500A').attr('stroke-width',1.5);
+  }
+}
+
+function renderWnorm(){
+  const g=d3.select('#svg-wnorm').select('g');
+  const maxN=Math.max(d3.max(normHist)||0,.2);
+  yNSc.domain([0,maxN*1.25]);
+  const style=ag=>{
+    ag.select('.domain').attr('stroke','#C8BE9A');
+    ag.selectAll('.tick line').attr('stroke','#C8BE9A');
+    ag.selectAll('.tick text').attr('font-family','IBM Plex Mono,monospace').attr('font-size',7).attr('fill','#888');
+  };
+  g.select('.yn-axis').call(d3.axisLeft(yNSc).ticks(4).tickSize(3)).call(style);
+  const ln=d3.line().x((_,i)=>xNSc(i+1)).y(d=>yNSc(d)).curve(d3.curveCatmullRom.alpha(.5));
+  g.select('.line-wnorm').attr('d',ln(normHist));
+}
+
+/* ── Loss simulation ── */
+function stepEpoch(){
+  epoch++;
+  const p=COMPLEXITY[complexityKey];
+  const nm=NOISE[noiseKey];
+  const effLr=lrVal*p.lrScale*12;
+  // Train loss: exponential decay + small noise
+  const tDecay=Math.exp(-effLr*epoch/MAX_EPOCHS*3.5);
+  const tLoss=Math.max(.02, p.trainBase*tDecay + (Math.random()-.5)*nm*.45 + .04);
+  // Val loss: slower decay + overfit rise
+  const vDecay=Math.exp(-effLr*epoch/MAX_EPOCHS*2.2);
+  const vRise=p.overfitMag*Math.pow(epoch/MAX_EPOCHS,1.7);
+  const vLoss=Math.max(.04, p.trainBase*1.12*vDecay + vRise + (Math.random()-.5)*nm*.75 + .07);
+  // Weight norm: monotonic growth + memorisation signal
+  const prevN=normHist.length?normHist[normHist.length-1]:.1;
+  const wNorm=prevN + .013 + p.overfitMag*.014 + (Math.random()-.3)*.007;
+
+  trainHist.push(tLoss);
+  valHist.push(vLoss);
+  normHist.push(wNorm);
+
+  // Early stopping check
+  if(vLoss<bestValLoss-.0005){
+    bestValLoss=vLoss; bestValEpoch=epoch; patienceCounter=0;
+  } else {
+    patienceCounter++;
+  }
+
+  updateStats(tLoss,vLoss);
+  renderChart();
+  renderWnorm();
+
+  const phase=detectPhase(tLoss,vLoss);
+  document.getElementById('stat-phase').textContent=phase;
+  updateAnno(tLoss,vLoss,phase);
+
+  if(patienceCounter>=patienceVal||epoch>=MAX_EPOCHS){
+    stopEpoch=epoch; stopped=true;
+    stopPlay();
+    renderChart();
+    const why=patienceCounter>=patienceVal
+      ?`patience exhausted (${patienceVal} epochs without improvement)`
+      :`maximum ${MAX_EPOCHS} epochs reached`;
+    setAnno(
+      `✓ Training stopped at epoch ${epoch} — ${why}. Best validation loss ${bestValLoss.toFixed(3)} at epoch ${bestValEpoch}. Restoring weights from epoch ${bestValEpoch}.`,
+      'good'
+    );
+    document.getElementById('stat-phase').textContent='Stopped';
+    document.getElementById('center-label').textContent=
+      `Stopped — best val epoch ${bestValEpoch} · gap ${(bestValLoss-(trainHist[bestValEpoch-1]||0)).toFixed(3)}`;
+  }
+}
+
+function detectPhase(tLoss,vLoss){
+  if(epoch<4) return 'Fitting';
+  const t3=trainHist.slice(-3),v3=valHist.slice(-3);
+  const at=t3.reduce((a,b)=>a+b,0)/t3.length,av=v3.reduce((a,b)=>a+b,0)/v3.length;
+  return av>at*1.12?'Overfitting':'Fitting';
+}
+
+/* ── Stats update ── */
+function updateStats(tLoss,vLoss){
+  document.getElementById('sb-epoch').textContent=epoch;
+  document.getElementById('sb-best-epoch').textContent=bestValEpoch||'—';
+  document.getElementById('sb-train-loss').textContent=tLoss!=null?tLoss.toFixed(3):'—';
+  document.getElementById('sb-val-loss').textContent=vLoss!=null?vLoss.toFixed(3):'—';
+  document.getElementById('stat-epoch').textContent=epoch;
+  document.getElementById('center-label').textContent=
+    `Training — epoch ${epoch} of ${MAX_EPOCHS} · patience ${patienceCounter}/${patienceVal}`;
+  if(tLoss!=null&&vLoss!=null){
+    const gap=vLoss-tLoss;
+    const gapEl=document.getElementById('sb-gap');
+    gapEl.textContent=(gap>=0?'+':'')+gap.toFixed(3);
+    gapEl.style.color=gap>.12?'var(--red)':gap>.04?'var(--orange)':'var(--g-dk)';
+    const tot=tLoss+vLoss;
+    document.getElementById('gap-train').style.width=(tLoss/tot*100).toFixed(0)+'%';
+    document.getElementById('gap-val').style.width=(vLoss/tot*100).toFixed(0)+'%';
+  }
+  const pFill=Math.min(100,patienceCounter/patienceVal*100).toFixed(0);
+  const pFillEl=document.getElementById('patience-fill');
+  pFillEl.style.width=pFill+'%';
+  pFillEl.style.background=patienceCounter>=patienceVal*.75?'var(--red)':'var(--orange)';
+  const pCtrEl=document.getElementById('sb-patience-ctr');
+  pCtrEl.textContent=`${patienceCounter} / ${patienceVal}`;
+  pCtrEl.style.color=patienceCounter>=patienceVal*.75?'var(--red)':'var(--g-dk)';
+}
+
+/* ── Annotations ── */
+function setAnno(txt,cls){
+  const b=document.getElementById('anno-box');
+  b.className='anno-box '+(cls||'neutral');
+  b.textContent=txt;
+}
+
+function updateAnno(tLoss,vLoss,phase){
+  if(stopped) return;
+  if(epoch<=3){
+    setAnno(`Epoch ${epoch} — both losses are falling. The model is learning the data signal. Training loss: ${tLoss.toFixed(3)}, val loss: ${vLoss.toFixed(3)}.`,'neutral');
+  } else if(phase==='Overfitting'){
+    if(patienceCounter===0){
+      setAnno(`New best val loss ${bestValLoss.toFixed(3)} at epoch ${bestValEpoch}, but val is rising above train — overfitting detected. Patience counter reset.`,'warn');
+    } else {
+      const left=patienceVal-patienceCounter;
+      setAnno(`⚠ Overfitting — val loss (${vLoss.toFixed(3)}) above train (${tLoss.toFixed(3)}). Patience ${patienceCounter}/${patienceVal}. Stopping in ${left} more epoch${left!==1?'s':''} unless val improves.`,'warn');
+    }
+  } else {
+    setAnno(`Epoch ${epoch} — train ${tLoss.toFixed(3)}, val ${vLoss.toFixed(3)}. Best val so far: ${bestValLoss.toFixed(3)} at epoch ${bestValEpoch}.`,'neutral');
+  }
+}
+
+/* ── Play / pause ── */
+function startPlay(){
+  if(stopped) return;
+  playing=true;
+  const btn=document.getElementById('btn-play');
+  btn.textContent='⏸ Pause'; btn.classList.add('playing');
+  tick();
+}
+function stopPlay(){
+  playing=false; clearTimeout(playTimer);
+  const btn=document.getElementById('btn-play');
+  btn.textContent='⏵ Play'; btn.classList.remove('playing');
+}
+function tick(){
+  if(!playing||stopped) return;
+  stepEpoch();
+  if(playing&&!stopped) playTimer=setTimeout(tick,SPEED_MS[speedIdx]);
+}
+
+/* ── Reset ── */
+function reset(){
+  stopPlay();
+  epoch=0; trainHist=[]; valHist=[]; normHist=[];
+  bestValLoss=Infinity; bestValEpoch=0; patienceCounter=0;
+  stopEpoch=null; stopped=false;
+  ['sb-epoch','stat-epoch'].forEach(id=>document.getElementById(id).textContent='0');
+  document.getElementById('sb-best-epoch').textContent='—';
+  document.getElementById('sb-train-loss').textContent='—';
+  document.getElementById('sb-val-loss').textContent='—';
+  const gapEl=document.getElementById('sb-gap');
+  gapEl.textContent='—'; gapEl.style.color='';
+  document.getElementById('gap-train').style.width='50%';
+  document.getElementById('gap-val').style.width='50%';
+  document.getElementById('patience-fill').style.width='0%';
+  document.getElementById('patience-fill').style.background='var(--orange)';
+  const pCtrEl=document.getElementById('sb-patience-ctr');
+  pCtrEl.textContent=`0 / ${patienceVal}`; pCtrEl.style.color='';
+  document.getElementById('stat-phase').textContent='—';
+  document.getElementById('center-label').textContent='Training — epoch 0';
+  setAnno('Press Play or Step to begin training. Watch training loss (green) and validation loss (orange) — when they diverge, overfitting has begun.','neutral');
+  buildScales();
+  initChart();
+  initWnorm();
+}
+
+/* ── Event listeners ── */
+document.getElementById('btn-play').addEventListener('click',()=>{if(playing)stopPlay();else startPlay();});
+document.getElementById('btn-step').addEventListener('click',()=>{if(!stopped){stopPlay();stepEpoch();}});
+document.getElementById('btn-reset').addEventListener('click',reset);
+
+document.getElementById('sld-lr').addEventListener('input',function(){
+  lrVal=parseFloat(this.value);
+  document.getElementById('val-lr').textContent=lrVal.toFixed(3);
+  document.getElementById('lr-hint').textContent=lrVal>.05
+    ?'High — fast descent, may overshoot the minimum'
+    :lrVal<.005?'Low — slow convergence, more stable'
+    :'Moderate — balanced descent speed';
+});
+
+document.getElementById('sld-patience').addEventListener('input',function(){
+  patienceVal=parseInt(this.value);
+  document.getElementById('val-patience').textContent=patienceVal;
+  document.getElementById('patience-hint').textContent=
+    `Stop after ${patienceVal} epoch${patienceVal!==1?'s':''} without val improvement`;
+  document.getElementById('sb-patience-ctr').textContent=`${patienceCounter} / ${patienceVal}`;
+});
+
+document.getElementById('sld-speed').addEventListener('input',function(){
+  speedIdx=parseInt(this.value);
+  document.getElementById('val-speed').textContent=SPEED_LBL[speedIdx];
+});
+
+document.querySelectorAll('#complexity-btns .kbtn').forEach(btn=>{
+  btn.addEventListener('click',function(){
+    document.querySelectorAll('#complexity-btns .kbtn').forEach(b=>b.classList.remove('active'));
+    this.classList.add('active');
+    complexityKey=this.dataset.complexity;
+    const h={simple:'Low capacity — less prone to overfitting',medium:'Moderate capacity — balanced fit',over:'High capacity — prone to memorizing noise'};
+    document.getElementById('complexity-hint').textContent=h[complexityKey];
+    reset();
+  });
+});
+
+document.querySelectorAll('#noise-btns .kbtn').forEach(btn=>{
+  btn.addEventListener('click',function(){
+    document.querySelectorAll('#noise-btns .kbtn').forEach(b=>b.classList.remove('active'));
+    this.classList.add('active');
+    noiseKey=this.dataset.noise;
+    const h={low:'Clean data — val loss tracks train loss closely',medium:'Typical noise level',high:'High noise — val loss diverges quickly'};
+    document.getElementById('noise-hint').textContent=h[noiseKey];
+    reset();
+  });
+});
+
+document.getElementById('concepts-toggle').addEventListener('click',function(){
+  const body=document.getElementById('concepts-body');
+  const c=body.classList.toggle('collapsed');
+  document.getElementById('concepts-arrow').textContent=c?'▸':'▾';
+});
+
+/* ── Init ── */
+buildScales();
+initChart();
+initWnorm();
+document.getElementById('val-speed').textContent=SPEED_LBL[speedIdx];
+document.getElementById('sb-patience-ctr').textContent=`0 / ${patienceVal}`;
+
+})();
+</script>
+
 <footer id="course-nav-footer" style="margin-top:1.5rem;padding:0.75rem 0 0 1rem;border-top:1px solid #E0DAC0;font-size:0.8rem;color:#78786A;text-align:left;">
   <a href="../" style="color:#2e7d32;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">&larr; All course visualizations</a>
 </footer>
