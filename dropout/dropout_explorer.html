@@ -107,6 +107,12 @@ body{
 /* ── Cards ───────────────────────────────────────────────────────── */
 .card{background:white;border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem;box-shadow:0 2px 8px var(--shadow)}
 .card-title{font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--g-dk);margin-bottom:.55rem}
+.concepts-body{overflow:hidden;max-height:600px;transition:max-height .3s ease}
+.concepts-body.collapsed{max-height:0;margin-bottom:-.55rem}
+.concepts-item{font-size:.74rem;color:var(--text-soft);line-height:1.5;margin-bottom:.45rem;padding-left:.9rem;position:relative}
+.concepts-item:last-child{margin-bottom:0}
+.concepts-item::before{content:'●';color:#2e7d32;position:absolute;left:0;top:0}
+.concepts-item strong{color:#2e7d32;font-weight:600}
 
 /* ── Sliders ─────────────────────────────────────────────────────── */
 .srow{display:flex;align-items:center;gap:.45rem;margin-bottom:.2rem}
@@ -143,6 +149,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   50%{box-shadow:0 0 0 3px var(--orange),0 0 10px var(--orange-lt)}
 }
 .btn-pulse{animation:btn-pulse .5s ease 0s 2;}
+@keyframes tab-pulse-green{
+  0%,100%{box-shadow:none}
+  50%{box-shadow:0 0 0 3px var(--g-lt),0 0 10px var(--g-pale)}
+}
+.tab-pulse-green{animation:tab-pulse-green .5s ease 0s 3;}
 
 /* ── Equation bar ────────────────────────────────────────────────── */
 .eq-bar{
@@ -278,6 +289,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     <div class="eq-bar">
       <div class="eq-name" id="eq-name">Inverted Dropout</div>
       <div class="eq-text" id="eq-text">ĥ = (h ⊙ Bern(1−p)) / (1−p)</div>
+    </div>
+
+    <div class="card" id="card-concepts">
+      <div class="card-title" style="cursor:pointer;user-select:none" id="concepts-toggle">Key Concepts <span id="concepts-arrow">▾</span></div>
+      <div class="concepts-body" id="concepts-body"></div>
     </div>
 
     <div class="card">
@@ -453,7 +469,7 @@ let archKey='small',pVal=0.5,speedIdx=1;
 let passCount=0,lossHist=[],dropHist=[];
 let nodes=[],edges=[];
 let animating=false,playing=false,playTimer=null;
-let currentTab='training',inferenceMark=null;
+let currentTab='training',inferenceMark=null,converged=false;
 
 const svgNet=d3.select('#svg-net');
 const svgLoss=d3.select('#svg-loss');
@@ -667,6 +683,45 @@ function setAnno(txt,cls){
   b.textContent=txt;
 }
 
+/* ── Key Concepts ── */
+const CONCEPTS={
+  training:[
+    {h:'Why dropout works',b:'Each pass trains a different thinned subnetwork — no single neuron can memorize the data because it might be absent next pass. This forces the network to learn redundant, distributed representations.'},
+    {h:'Inverted dropout',b:'Active nodes are scaled by 1/(1−p) during training so the expected output magnitude stays constant regardless of how many nodes survive. This means no scaling is needed at inference.'},
+    {h:'Choosing p',b:'p=0.5 is common for hidden layers. p=0.2 for input layers. Higher p = more regularization but slower convergence.'},
+  ],
+  inference:[
+    {h:'No randomness at inference',b:'The full network activates deterministically — same input always gives the same output.'},
+    {h:'Weight scaling',b:'Because active units were scaled up by 1/(1−p) during training, no additional scaling is needed at inference. The expected activation matches training.'},
+    {h:'Effective ensemble',b:'The full network approximates the average prediction of all 2ⁿ thinned subnetworks trained during dropout.'},
+  ],
+  ensemble:[
+    {h:'Exponential ensemble',b:'With n hidden nodes and p=0.5, dropout implicitly trains 2ⁿ unique subnetworks — far more than any explicit ensemble could.'},
+    {h:'Shared weights',b:'All subnetworks share the same weight matrix — they are not trained independently. This is what makes dropout computationally cheap.'},
+    {h:'Edge consensus',b:'Edges that appear in more subnetworks (brighter in the combined view) are more robustly learned features.'},
+  ],
+};
+function renderConcepts(tab){
+  document.getElementById('concepts-body').innerHTML=
+    CONCEPTS[tab].map(c=>`<div class="concepts-item"><strong>${c.h}:</strong> ${c.b}</div>`).join('');
+}
+
+/* ── Convergence check ── */
+function checkConvergence(){
+  if(converged||lossHist.length<5)return;
+  const recent=lossHist.slice(-5);
+  if(recent.some(v=>v>=0.15))return;
+  const mean=recent.reduce((a,b)=>a+b,0)/5;
+  const variance=recent.reduce((a,b)=>a+(b-mean)**2,0)/5;
+  if(variance>=0.001)return;
+  converged=true;
+  stopPlay();
+  setAnno(`✓ Training converged — loss has stabilized at ${mean.toFixed(2)}. Switch to Inference Mode to see how the full network performs without dropout.`,'good');
+  const tabBtn=document.querySelector('[data-tab="inference"]');
+  tabBtn.classList.add('tab-pulse-green');
+  setTimeout(()=>tabBtn.classList.remove('tab-pulse-green'),1500);
+}
+
 /* ── Training forward pass ── */
 function forwardPass(onDone){
   if(currentTab!=='training'){if(onDone)onDone();return;}
@@ -696,6 +751,7 @@ function forwardPass(onDone){
       renderNetTraining();renderLoss();
       animating=false;
       document.getElementById('btn-forward').disabled=false;
+      checkConvergence();
       if(onDone)onDone();return;
     }
     nodes.filter(n=>n.layer===li&&!n.dropped).forEach(n=>{n.firing=true;});
@@ -818,7 +874,7 @@ function enterInferenceMode(){
     // Restore training tab as active — don't switch
     document.querySelectorAll('#tab-bar button').forEach(b=>b.classList.remove('active'));
     document.querySelector('[data-tab="training"]').classList.add('active');
-    setAnno('⚠ Run at least 10 training passes first — then switch to Inference Mode to see the comparison between sparse training and full inference.','warn');
+    setAnno('⚠ Run training passes first — press Auto-Play and let the model converge, then switch to Inference Mode.','warn');
     ['btn-forward','btn-play'].forEach(id=>{
       const el=document.getElementById(id);
       el.classList.add('btn-pulse');
@@ -840,10 +896,11 @@ function enterInferenceMode(){
   document.getElementById('center-label').textContent=
     `Inference mode — all nodes active · weights ×${(1-pVal).toFixed(2)}`;
   const hidden=nodes.filter(n=>n.type==='hidden');
-  const switchAnno=passCount<10
-    ?`Tip: More training passes give a clearer comparison — consider running at least 10 before switching. Activating all ${hidden.length} nodes and scaling weights by (1−p) = ${(1-pVal).toFixed(2)}.`
+  const switchAnno=!converged
+    ?`Tip — the model hasn't fully converged yet. More training passes will give a clearer inference comparison. Activating all ${hidden.length} nodes and scaling weights by (1−p) = ${(1-pVal).toFixed(2)}.`
     :`Switching to inference — activating all ${hidden.length} nodes and scaling weights by (1−p) = ${(1-pVal).toFixed(2)}.`;
   setAnno(switchAnno,'neutral');
+  renderConcepts('inference');
   renderNetInference();renderLoss();
   document.getElementById('mini-compare').style.display='block';
   renderMiniTrain();renderMiniInfer();
@@ -879,6 +936,7 @@ function enterTrainingMode(){
   document.getElementById('mini-compare').style.display='none';
   renderNetTraining();renderLoss();
   setAnno('Press Forward Pass or Play to continue training.','neutral');
+  renderConcepts('training');
 }
 
 /* ── Ensemble view ── */
@@ -1090,6 +1148,7 @@ function enterEnsembleMode(){
     `Click Generate Ensemble to see 6 random thinned networks that dropout implicitly trains simultaneously. With p=${pVal.toFixed(2)} and ${nH} hidden nodes, there are ${possibleNets} possible sub-networks.`,
     'neutral'
   );
+  renderConcepts('ensemble');
 }
 
 function exitEnsembleMode(){
@@ -1126,7 +1185,7 @@ function stopPlay(){
 function reset(){
   stopPlay();
   if(currentTab==='ensemble'){exitEnsembleMode();ensembleMembers=[];ensGenerating=false;}
-  passCount=0;lossHist=[];dropHist=[];inferenceMark=null;
+  passCount=0;lossHist=[];dropHist=[];inferenceMark=null;converged=false;
   currentTab='training';
   nodes.forEach(n=>{n.dropped=false;n.active=true;n.firing=false;});
   document.getElementById('btn-forward').style.display='';
@@ -1147,6 +1206,7 @@ function reset(){
   document.getElementById('center-label').textContent=
     `Training mode — thinned subnetwork (p = ${pVal.toFixed(2)})`;
   setAnno('Press Forward Pass or Play to begin. Each pass randomly drops hidden nodes with probability p.','neutral');
+  renderConcepts('training');
 }
 
 /* ── Event listeners ── */
@@ -1201,6 +1261,11 @@ document.getElementById('btn-forward').addEventListener('click',()=>{
 document.getElementById('btn-reset').addEventListener('click',reset);
 document.getElementById('btn-play').addEventListener('click',()=>{if(playing)stopPlay();else startPlay();});
 document.getElementById('btn-gen-ensemble').addEventListener('click',generateEnsemble);
+document.getElementById('concepts-toggle').addEventListener('click',function(){
+  const body=document.getElementById('concepts-body');
+  const nowCollapsed=body.classList.toggle('collapsed');
+  document.getElementById('concepts-arrow').textContent=nowCollapsed?'▸':'▾';
+});
 
 document.querySelectorAll('#tab-bar button').forEach(btn=>{
   btn.addEventListener('click',function(){
@@ -1215,6 +1280,7 @@ document.querySelectorAll('#tab-bar button').forEach(btn=>{
 
 /* ── Init ── */
 buildNetwork();
+renderConcepts('training');
 renderNetTraining();
 renderLoss();
 document.getElementById('val-speed').textContent=SPEED_LBL[speedIdx];
