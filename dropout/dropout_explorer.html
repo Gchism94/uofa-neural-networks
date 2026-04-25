@@ -196,6 +196,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 .mini-row{display:flex;gap:.45rem}
 .mini-col{flex:1;min-width:0}
 .mini-col svg{width:100%;display:block;border-radius:4px}
+.ens-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem;margin-bottom:.4rem}
+.ens-thumb-lbl{font-size:.58rem;color:var(--text-muted);text-align:center;margin-bottom:.15rem}
+.ens-mask-list{margin-top:.4rem;padding-top:.35rem;border-top:1px solid var(--border-lt);font-size:.65rem;line-height:1.85}
+.ens-mask-row{display:flex;justify-content:space-between;gap:.3rem;padding:.05rem 0}
 </style>
 </head>
 <body>
@@ -218,7 +222,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 <nav class="tab-bar" id="tab-bar">
   <button class="active" data-tab="training"><span class="n">1</span>Training Mode</button>
   <button data-tab="inference"><span class="n">2</span>Inference Mode</button>
-  <button class="tab-soon" data-tab="ensemble" title="Coming soon"><span class="n">3</span>Ensemble View</button>
+  <button data-tab="ensemble"><span class="n">3</span>Ensemble View</button>
 </nav>
 
 <!-- Main explorer -->
@@ -256,6 +260,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
       <div class="ctrl-btns">
         <button id="btn-play" class="pbtn" style="flex:1">⏵ Auto-Play</button>
       </div>
+      <div id="ensemble-controls" style="display:none;margin-top:.35rem">
+        <button id="btn-gen-ensemble" class="pbtn primary" style="width:100%">⚡ Generate Ensemble</button>
+      </div>
       <div class="srow" style="margin-top:.5rem">
         <span class="slbl" style="font-size:.72rem;min-width:42px">Speed</span>
         <input type="range" id="sld-speed" min="0" max="2" step="1" value="1">
@@ -286,7 +293,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 
     <div class="card">
       <div class="plot-label" id="center-label">Training mode — thinned subnetwork (p = 0.50)</div>
-      <div class="net-wrap">
+      <div class="net-wrap" id="main-net-wrap">
         <svg id="svg-net" viewBox="0 0 640 480" preserveAspectRatio="none">
           <rect width="640" height="480" fill="#1A2A1A"/>
           <text x="320" y="225" text-anchor="middle" dominant-baseline="middle"
@@ -317,6 +324,24 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
         </div>
         <div id="infer-compare-txt" style="font-size:.7rem;color:var(--text-soft);line-height:1.55;margin-top:.45rem;padding:.4rem .5rem;background:var(--cream-mid);border-radius:5px;border-left:3px solid var(--g-mid)"></div>
       </div>
+      <!-- Ensemble view panel -->
+      <div id="ensemble-panel" style="display:none;margin-top:.4rem">
+        <div style="font-size:.62rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:.35rem;padding-top:.55rem;border-top:1px solid var(--border-lt)">6 Random Sub-networks — Ensemble Members</div>
+        <div class="ens-grid">
+          <div><div class="ens-thumb-lbl">Sub-net 1</div><svg id="svg-ens-0" viewBox="0 0 200 150" preserveAspectRatio="none" style="width:100%;display:block;border-radius:4px"></svg></div>
+          <div><div class="ens-thumb-lbl">Sub-net 2</div><svg id="svg-ens-1" viewBox="0 0 200 150" preserveAspectRatio="none" style="width:100%;display:block;border-radius:4px"></svg></div>
+          <div><div class="ens-thumb-lbl">Sub-net 3</div><svg id="svg-ens-2" viewBox="0 0 200 150" preserveAspectRatio="none" style="width:100%;display:block;border-radius:4px"></svg></div>
+          <div><div class="ens-thumb-lbl">Sub-net 4</div><svg id="svg-ens-3" viewBox="0 0 200 150" preserveAspectRatio="none" style="width:100%;display:block;border-radius:4px"></svg></div>
+          <div><div class="ens-thumb-lbl">Sub-net 5</div><svg id="svg-ens-4" viewBox="0 0 200 150" preserveAspectRatio="none" style="width:100%;display:block;border-radius:4px"></svg></div>
+          <div><div class="ens-thumb-lbl">Sub-net 6</div><svg id="svg-ens-5" viewBox="0 0 200 150" preserveAspectRatio="none" style="width:100%;display:block;border-radius:4px"></svg></div>
+        </div>
+        <div style="padding-top:.45rem;border-top:1px solid var(--border-lt)">
+          <div class="plot-label" style="margin-bottom:.3rem">Combined — edge brightness ∝ sub-network consensus</div>
+          <div style="width:100%;aspect-ratio:4/3">
+            <svg id="svg-ens-combined" viewBox="0 0 640 480" preserveAspectRatio="none" style="width:100%;height:100%;display:block;border-radius:5px"></svg>
+          </div>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -324,7 +349,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   <!-- RIGHT: Statistics panel -->
   <div class="right-col">
 
-    <div class="card">
+    <div class="card" id="card-drop-stats">
       <div class="card-title">Drop Statistics</div>
       <div class="stat-grid">
         <div class="stat-block">
@@ -360,7 +385,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
       </div>
     </div>
 
-    <div class="card">
+    <div class="card" id="card-loss">
       <div class="card-title">Loss over Passes</div>
       <div class="loss-chart-wrap">
         <svg id="svg-loss" viewBox="0 0 200 130" preserveAspectRatio="none">
@@ -388,6 +413,21 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
           Network averages all subnetworks.
         </div>
       </div>
+    </div>
+
+    <div class="card" id="card-ens-stats" style="display:none">
+      <div class="card-title">Ensemble Stats</div>
+      <div class="stat-grid">
+        <div class="stat-block">
+          <span class="sb-val" id="sb-ens-count">0/6</span>
+          <div class="sb-lbl">Generated</div>
+        </div>
+        <div class="stat-block">
+          <span class="sb-val" id="sb-ens-avg">—</span>
+          <div class="sb-lbl">Avg Active</div>
+        </div>
+      </div>
+      <div id="ens-mask-list" class="ens-mask-list"></div>
     </div>
 
   </div>
@@ -597,7 +637,7 @@ function renderPropBar(){
   const hidden=nodes.filter(n=>n.type==='hidden');
   if(!hidden.length)return;
   let activePct=currentTab==='inference'?100
-    :dropHist.length?(1-dropHist[dropHist.length-1])*100:100;
+    :dropHist.length?(1-dropHist.reduce((a,b)=>a+b,0)/dropHist.length)*100:(1-pVal)*100;
   document.getElementById('prop-active').style.width=activePct.toFixed(0)+'%';
   document.getElementById('prop-dropped').style.width=(100-activePct).toFixed(0)+'%';
 }
@@ -765,45 +805,65 @@ function renderMiniInfer(){
 
 /* ── Mode transitions ── */
 function enterInferenceMode(){
-  currentTab='inference';
+  if(currentTab==='ensemble')exitEnsembleMode();
   stopPlay();
-  if(inferenceMark===null&&lossHist.length>0)inferenceMark=lossHist.length-1;
-  nodes.forEach(n=>{n.dropped=false;n.active=true;n.firing=false;});
-  document.getElementById('btn-forward').textContent='▶ Run Inference';
-  document.getElementById('btn-forward').classList.add('primary');
-  document.getElementById('btn-play').disabled=true;
-  document.getElementById('btn-play').style.opacity='0.38';
-  document.getElementById('eq-name').textContent='Inference — No Dropout';
-  document.getElementById('eq-text').textContent=
-    `ŷ = f(x; W·${(1-pVal).toFixed(2)})  — all nodes active`;
-  document.getElementById('center-label').textContent=
-    `Inference mode — all nodes active · weights ×${(1-pVal).toFixed(2)}`;
-  const hidden=nodes.filter(n=>n.type==='hidden');
-  setAnno(
-    `Switching to inference — activating all ${hidden.length} nodes and scaling weights by (1−p) = ${(1-pVal).toFixed(2)}.`,
-    'neutral'
-  );
-  renderNetInference();renderLoss();
-  document.getElementById('mini-compare').style.display='block';
-  renderMiniTrain();renderMiniInfer();
-  updateStats(0,hidden.length);
-  setTimeout(()=>{
-    inferencePass(()=>{
-      const scale=(1-pVal).toFixed(2);
-      const avgAct=dropHist.length
-        ?((1-dropHist.reduce((a,b)=>a+b,0)/dropHist.length)*100).toFixed(0)
-        :'100';
-      const cmpTxt=`During training, only ~${avgAct}% of hidden nodes were active on average. At inference, all ${hidden.length} nodes activate but weights are scaled by (1−p) = ${scale} to match expected activations.`;
-      document.getElementById('infer-compare-txt').textContent=cmpTxt;
-      setAnno(
-        `Inference mode — all ${hidden.length} hidden nodes active. Weights scaled by (1−p) = ${scale}. No randomness — same input always produces the same output. `+cmpTxt,
-        'good'
-      );
-    });
-  },300);
+
+  function _doEnter(){
+    currentTab='inference';
+    if(inferenceMark===null&&lossHist.length>0)inferenceMark=lossHist.length-1;
+    nodes.forEach(n=>{n.dropped=false;n.active=true;n.firing=false;});
+    document.getElementById('btn-forward').textContent='▶ Run Inference';
+    document.getElementById('btn-forward').classList.add('primary');
+    document.getElementById('btn-play').disabled=true;
+    document.getElementById('btn-play').style.opacity='0.38';
+    document.getElementById('eq-name').textContent='Inference — No Dropout';
+    document.getElementById('eq-text').textContent=
+      `ŷ = f(x; W·${(1-pVal).toFixed(2)})  — all nodes active`;
+    document.getElementById('center-label').textContent=
+      `Inference mode — all nodes active · weights ×${(1-pVal).toFixed(2)}`;
+    const hidden=nodes.filter(n=>n.type==='hidden');
+    setAnno(
+      `Switching to inference — activating all ${hidden.length} nodes and scaling weights by (1−p) = ${(1-pVal).toFixed(2)}.`,
+      'neutral'
+    );
+    renderNetInference();renderLoss();
+    document.getElementById('mini-compare').style.display='block';
+    renderMiniTrain();renderMiniInfer();
+    updateStats(0,hidden.length);
+    setTimeout(()=>{
+      inferencePass(()=>{
+        const scale=(1-pVal).toFixed(2);
+        const avgAct=((1-dropHist.reduce((a,b)=>a+b,0)/dropHist.length)*100).toFixed(0);
+        const cmpTxt=`During training, only ~${avgAct}% of hidden nodes were active on average. At inference, all ${hidden.length} nodes activate but weights are scaled by (1−p) = ${scale} to match expected activations.`;
+        document.getElementById('infer-compare-txt').textContent=cmpTxt;
+        setAnno(
+          `Inference mode — all ${hidden.length} hidden nodes active. Weights scaled by (1−p) = ${scale}. No randomness — same input always produces the same output. `+cmpTxt,
+          'good'
+        );
+      });
+    },300);
+  }
+
+  if(passCount===0){
+    setAnno('Running training passes first so inference has something to compare against...','neutral');
+    const hidden=nodes.filter(n=>n.type==='hidden');
+    for(let i=0;i<5;i++){
+      passCount++;
+      hidden.forEach(n=>{n.dropped=Math.random()<pVal;n.active=!n.dropped;n.firing=false;});
+      const dn=hidden.filter(n=>n.dropped).length;
+      dropHist.push(dn/hidden.length);
+      const prev=lossHist.length?lossHist[lossHist.length-1]:1.0;
+      lossHist.push(Math.max(0.04,prev*0.97-0.008+(Math.random()-.5)*0.07));
+    }
+    updateStats(null,null);
+    setTimeout(_doEnter,600);
+    return;
+  }
+  _doEnter();
 }
 
 function enterTrainingMode(){
+  if(currentTab==='ensemble')exitEnsembleMode();
   currentTab='training';
   document.getElementById('btn-forward').textContent='▶ Forward Pass';
   document.getElementById('btn-forward').classList.add('primary');
@@ -819,6 +879,230 @@ function enterTrainingMode(){
   document.getElementById('mini-compare').style.display='none';
   renderNetTraining();renderLoss();
   setAnno('Press Forward Pass or Play to continue training.','neutral');
+}
+
+/* ── Ensemble view ── */
+const ENS_COUNT=6;
+let ensembleMembers=[],ensGenerating=false;
+
+function renderEnsThumbnail(idx,droppedSet){
+  const svg=d3.select(`#svg-ens-${idx}`);
+  svg.selectAll('*').remove();
+  const W=200,H=150;
+  svg.append('rect').attr('width',W).attr('height',H).attr('fill','#1A2A1A');
+  const{mn,me}=buildMiniNodes();
+  mn.forEach(n=>{n.dropped=n.type==='hidden'&&droppedSet.has(`n${n.layer}_${n.idx}`);});
+  const nm=Object.fromEntries(mn.map(n=>[n.id,n]));
+  svg.append('g').selectAll('line').data(me).join('line')
+    .each(function(d){
+      const fn=nm[d.from],tn=nm[d.to],drop=fn.dropped||tn.dropped;
+      d3.select(this).attr('x1',fn.cx).attr('y1',fn.cy).attr('x2',tn.cx).attr('y2',tn.cy)
+        .attr('stroke',drop?'#2E2E2E':'#3A7A30').attr('stroke-width',drop?0.5:1)
+        .attr('stroke-opacity',drop?0.18:0.5).attr('stroke-dasharray',drop?'3,3':null);
+    });
+  const ng=svg.append('g').selectAll('g').data(mn).join('g')
+    .attr('transform',d=>`translate(${d.cx},${d.cy})`);
+  ng.append('circle').attr('r',d=>d.r)
+    .each(function(d){
+      let fill='#2e7d32',op=1;
+      if(d.type==='input')fill='#1A56A0';
+      else if(d.type==='output')fill='#E8630A';
+      else if(d.dropped){fill='#2E2E2E';op=0.38;}
+      d3.select(this).attr('fill',fill).attr('stroke','rgba(255,255,255,.22)').attr('stroke-width',1).attr('opacity',op);
+    });
+  ng.filter(d=>d.dropped).append('text').text('✕').attr('y',3)
+    .attr('font-size',d=>Math.round(d.r*0.88)).attr('fill','#ff5555').attr('font-weight',700)
+    .attr('text-anchor','middle').attr('dominant-baseline','middle');
+  const dn=mn.filter(n=>n.dropped).length;
+  svg.append('text').attr('x',W/2).attr('y',H-4)
+    .attr('text-anchor','middle').attr('font-size',7.5).attr('fill','rgba(255,255,255,.35)')
+    .attr('font-family','Outfit,sans-serif').text(`${dn} node${dn===1?'':'s'} dropped`);
+}
+
+function renderCombined(){
+  const svgC=d3.select('#svg-ens-combined');
+  svgC.selectAll('*').remove();
+  svgC.append('rect').attr('width',640).attr('height',480).attr('fill','#1A2A1A');
+  if(!ensembleMembers.length)return;
+  const defs=svgC.append('defs');
+  const fl=defs.append('filter').attr('id','glow').attr('x','-60%').attr('y','-60%').attr('width','220%').attr('height','220%');
+  fl.append('feGaussianBlur').attr('stdDeviation',5).attr('result','blur');
+  const m=fl.append('feMerge');
+  m.append('feMergeNode').attr('in','blur');
+  m.append('feMergeNode').attr('in','SourceGraphic');
+  const nm=Object.fromEntries(nodes.map(n=>[n.id,n]));
+  svgC.append('g').selectAll('line').data(edges).join('line')
+    .each(function(d){
+      const fn=nm[d.from],tn=nm[d.to];
+      let cnt=0;
+      ensembleMembers.forEach(s=>{if(!s.has(fn.id)&&!s.has(tn.id))cnt++;});
+      const f=cnt/ensembleMembers.length;
+      d3.select(this)
+        .attr('x1',fn.cx).attr('y1',fn.cy).attr('x2',tn.cx).attr('y2',tn.cy)
+        .attr('stroke',f>0.65?'#56e866':f>0.35?'#3A9A40':'#2A5A2A')
+        .attr('stroke-width',0.5+f*3.5).attr('stroke-opacity',0.1+f*0.8);
+    });
+  const ng=svgC.append('g').selectAll('g').data(nodes).join('g')
+    .attr('transform',d=>`translate(${d.cx},${d.cy})`);
+  ng.append('circle').attr('r',d=>d.r)
+    .each(function(d){
+      let fill,stroke='rgba(255,255,255,.38)',sw=2,filt=null;
+      if(d.type==='input'){fill='#1A56A0';}
+      else if(d.type==='output'){fill='#E8630A';}
+      else{
+        const act=ensembleMembers.filter(s=>!s.has(d.id)).length/ensembleMembers.length;
+        const g=Math.round(100+act*130),rb=Math.round(30+act*28);
+        fill=`rgb(${rb},${g},${rb})`;
+        if(act>0.75)filt='url(#glow)';
+      }
+      d3.select(this).attr('fill',fill).attr('stroke',stroke).attr('stroke-width',sw).attr('filter',filt);
+    });
+  ng.filter(d=>d.type==='input').append('text')
+    .text(d=>'x'+SUB[d.idx]).attr('x',d=>-(d.r+8)).attr('y',4)
+    .attr('font-family','IBM Plex Mono,monospace').attr('font-size',11)
+    .attr('fill','rgba(255,255,255,.58)').attr('text-anchor','end');
+  ng.filter(d=>d.type==='output').append('text')
+    .text(d=>'y'+SUB[d.idx]).attr('x',d=>d.r+8).attr('y',4)
+    .attr('font-family','IBM Plex Mono,monospace').attr('font-size',11)
+    .attr('fill','rgba(255,255,255,.58)').attr('text-anchor','start');
+  svgC.append('text').attr('x',10).attr('y',468)
+    .attr('font-size',9).attr('fill','rgba(255,255,255,.35)').attr('font-family','Outfit,sans-serif')
+    .text('Edge brightness = how many sub-networks shared that connection');
+}
+
+function updateEnsMaskList(i,droppedSet,hidden){
+  const list=document.getElementById('ens-mask-list');
+  const dn=hidden.filter(n=>droppedSet.has(n.id)).map(n=>'h'+(n.idx+1));
+  const activeN=hidden.length-droppedSet.size;
+  const col=activeN>=hidden.length*0.7?'var(--g-dk)':activeN>=hidden.length*0.4?'var(--text-muted)':'var(--red)';
+  const row=document.createElement('div');
+  row.className='ens-mask-row';
+  row.innerHTML=`<span style="color:${col};font-weight:500">Net ${i+1}</span>`+
+    `<span style="font-family:'IBM Plex Mono',monospace;font-size:.6rem;color:var(--text-muted)">`+
+    (dn.length?dn.join(', ')+' ✕':'all active')+`</span>`;
+  list.appendChild(row);
+}
+
+function generateEnsemble(){
+  if(ensGenerating||animating)return;
+  ensGenerating=true;
+  ensembleMembers=[];
+  for(let i=0;i<ENS_COUNT;i++){
+    const s=d3.select(`#svg-ens-${i}`);
+    s.selectAll('*').remove();
+    s.append('rect').attr('width',200).attr('height',150).attr('fill','#1A2A1A');
+    s.append('text').attr('x',100).attr('y',75)
+      .attr('text-anchor','middle').attr('dominant-baseline','middle')
+      .attr('fill','rgba(255,255,255,.15)').attr('font-family','Outfit,sans-serif')
+      .attr('font-size',9).text(`Sub-net ${i+1}`);
+  }
+  d3.select('#svg-ens-combined').selectAll('*').remove();
+  d3.select('#svg-ens-combined').append('rect').attr('width',640).attr('height',480).attr('fill','#1A2A1A');
+  document.getElementById('sb-ens-count').textContent='0/6';
+  document.getElementById('sb-ens-avg').textContent='—';
+  document.getElementById('ens-mask-list').innerHTML='';
+  document.getElementById('btn-gen-ensemble').disabled=true;
+  const hidden=nodes.filter(n=>n.type==='hidden');
+  const step=Math.max(220,Math.round(SPEED_MS[speedIdx]*0.45));
+  function genNext(i){
+    if(i>=ENS_COUNT){
+      renderCombined();
+      ensGenerating=false;
+      document.getElementById('btn-gen-ensemble').disabled=false;
+      const avgAct=ensembleMembers.reduce((s,ds)=>s+(hidden.length-ds.size),0)/ENS_COUNT;
+      document.getElementById('sb-ens-avg').textContent=avgAct.toFixed(1)+'/'+hidden.length;
+      const nH=hidden.length;
+      const possibleNets=nH<=20?'≈2^'+nH+' ≈ '+Math.round(Math.pow(2,nH)).toLocaleString():'2^'+nH;
+      setAnno(
+        `With p=${pVal.toFixed(2)} and ${nH} hidden nodes, dropout implicitly trains ${possibleNets} unique sub-networks sharing weights. The full network at inference approximates averaging all ensemble members.`,
+        'good'
+      );
+      return;
+    }
+    const droppedSet=new Set();
+    hidden.forEach(n=>{if(Math.random()<pVal)droppedSet.add(n.id);});
+    ensembleMembers.push(droppedSet);
+    document.getElementById('sb-ens-count').textContent=`${i+1}/6`;
+    const dn=hidden.filter(n=>droppedSet.has(n.id)).map(n=>'h'+(n.idx+1));
+    setAnno(
+      `Generating sub-network ${i+1}/6 — dropout mask: ${dn.length?dn.join(', ')+' dropped':'no nodes dropped'} (p=${pVal.toFixed(2)})`,
+      'neutral'
+    );
+    renderEnsThumbnail(i,droppedSet);
+    updateEnsMaskList(i,droppedSet,hidden);
+    setTimeout(()=>genNext(i+1),step);
+  }
+  genNext(0);
+}
+
+function enterEnsembleMode(){
+  if(currentTab==='inference'){
+    document.getElementById('btn-forward').textContent='▶ Forward Pass';
+    document.getElementById('btn-forward').classList.add('primary');
+    document.getElementById('btn-play').disabled=false;
+    document.getElementById('btn-play').style.opacity='';
+    document.getElementById('mini-compare').style.display='none';
+  }
+  currentTab='ensemble';
+  stopPlay();
+  ensembleMembers=[];ensGenerating=false;
+  // Left panel
+  document.getElementById('btn-forward').style.display='none';
+  document.getElementById('btn-play').style.display='none';
+  document.getElementById('ensemble-controls').style.display='block';
+  document.getElementById('btn-gen-ensemble').disabled=false;
+  document.getElementById('eq-name').textContent='Ensemble Interpretation';
+  document.getElementById('eq-text').textContent='Dropout ≈ training 2ⁿ thinned networks';
+  // Center panel
+  document.getElementById('main-net-wrap').style.display='none';
+  document.getElementById('net-legend').style.display='none';
+  document.getElementById('mini-compare').style.display='none';
+  document.getElementById('ensemble-panel').style.display='block';
+  document.getElementById('center-label').textContent=
+    `Ensemble view — 6 random sub-networks (p = ${pVal.toFixed(2)})`;
+  // Right panel
+  document.getElementById('card-drop-stats').style.display='none';
+  document.getElementById('card-loss').style.display='none';
+  document.getElementById('card-ens-stats').style.display='block';
+  document.getElementById('sb-ens-count').textContent='0/6';
+  document.getElementById('sb-ens-avg').textContent='—';
+  document.getElementById('ens-mask-list').innerHTML='';
+  // Blank thumbnails
+  for(let i=0;i<ENS_COUNT;i++){
+    const s=d3.select(`#svg-ens-${i}`);
+    s.selectAll('*').remove();
+    s.append('rect').attr('width',200).attr('height',150).attr('fill','#1A2A1A');
+    s.append('text').attr('x',100).attr('y',75)
+      .attr('text-anchor','middle').attr('dominant-baseline','middle')
+      .attr('fill','rgba(255,255,255,.15)').attr('font-family','Outfit,sans-serif')
+      .attr('font-size',9).text(`Sub-net ${i+1}`);
+  }
+  const sc=d3.select('#svg-ens-combined');
+  sc.selectAll('*').remove();
+  sc.append('rect').attr('width',640).attr('height',480).attr('fill','#1A2A1A');
+  sc.append('text').attr('x',320).attr('y',228).attr('text-anchor','middle')
+    .attr('dominant-baseline','middle').attr('fill','rgba(255,255,255,.2)')
+    .attr('font-family','Outfit,sans-serif').attr('font-size',14)
+    .text('Combined network appears after generation');
+  const nH=nodes.filter(n=>n.type==='hidden').length;
+  const possibleNets=nH<=20?'≈2^'+nH+' ≈ '+Math.round(Math.pow(2,nH)).toLocaleString():'2^'+nH;
+  setAnno(
+    `Click Generate Ensemble to see 6 random thinned networks that dropout implicitly trains simultaneously. With p=${pVal.toFixed(2)} and ${nH} hidden nodes, there are ${possibleNets} possible sub-networks.`,
+    'neutral'
+  );
+}
+
+function exitEnsembleMode(){
+  document.getElementById('btn-forward').style.display='';
+  document.getElementById('btn-play').style.display='';
+  document.getElementById('ensemble-controls').style.display='none';
+  document.getElementById('main-net-wrap').style.display='';
+  document.getElementById('net-legend').style.display='';
+  document.getElementById('ensemble-panel').style.display='none';
+  document.getElementById('card-drop-stats').style.display='';
+  document.getElementById('card-loss').style.display='';
+  document.getElementById('card-ens-stats').style.display='none';
+  ensGenerating=false;
 }
 
 /* ── Play/pause ── */
@@ -841,9 +1125,12 @@ function stopPlay(){
 /* ── Reset ── */
 function reset(){
   stopPlay();
+  if(currentTab==='ensemble'){exitEnsembleMode();ensembleMembers=[];ensGenerating=false;}
   passCount=0;lossHist=[];dropHist=[];inferenceMark=null;
   currentTab='training';
   nodes.forEach(n=>{n.dropped=false;n.active=true;n.firing=false;});
+  document.getElementById('btn-forward').style.display='';
+  document.getElementById('btn-play').style.display='';
   document.getElementById('btn-forward').textContent='▶ Forward Pass';
   document.getElementById('btn-forward').classList.add('primary');
   document.getElementById('btn-play').disabled=false;
@@ -876,7 +1163,7 @@ document.getElementById('sld-dropout').addEventListener('input',function(){
       `ĥ = (h ⊙ Bern(${(1-pVal).toFixed(2)})) / ${(1-pVal).toFixed(2)}`;
     if(!passCount)document.getElementById('center-label').textContent=
       `Training mode — thinned subnetwork (p = ${pVal.toFixed(2)})`;
-  }else{
+  }else if(currentTab==='inference'){
     document.getElementById('eq-text').textContent=
       `ŷ = f(x; W·${(1-pVal).toFixed(2)})  — all nodes active`;
     document.getElementById('center-label').textContent=
@@ -885,6 +1172,10 @@ document.getElementById('sld-dropout').addEventListener('input',function(){
     if(document.getElementById('mini-compare').style.display!=='none'){
       renderMiniTrain();renderMiniInfer();
     }
+  }else if(currentTab==='ensemble'){
+    document.getElementById('eq-text').textContent='Dropout ≈ training 2ⁿ thinned networks';
+    document.getElementById('center-label').textContent=
+      `Ensemble view — 6 random sub-networks (p = ${pVal.toFixed(2)})`;
   }
 });
 
@@ -909,13 +1200,15 @@ document.getElementById('btn-forward').addEventListener('click',()=>{
 });
 document.getElementById('btn-reset').addEventListener('click',reset);
 document.getElementById('btn-play').addEventListener('click',()=>{if(playing)stopPlay();else startPlay();});
+document.getElementById('btn-gen-ensemble').addEventListener('click',generateEnsemble);
 
-document.querySelectorAll('#tab-bar button:not(.tab-soon)').forEach(btn=>{
+document.querySelectorAll('#tab-bar button').forEach(btn=>{
   btn.addEventListener('click',function(){
-    if(this.classList.contains('active'))return;
+    if(this.classList.contains('active')||this.classList.contains('tab-soon'))return;
     document.querySelectorAll('#tab-bar button').forEach(b=>b.classList.remove('active'));
     this.classList.add('active');
-    if(this.dataset.tab==='inference')enterInferenceMode();
+    if(this.dataset.tab==='ensemble')enterEnsembleMode();
+    else if(this.dataset.tab==='inference')enterInferenceMode();
     else enterTrainingMode();
   });
 });

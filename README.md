@@ -81,6 +81,7 @@ as iframes.
 | [`transformers/transformer_explorer.html`](transformers/transformer_explorer.html) | Interactive explorer for the Transformer architecture: step through scaled dot-product self-attention, multi-head attention, positional encodings, and Vision Transformers (ViT) with live attention-map and patch-embedding visualizations |
 | [`transformers/toward_multimodal_AI.html`](transformers/toward_multimodal_AI.html) | Interactive explainer tracing the path from CNNs and patch embeddings to Vision Transformers (ViT), CLIP-style contrastive pretraining, and modern multimodal architectures |
 | [`activation_functions/af_explorer.html`](activation_functions/af_explorer.html) | Interactive explorer for neural network activation functions: adjust parameters for ReLU, Leaky ReLU, ELU, Swish, Sigmoid, Tanh, Maxout, and Linear units with side-by-side function and derivative plots annotated for saturation and vanishing gradients |
+| [`dropout/dropout_explorer.html`](dropout/dropout_explorer.html) | Watch nodes randomly drop during training, then see the full network activate at inference with inverted-dropout weight scaling — exploring how dropout prevents overfitting by training an ensemble of subnetworks |
 
 ### Cellular Automata
 
