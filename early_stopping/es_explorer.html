@@ -393,20 +393,19 @@ const SPEED_MS=[800,400,100];
 const SPEED_LBL=['Slow','Med','Fast'];
 
 const COMPLEXITY={
-  simple:{ trainStart:.92,trainFloor:.040,lrScale:1.00,
-           valStart:1.00,valFloor:.080,valLrScale:.60,
-           overfitMag:.18,minT:.50,normGrowth:.008 },
-  medium:{ trainStart:1.00,trainFloor:.030,lrScale:1.00,
-           valStart:1.06,valFloor:.090,valLrScale:.52,
-           overfitMag:.45,minT:.30,normGrowth:.014 },
-  over:  { trainStart:1.10,trainFloor:.015,lrScale:.85,
-           valStart:1.12,valFloor:.095,valLrScale:.42,
-           overfitMag:.65,minT:.15,normGrowth:.022 },
+  // bestEpochFrac: where val loss hits its minimum (fraction of MAX_EPOCHS)
+  // overfitSlope: rate coefficient for Phase-2 rise — rise = overfitSlope * dist^1.5 * slopeScale
+  //   calibrated so rise at dist=4 exceeds max noise for all complexity/noise combos
+  simple:{ bestEpochFrac:.45, overfitSlope:.008, normGrowth:.008 },
+  medium:{ bestEpochFrac:.30, overfitSlope:.015, normGrowth:.014 },
+  over:  { bestEpochFrac:.15, overfitSlope:.030, normGrowth:.022 },
 };
 const NOISE={
-  low:   {mag:.018,overfitScale:.70},
-  medium:{mag:.055,overfitScale:1.00},
-  high:  {mag:.130,overfitScale:1.55},
+  // trainNoise: jitter on train loss, valNoise: jitter on val loss
+  // slopeScale: multiplies overfitMag so high noise = steeper divergence
+  low:   { trainNoise:.007, valNoise:.012, slopeScale:.65 },
+  medium:{ trainNoise:.018, valNoise:.032, slopeScale:1.00 },
+  high:  { trainNoise:.045, valNoise:.070, slopeScale:1.50 },
 };
 
 /* ── State ── */
@@ -438,20 +437,58 @@ function paramSeed(){
 /* ── Pre-compute full loss curves ── */
 function computeCurves(){
   const p=COMPLEXITY[complexityKey], n=NOISE[noiseKey];
-  const effK=lrVal*p.lrScale*40;
   const rng=makeRng(paramSeed());
+
+  // LR shifts convergence speed (sqrt scale keeps extremes sane)
+  const lrFactor=Math.max(0.1,Math.min(10,lrVal/0.01));
+  const k=3.5*Math.sqrt(lrFactor);
+
+  // First RNG draw: slight trainStart variation so curves differ between seeds
+  const trainStart=0.90+rng()*0.15;
+
+  // Divergence epoch: higher LR → slightly earlier, clamped to [5, 90]
+  const bestEpochFrac=Math.max(0.05,p.bestEpochFrac/Math.pow(lrFactor,0.20));
+  const divergeAt=Math.max(5,Math.min(90,Math.round(bestEpochFrac*MAX_EPOCHS)));
+
   const trainFull=[],valFull=[],normFull=[];
+  let valMinBase=null; // val loss at the divergence epoch (for phase-2 anchor)
+
   for(let e=1;e<=MAX_EPOCHS;e++){
     const t=e/MAX_EPOCHS;
-    const tDecay=Math.exp(-effK*t*3.2);
-    const tLoss=Math.max(.015, p.trainStart*tDecay+p.trainFloor+(rng()-.5)*n.mag*.45);
-    const vDecay=Math.exp(-effK*t*p.valLrScale*3.2);
-    const overfitAmt=n.overfitScale*p.overfitMag*Math.pow(Math.max(0,t-p.minT),1.6);
-    const vLoss=Math.max(.04, p.valStart*vDecay+p.valFloor+overfitAmt+(rng()-.5)*n.mag*.75);
-    const prevN=normFull.length?normFull[normFull.length-1]:.10;
-    normFull.push(prevN+.012+p.normGrowth+(rng()-.35)*.006);
-    trainFull.push(tLoss); valFull.push(vLoss);
+
+    // ── Train loss: smooth exponential decay toward zero, no floor ──
+    const tBase=trainStart*Math.exp(-k*t);
+    const tLoss=Math.max(0.005, tBase+(rng()-.5)*n.trainNoise);
+    trainFull.push(tLoss);
+
+    // ── Val loss: three phases ──
+    if(e<=divergeAt){
+      // Phase 1 — descent: val tracks train but stays above it.
+      // gapFactor starts at 1.35 and shrinks to 1.10 at the diverge epoch,
+      // giving a visible but narrowing gap throughout the learning phase.
+      const frac=e/divergeAt;
+      const gapFactor=1.35-0.25*frac;          // 1.35 → 1.10
+      const vBase=tLoss*gapFactor;
+      const vNoisy=vBase+(rng()-.5)*n.valNoise;
+      const pushed=Math.max(tLoss+0.012, vNoisy);
+      valFull.push(pushed);
+      if(e===divergeAt) valMinBase=pushed;      // anchor Phase 2 on actual val at divergeAt
+    } else {
+      // Phase 2 — val MUST RISE. No decay, no normalization.
+      // rise = overfitSlope * dist^1.5 * slopeScale (exponent 1.5 accelerates rise over time)
+      // At dist≥4 rise strictly exceeds max noise for all param combinations.
+      const distFromMin = e - divergeAt;
+      const rise = p.overfitSlope * Math.pow(distFromMin, 1.5) * n.slopeScale;
+      const noiseAmp = n.valNoise * 0.1; // kept small so rise dominates from dist≥4
+      const noise = noiseAmp * 5 * (rng() - 0.5);
+      valFull.push(valMinBase + rise + noise);
+    }
+
+    // ── Weight norm: monotonically growing ──
+    const prevN=normFull.length?normFull[normFull.length-1]:0.10;
+    normFull.push(prevN+0.010+p.normGrowth*Math.sqrt(lrFactor)+(rng()-.35)*0.005);
   }
+
   let bestValLoss=Infinity,bestValEpoch=1;
   valFull.forEach((v,i)=>{if(v<bestValLoss){bestValLoss=v;bestValEpoch=i+1;}});
   curves={trainFull,valFull,normFull,bestValLoss,bestValEpoch};
@@ -460,9 +497,13 @@ function computeCurves(){
 
 /* ── Scales (set once per computeCurves, not rescaled during animation) ── */
 function buildScales(){
-  const maxL=Math.max(d3.max(curves.trainFull),d3.max(curves.valFull),.6);
+  // Y-axis capped at the active region (up to stopEpoch) so early training stays readable.
+  // Ghost curves that exceed this cap are clipped at the chart boundary.
+  const activeTrain=curves.trainFull.slice(0,stopEpoch);
+  const activeVal=curves.valFull.slice(0,stopEpoch);
+  const activeMax=Math.max(d3.max(activeTrain),d3.max(activeVal),.6);
   xSc =d3.scaleLinear().domain([0,MAX_EPOCHS]).range([0,C.iw]);
-  ySc =d3.scaleLinear().domain([0,Math.min(2.2,maxL*1.18)]).range([C.ih,0]);
+  ySc =d3.scaleLinear().domain([0,activeMax*2.5]).range([C.ih,0]);
   xNSc=d3.scaleLinear().domain([0,MAX_EPOCHS]).range([0,N.iw]);
   yNSc=d3.scaleLinear().domain([0,d3.max(curves.normFull)*1.18]).range([N.ih,0]);
 }
@@ -505,10 +546,10 @@ function initChart(){
   const bx=xSc(curves.bestValEpoch), sx=xSc(stopEpoch);
   shadeG.append('rect').attr('class','shade-patience')
     .attr('x',bx).attr('y',0).attr('width',Math.max(0,sx-bx)).attr('height',C.ih)
-    .attr('fill','rgba(232,99,10,.11)');
+    .attr('fill','rgba(232,99,10,.15)');
   shadeG.append('rect').attr('class','shade-over')
     .attr('x',sx).attr('y',0).attr('width',Math.max(0,C.iw-sx)).attr('height',C.ih)
-    .attr('fill','rgba(176,50,29,.09)');
+    .attr('fill','rgba(176,50,29,.08)');
 
   // Axes
   g.append('g').attr('class','x-axis').attr('transform',`translate(0,${C.ih})`)
@@ -527,13 +568,30 @@ function initChart(){
   const mkLine=()=>d3.line().x((_,i)=>xSc(i+1)).y(d=>ySc(d)).curve(d3.curveCatmullRom.alpha(.5));
   const mkArea=base=>d3.area().x((_,i)=>xSc(i+1)).y0(ySc(base)).y1(d=>ySc(d)).curve(d3.curveCatmullRom.alpha(.5));
   cg.append('path').attr('d',mkArea(d3.min(curves.trainFull))(curves.trainFull))
-    .attr('fill','#2e7d32').attr('fill-opacity',.07);
+    .attr('fill','#2e7d32').attr('fill-opacity',.06);
   cg.append('path').attr('d',mkArea(d3.min(curves.valFull))(curves.valFull))
     .attr('fill','#E8630A').attr('fill-opacity',.09);
   cg.append('path').attr('d',mkLine()(curves.trainFull))
     .attr('fill','none').attr('stroke','#2e7d32').attr('stroke-width',2).attr('stroke-linejoin','round');
   cg.append('path').attr('d',mkLine()(curves.valFull))
     .attr('fill','none').attr('stroke','#E8630A').attr('stroke-width',2).attr('stroke-linejoin','round');
+
+  // Ghost curves — full run past stopping point, revealed at 40% opacity when training stops.
+  // Drawn OUTSIDE the clip path so they appear immediately on fade-in, not as a re-animation.
+  const ghostG=g.append('g').attr('class','ghost-curves').attr('opacity',0);
+  if(stopEpoch<MAX_EPOCHS){
+    // Slice from stopEpoch-1 so ghost starts at the exact stopping point (connecting seamlessly)
+    const ghostTrain=curves.trainFull.slice(stopEpoch-1);
+    const ghostVal=curves.valFull.slice(stopEpoch-1);
+    const mkGhost=start=>d3.line().x((_,i)=>xSc(start+i)).y(d=>ySc(d))
+      .curve(d3.curveCatmullRom.alpha(.5));
+    ghostG.append('path').attr('d',mkGhost(stopEpoch)(ghostTrain))
+      .attr('fill','none').attr('stroke','#2e7d32').attr('stroke-width',1.5)
+      .attr('stroke-dasharray','6,4').attr('stroke-linejoin','round');
+    ghostG.append('path').attr('d',mkGhost(stopEpoch)(ghostVal))
+      .attr('fill','none').attr('stroke','#E8630A').attr('stroke-width',1.5)
+      .attr('stroke-dasharray','6,4').attr('stroke-linejoin','round');
+  }
 
   // Marker: best val epoch (dashed green) — hidden until epoch reached
   const bmG=g.append('g').attr('class','marker-bve').attr('opacity',0)
@@ -569,6 +627,11 @@ function renderAtEpoch(e){
     .transition().duration(150).attr('opacity',e>=curves.bestValEpoch?1:0);
   d3.select('#svg-chart').select('.marker-stop')
     .transition().duration(150).attr('opacity',e>=stopEpoch?1:0);
+  // Fade in ghost curves (post-stopping "what would have happened") when training stops
+  if(e>=stopEpoch){
+    d3.select('#svg-chart').select('.ghost-curves')
+      .transition().duration(500).attr('opacity',0.4);
+  }
 }
 
 /* ── Weight norm chart ── */
