@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<!-- Copyright © 2026 Greg T. Chism. University of Arizona, College of Information Science.
+     INFO 557: Neural Networks. MIT License. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Optimization Algorithms — Interactive Explorer | INFO 557: Neural Networks</title>
+<meta name="description" content="Watch SGD, Momentum, AdaGrad, RMSProp, and Adam navigate the same loss landscape — see why adaptive methods converge faster and how hyperparameters shape each optimizer's path.">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Optimization Algorithms — Interactive Explorer">
+<meta property="og:description" content="Watch SGD, Momentum, AdaGrad, RMSProp, and Adam navigate the same loss landscape — see why adaptive methods converge faster and how hyperparameters shape each optimizer's path.">
+<meta property="og:image" content="https://gchism94.github.io/uofa-neural-networks/optimizers/optimizer_explorer-preview.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="600">
+<meta property="og:url" content="https://gchism94.github.io/uofa-neural-networks/optimizers/optimizer_explorer.html">
+<meta property="fb:app_id" content="2385695445236853">
+
+<!-- Twitter/X card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Optimization Algorithms — Interactive Explorer">
+<meta name="twitter:description" content="Watch SGD, Momentum, AdaGrad, RMSProp, and Adam navigate the same loss landscape — see why adaptive methods converge faster and how hyperparameters shape each optimizer's path.">
+<meta name="twitter:image" content="https://gchism94.github.io/uofa-neural-networks/optimizers/optimizer_explorer-preview.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+
+<style>
+/* ── Design tokens ──────────────────────────────────────────────── */
+:root{
+  --cream:#FAF7F0;--cream-mid:#F0EBE0;--cream-dk:#E2D9C5;
+  --g-dk:#1C3A0E;--g-mid:#2D5A1B;--g-lt:#4A8C2F;--g-pale:#C8E6A8;
+  --orange:#E8630A;--orange-lt:#F08C50;--orange-dk:#C0500A;
+  --blue:#1A56A0;--blue-pale:#D0E4F8;
+  --red:#B0321D;--red-pale:#F8DDD8;
+  --purple:#7B3FC4;--purple-pale:#E8D8F8;
+  --text:#1A1A1A;--text-muted:#888;--text-soft:#555;
+  --border:#C8BE9A;--border-lt:#DDD6BE;--shadow:rgba(44,90,27,.10);
+
+  /* Per-optimizer palette */
+  --opt-sgd:#888888;
+  --opt-momentum:#1A56A0;
+  --opt-adagrad:#7B3FC4;
+  --opt-rmsprop:#E8630A;
+  --opt-adam:#2e7d32;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:'Outfit',sans-serif;background:var(--cream);color:var(--text);
+  padding:1.25rem 1rem 2rem;min-height:100vh;line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:.85rem}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+.hdr{display:flex;justify-content:space-between;align-items:flex-start;column-gap:1rem;row-gap:.35rem;flex-wrap:wrap}
+.hdr>div:first-child{flex:1 1 auto;min-width:0}
+.hdr h1{font-size:clamp(1.25rem,2.2vw,1.6rem);font-weight:700;color:var(--g-dk);letter-spacing:-.02em;line-height:1.2}
+.hdr p.subtitle{font-size:.86rem;color:var(--text-muted);margin-top:.18rem}
+.hdr-rule{border:none;border-top:2.5px solid var(--g-dk);margin-top:.55rem}
+
+/* ── Fixed copyright ─────────────────────────────────────────────── */
+.cr-top{
+  position:fixed;top:.75rem;right:1rem;z-index:1000;
+  font-size:.72rem;color:var(--text-muted);text-align:right;
+  background:rgba(250,247,240,.92);padding:.2rem 1.5rem .2rem .5rem;
+  border-radius:5px;backdrop-filter:blur(4px);
+  border:1px solid var(--border-lt);white-space:nowrap;min-width:max-content;
+}
+.cr-top a{color:var(--orange);text-decoration:none}
+.cr-top a:hover{text-decoration:underline}
+
+/* ── Tab bar ─────────────────────────────────────────────────────── */
+.tab-bar{
+  display:flex;gap:.35rem;background:var(--cream-mid);
+  border:1px solid var(--border);border-radius:8px;
+  padding:.3rem;width:fit-content;
+}
+.tab-bar button{
+  font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:500;
+  padding:.3rem .9rem;border-radius:6px;cursor:pointer;
+  border:none;background:transparent;color:var(--text-soft);
+  transition:all .15s;
+}
+.tab-bar button:hover{background:white;color:var(--g-dk)}
+.tab-bar button.active{background:white;color:var(--g-dk);font-weight:600;
+  box-shadow:0 1px 4px var(--shadow);}
+
+/* ── Explorer grid ───────────────────────────────────────────────── */
+.explorer-grid{
+  display:grid;
+  grid-template-columns:260px 1fr 220px;
+  gap:.85rem;
+  align-items:start;
+}
+@media(max-width:980px){
+  .explorer-grid{grid-template-columns:260px 1fr}
+  .right-col{display:none}
+}
+@media(max-width:680px){
+  .explorer-grid{grid-template-columns:1fr}
+}
+.left-col{display:flex;flex-direction:column;gap:.75rem}
+.center-col{display:flex;flex-direction:column;gap:.75rem}
+.right-col{display:flex;flex-direction:column;gap:.75rem}
+
+/* ── Cards ───────────────────────────────────────────────────────── */
+.card{background:white;border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem;box-shadow:0 2px 8px var(--shadow)}
+.card-title{font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--g-dk);margin-bottom:.55rem}
+
+/* ── Optimizer toggles ───────────────────────────────────────────── */
+.opt-list{display:flex;flex-direction:column;gap:.35rem}
+.opt-row{
+  display:flex;align-items:center;gap:.55rem;
+  padding:.28rem .5rem;border-radius:6px;cursor:pointer;
+  border:1.5px solid var(--border-lt);background:var(--cream);
+  transition:background .12s,border-color .12s;
+  user-select:none;
+}
+.opt-row:hover{background:var(--cream-mid)}
+.opt-row.active{background:white;border-color:var(--opt-color)}
+.opt-dot{
+  width:10px;height:10px;border-radius:50%;flex-shrink:0;
+  background:var(--opt-color);
+}
+.opt-check{
+  width:14px;height:14px;flex-shrink:0;
+  accent-color:var(--opt-color);cursor:pointer;
+}
+.opt-name{font-size:.8rem;font-weight:500;color:var(--text);flex:1}
+.opt-abbr{font-family:'IBM Plex Mono',monospace;font-size:.68rem;color:var(--text-muted)}
+
+/* ── Sliders ─────────────────────────────────────────────────────── */
+.srow{display:flex;align-items:center;gap:.45rem;margin-bottom:.2rem}
+.slbl{font-family:'IBM Plex Mono',monospace;font-size:.82rem;font-weight:500;color:var(--g-dk);min-width:28px}
+input[type=range]{flex:1;appearance:none;-webkit-appearance:none;height:4px;background:var(--cream-dk);border-radius:2px;cursor:pointer;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--g-mid);border:2.5px solid white;box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:pointer}
+.sval{font-family:'IBM Plex Mono',monospace;font-size:.76rem;color:var(--text-muted);min-width:44px;text-align:right}
+.hint-txt{font-size:.7rem;color:var(--text-muted);font-style:italic;margin-top:.15rem;padding-left:1.6rem}
+.param-section{margin-top:.55rem;padding-top:.5rem;border-top:1px solid var(--border-lt)}
+.param-section-title{font-size:.62rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-bottom:.35rem}
+
+/* Conditional parameter sections — shown/hidden by JS */
+.cond-momentum{display:none}
+.cond-adam{display:none}
+
+/* ── Buttons ─────────────────────────────────────────────────────── */
+.ctrl-btns{display:flex;gap:.45rem;flex-wrap:wrap}
+.pbtn{
+  font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:600;
+  padding:.35rem .9rem;border-radius:6px;cursor:pointer;
+  border:1.5px solid var(--border);background:var(--cream);color:var(--g-dk);
+  transition:all .12s;
+}
+.pbtn:hover{background:var(--g-pale);border-color:var(--g-lt)}
+.pbtn.primary{background:var(--g-mid);border-color:var(--g-mid);color:white}
+.pbtn.primary:hover{background:var(--g-dk);border-color:var(--g-dk)}
+.pbtn.playing{background:var(--orange);border-color:var(--orange-dk);color:white}
+.pbtn.playing:hover{background:var(--orange-dk);border-color:var(--orange-dk)}
+
+/* ── Annotation box ──────────────────────────────────────────────── */
+.anno-box{
+  border-radius:6px;padding:.55rem .75rem;font-size:.78rem;line-height:1.55;
+  background:var(--blue-pale);color:var(--blue);border-left:3px solid var(--blue);
+  min-height:3.5rem;
+}
+.anno-box.warn{background:var(--red-pale);color:var(--red);border-color:var(--red)}
+.anno-box.good{background:var(--g-pale);color:var(--g-dk);border-color:var(--g-mid)}
+.anno-box.neutral{background:var(--cream-mid);color:var(--text-soft);border-color:var(--border)}
+
+/* ── Key Concepts ────────────────────────────────────────────────── */
+.concepts-body{overflow:hidden;max-height:700px;transition:max-height .3s ease}
+.concepts-body.collapsed{max-height:0;margin-bottom:-.55rem}
+.concepts-item{font-size:.74rem;color:var(--text-soft);line-height:1.5;margin-bottom:.45rem;padding-left:.9rem;position:relative}
+.concepts-item:last-child{margin-bottom:0}
+.concepts-item::before{content:'●';color:#2e7d32;position:absolute;left:0;top:0}
+.concepts-item strong{color:#2e7d32;font-weight:600}
+
+/* ── Status bar ──────────────────────────────────────────────────── */
+.status-bar{
+  display:flex;gap:.6rem;flex-wrap:wrap;font-family:'IBM Plex Mono',monospace;
+  font-size:.72rem;color:var(--text-muted);
+}
+.stat-pill{
+  background:var(--cream-mid);border:1px solid var(--border-lt);
+  border-radius:12px;padding:.15rem .55rem;
+}
+.stat-pill span{color:var(--g-dk);font-weight:600}
+
+/* ── Chart wrappers ──────────────────────────────────────────────── */
+.chart-wrap{width:100%;aspect-ratio:4/3}
+.chart-wrap svg{width:100%;height:100%;display:block;border-radius:5px}
+.chart-wrap-wide{width:100%;aspect-ratio:5/3}
+.chart-wrap-wide svg{width:100%;height:100%;display:block;border-radius:5px}
+
+/* ── Plot label ──────────────────────────────────────────────────── */
+.plot-label{font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);text-align:center;margin-bottom:.35rem}
+
+/* ── Legend ──────────────────────────────────────────────────────── */
+.legend{display:flex;gap:.75rem;flex-wrap:wrap;font-size:.72rem;color:var(--text-soft);margin-top:.45rem;align-items:center}
+.legend-dot{width:10px;height:10px;border-radius:50%;display:inline-block;vertical-align:middle;margin-right:.25rem;flex-shrink:0}
+.legend-line{width:18px;height:2.5px;display:inline-block;vertical-align:middle;margin-right:.2rem;border-radius:2px}
+
+/* ── Tab content panels ──────────────────────────────────────────── */
+.tab-panel{display:none}
+.tab-panel.active{display:flex;flex-direction:column;gap:.75rem}
+
+/* ── Right column — optimizer status ────────────────────────────── */
+.opt-status-list{display:flex;flex-direction:column;gap:.45rem}
+.opt-status-row{
+  display:flex;align-items:center;gap:.5rem;
+  padding:.35rem .5rem;border-radius:6px;
+  border:1.5px solid var(--border-lt);background:var(--cream);
+}
+.osr-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.osr-name{font-size:.78rem;font-weight:500;color:var(--text);flex:1;min-width:0}
+.osr-loss{font-family:'IBM Plex Mono',monospace;font-size:.72rem;color:var(--text-muted);min-width:38px;text-align:right}
+.osr-badge{
+  font-size:.6rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
+  padding:.1rem .35rem;border-radius:8px;flex-shrink:0;
+}
+.osr-badge.running{background:var(--blue-pale);color:var(--blue)}
+.osr-badge.converged{background:var(--g-pale);color:var(--g-dk)}
+.osr-badge.diverged{background:var(--red-pale);color:var(--red)}
+.osr-badge.inactive{background:var(--cream-mid);color:var(--text-muted)}
+
+.steps-grid{display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin-top:.5rem;padding-top:.45rem;border-top:1px solid var(--border-lt)}
+.steps-block{background:var(--cream);border:1px solid var(--border-lt);border-radius:6px;padding:.35rem .45rem;text-align:center}
+.steps-val{display:block;font-family:'IBM Plex Mono',monospace;font-size:.95rem;font-weight:600;color:var(--g-dk);line-height:1.2}
+.steps-lbl{font-size:.58rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;margin-top:.08rem}
+</style>
+</head>
+<body>
+
+<div class="cr-top">© 2026 Greg T. Chism · <a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a></div>
+
+<div class="wrap">
+
+<header>
+  <div class="hdr">
+    <div>
+      <h1>Optimization Algorithms — Interactive Explorer</h1>
+      <p class="subtitle">Watch SGD, Momentum, AdaGrad, RMSProp, and Adam navigate the same loss landscape — see why adaptive methods converge faster</p>
+    </div>
+  </div>
+  <hr class="hdr-rule">
+</header>
+
+<!-- Tab bar -->
+<div class="tab-bar" id="tab-bar">
+  <button class="active" data-tab="landscape">Loss Landscape</button>
+  <button data-tab="curves">Convergence Curves</button>
+</div>
+
+<!-- Main explorer -->
+<div class="explorer-grid">
+
+  <!-- LEFT: Controls -->
+  <div class="left-col">
+
+    <!-- Optimizer toggles -->
+    <div class="card">
+      <div class="card-title">Optimizers</div>
+      <div class="opt-list">
+
+        <label class="opt-row active" style="--opt-color:var(--opt-sgd)">
+          <input class="opt-check" type="checkbox" id="chk-sgd" checked>
+          <span class="opt-dot"></span>
+          <span class="opt-name">SGD</span>
+          <span class="opt-abbr">vanilla</span>
+        </label>
+
+        <label class="opt-row active" style="--opt-color:var(--opt-momentum)">
+          <input class="opt-check" type="checkbox" id="chk-momentum" checked>
+          <span class="opt-dot"></span>
+          <span class="opt-name">Momentum</span>
+          <span class="opt-abbr">SGD+β</span>
+        </label>
+
+        <label class="opt-row active" style="--opt-color:var(--opt-adagrad)">
+          <input class="opt-check" type="checkbox" id="chk-adagrad" checked>
+          <span class="opt-dot"></span>
+          <span class="opt-name">AdaGrad</span>
+          <span class="opt-abbr">adaptive</span>
+        </label>
+
+        <label class="opt-row active" style="--opt-color:var(--opt-rmsprop)">
+          <input class="opt-check" type="checkbox" id="chk-rmsprop" checked>
+          <span class="opt-dot"></span>
+          <span class="opt-name">RMSProp</span>
+          <span class="opt-abbr">decay-G</span>
+        </label>
+
+        <label class="opt-row active" style="--opt-color:var(--opt-adam)">
+          <input class="opt-check" type="checkbox" id="chk-adam" checked>
+          <span class="opt-dot"></span>
+          <span class="opt-name">Adam</span>
+          <span class="opt-abbr">m̂+v̂</span>
+        </label>
+
+      </div>
+    </div>
+
+    <!-- Training parameters -->
+    <div class="card">
+      <div class="card-title">Training Parameters</div>
+
+      <!-- Learning rate -->
+      <div class="srow">
+        <span class="slbl">η</span>
+        <input type="range" id="sld-lr" min="0.001" max="0.1" step="0.001" value="0.01">
+        <span class="sval" id="val-lr">0.010</span>
+      </div>
+      <div class="hint-txt" id="lr-hint">Learning rate — scales every gradient step</div>
+
+      <!-- Momentum β — shown only when Momentum is active -->
+      <div class="param-section cond-momentum" id="section-momentum">
+        <div class="param-section-title" style="color:var(--opt-momentum)">Momentum</div>
+        <div class="srow">
+          <span class="slbl" style="color:var(--opt-momentum)">β</span>
+          <input type="range" id="sld-beta" min="0.0" max="0.99" step="0.01" value="0.9">
+          <span class="sval" id="val-beta">0.90</span>
+        </div>
+        <div class="hint-txt">Fraction of previous velocity to carry forward</div>
+      </div>
+
+      <!-- Adam β₁/β₂ — shown only when Adam is active -->
+      <div class="param-section cond-adam" id="section-adam">
+        <div class="param-section-title" style="color:var(--opt-adam)">Adam</div>
+        <div class="srow">
+          <span class="slbl" style="color:var(--opt-adam)">β₁</span>
+          <input type="range" id="sld-beta1" min="0.5" max="0.99" step="0.01" value="0.9">
+          <span class="sval" id="val-beta1">0.90</span>
+        </div>
+        <div class="hint-txt" style="margin-bottom:.35rem">1st-moment (mean) decay rate</div>
+        <div class="srow">
+          <span class="slbl" style="color:var(--opt-adam)">β₂</span>
+          <input type="range" id="sld-beta2" min="0.9" max="0.9999" step="0.0001" value="0.999">
+          <span class="sval" id="val-beta2">0.999</span>
+        </div>
+        <div class="hint-txt">2nd-moment (variance) decay rate</div>
+      </div>
+
+    </div>
+
+    <!-- Simulation controls -->
+    <div class="card">
+      <div class="card-title">Simulation</div>
+      <div class="ctrl-btns" style="margin-bottom:.45rem">
+        <button id="btn-play" class="pbtn primary" style="flex:1">⏵ Play</button>
+        <button id="btn-step" class="pbtn">⏭ Step</button>
+      </div>
+      <div class="ctrl-btns">
+        <button id="btn-reset" class="pbtn" style="flex:1">↺ Reset</button>
+      </div>
+      <div class="srow" style="margin-top:.5rem">
+        <span class="slbl" style="font-size:.72rem;min-width:42px">Speed</span>
+        <input type="range" id="sld-speed" min="0" max="2" step="1" value="1">
+        <span class="sval" id="val-speed">Med</span>
+      </div>
+    </div>
+
+    <!-- Annotation -->
+    <div class="card">
+      <div class="card-title">What's happening?</div>
+      <div class="anno-box neutral" id="anno-box">Select optimizers and press Play to watch each one navigate the loss landscape. Observe how their paths differ — especially in narrow valleys.</div>
+    </div>
+
+    <!-- Key Concepts -->
+    <div class="card" id="card-concepts">
+      <div class="card-title" style="cursor:pointer;user-select:none" id="concepts-toggle">
+        Key Concepts <span id="concepts-arrow">▾</span>
+      </div>
+      <div class="concepts-body" id="concepts-body">
+        <div class="concepts-item"><strong>Why SGD zigzags:</strong> Vanilla SGD updates each parameter by the same learning rate regardless of gradient history. In narrow valleys the gradient oscillates between walls, causing slow, zigzagging descent toward the minimum.</div>
+        <div class="concepts-item"><strong>What Momentum adds:</strong> Momentum accumulates a velocity vector — a weighted average of past gradients. It accelerates in consistent directions and dampens oscillations, letting the optimizer "roll through" small bumps and converge faster.</div>
+        <div class="concepts-item"><strong>How AdaGrad adapts:</strong> AdaGrad divides each gradient by the square root of its accumulated squared history. Parameters that receive large, frequent gradients get smaller effective learning rates — useful for sparse data but G grows without bound, eventually freezing learning.</div>
+        <div class="concepts-item"><strong>Why RMSProp fixes AdaGrad:</strong> RMSProp replaces AdaGrad's running sum with an exponentially decaying average (controlled by ρ). This prevents the learning rate from decaying to zero, keeping the optimizer effective deep into training.</div>
+        <div class="concepts-item"><strong>What Adam combines:</strong> Adam maintains both a first moment (momentum, like Momentum SGD) and a second moment (variance, like RMSProp), with bias-correction in early steps. It tends to converge quickly and works well across a wide range of architectures and learning rates.</div>
+      </div>
+    </div>
+
+    <!-- Status bar -->
+    <div class="status-bar">
+      <div class="stat-pill">Step <span id="stat-step">0</span></div>
+      <div class="stat-pill">Active <span id="stat-active">5</span></div>
+    </div>
+
+  </div>
+
+  <!-- CENTER: Tab content -->
+  <div class="center-col">
+
+    <!-- Tab 1: Loss Landscape -->
+    <div class="tab-panel active" id="panel-landscape">
+      <div class="card">
+        <div class="plot-label" id="landscape-label">Loss Landscape — step 0</div>
+        <div class="chart-wrap">
+          <svg id="svg-landscape" viewBox="0 0 560 420" preserveAspectRatio="none">
+            <rect width="560" height="420" fill="#FDFAF5"/>
+            <text x="280" y="196" text-anchor="middle" dominant-baseline="middle"
+                  fill="rgba(0,0,0,.2)" font-family="Outfit, sans-serif" font-size="14">
+              Loss landscape renders here
+            </text>
+            <text x="280" y="222" text-anchor="middle" dominant-baseline="middle"
+                  fill="rgba(0,0,0,.12)" font-family="Outfit, sans-serif" font-size="10">
+              Contour plot + optimizer trajectories
+            </text>
+          </svg>
+        </div>
+        <div class="legend" id="landscape-legend">
+          <span><span class="legend-dot" style="background:var(--opt-sgd)"></span>SGD</span>
+          <span><span class="legend-dot" style="background:var(--opt-momentum)"></span>Momentum</span>
+          <span><span class="legend-dot" style="background:var(--opt-adagrad)"></span>AdaGrad</span>
+          <span><span class="legend-dot" style="background:var(--opt-rmsprop)"></span>RMSProp</span>
+          <span><span class="legend-dot" style="background:var(--opt-adam)"></span>Adam</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2: Convergence Curves -->
+    <div class="tab-panel" id="panel-curves">
+      <div class="card">
+        <div class="plot-label" id="curves-label">Convergence Curves — loss vs. step</div>
+        <div class="chart-wrap-wide">
+          <svg id="svg-curves" viewBox="0 0 700 420" preserveAspectRatio="none">
+            <rect width="700" height="420" fill="#FDFAF5"/>
+            <text x="350" y="196" text-anchor="middle" dominant-baseline="middle"
+                  fill="rgba(0,0,0,.2)" font-family="Outfit, sans-serif" font-size="14">
+              Convergence curves render here
+            </text>
+            <text x="350" y="222" text-anchor="middle" dominant-baseline="middle"
+                  fill="rgba(0,0,0,.12)" font-family="Outfit, sans-serif" font-size="10">
+              One line per optimizer — loss over steps
+            </text>
+          </svg>
+        </div>
+        <div class="legend" id="curves-legend">
+          <span><span class="legend-line" style="background:var(--opt-sgd)"></span>SGD</span>
+          <span><span class="legend-line" style="background:var(--opt-momentum)"></span>Momentum</span>
+          <span><span class="legend-line" style="background:var(--opt-adagrad)"></span>AdaGrad</span>
+          <span><span class="legend-line" style="background:var(--opt-rmsprop)"></span>RMSProp</span>
+          <span><span class="legend-line" style="background:var(--opt-adam)"></span>Adam</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- RIGHT: Optimizer status -->
+  <div class="right-col">
+
+    <div class="card">
+      <div class="card-title">Optimizer Status</div>
+      <div class="opt-status-list">
+
+        <div class="opt-status-row" id="status-sgd">
+          <span class="osr-dot" style="background:var(--opt-sgd)"></span>
+          <span class="osr-name">SGD</span>
+          <span class="osr-loss" id="loss-sgd">—</span>
+          <span class="osr-badge inactive" id="badge-sgd">idle</span>
+        </div>
+
+        <div class="opt-status-row" id="status-momentum">
+          <span class="osr-dot" style="background:var(--opt-momentum)"></span>
+          <span class="osr-name">Momentum</span>
+          <span class="osr-loss" id="loss-momentum">—</span>
+          <span class="osr-badge inactive" id="badge-momentum">idle</span>
+        </div>
+
+        <div class="opt-status-row" id="status-adagrad">
+          <span class="osr-dot" style="background:var(--opt-adagrad)"></span>
+          <span class="osr-name">AdaGrad</span>
+          <span class="osr-loss" id="loss-adagrad">—</span>
+          <span class="osr-badge inactive" id="badge-adagrad">idle</span>
+        </div>
+
+        <div class="opt-status-row" id="status-rmsprop">
+          <span class="osr-dot" style="background:var(--opt-rmsprop)"></span>
+          <span class="osr-name">RMSProp</span>
+          <span class="osr-loss" id="loss-rmsprop">—</span>
+          <span class="osr-badge inactive" id="badge-rmsprop">idle</span>
+        </div>
+
+        <div class="opt-status-row" id="status-adam">
+          <span class="osr-dot" style="background:var(--opt-adam)"></span>
+          <span class="osr-name">Adam</span>
+          <span class="osr-loss" id="loss-adam">—</span>
+          <span class="osr-badge inactive" id="badge-adam">idle</span>
+        </div>
+
+      </div>
+
+      <!-- Steps to convergence grid -->
+      <div class="steps-grid">
+        <div class="steps-block">
+          <span class="steps-val" id="steps-fastest">—</span>
+          <div class="steps-lbl">Fastest</div>
+        </div>
+        <div class="steps-block">
+          <span class="steps-val" id="steps-slowest">—</span>
+          <div class="steps-lbl">Slowest</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mini weight-norm-style chart placeholder -->
+    <div class="card">
+      <div class="card-title">Gradient Norm</div>
+      <div style="width:100%;aspect-ratio:5/3">
+        <svg id="svg-gradnorm" viewBox="0 0 200 120" preserveAspectRatio="none">
+          <rect width="200" height="120" fill="#FDFAF5"/>
+          <text x="100" y="52" text-anchor="middle" dominant-baseline="middle"
+                fill="rgba(0,0,0,.18)" font-family="Outfit, sans-serif" font-size="9">
+            Gradient norm
+          </text>
+          <text x="100" y="70" text-anchor="middle" dominant-baseline="middle"
+                fill="rgba(0,0,0,.12)" font-family="Outfit, sans-serif" font-size="7">
+            renders here
+          </text>
+        </svg>
+      </div>
+      <div style="font-size:.67rem;color:var(--text-muted);margin-top:.35rem;font-style:italic;line-height:1.5">
+        Effective gradient magnitude per optimizer — adaptive methods shrink this over time.
+      </div>
+    </div>
+
+  </div>
+
+</div><!-- end .explorer-grid -->
+
+</div><!-- end .wrap -->
+
+<footer id="course-nav-footer" style="margin-top:1.5rem;padding:0.75rem 0 0 1rem;border-top:1px solid #E0DAC0;font-size:0.8rem;color:#78786A;text-align:left;">
+  <a href="../" style="color:#2e7d32;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">&larr; All course visualizations</a>
+</footer>
+<script>
+if (window.self !== window.top) { var f = document.getElementById('course-nav-footer'); if (f) { f.style.display = 'none'; } }
+</script>
+
+</body>
+</html>
