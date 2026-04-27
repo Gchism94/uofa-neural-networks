@@ -83,6 +83,7 @@ as iframes.
 | [`activation_functions/af_explorer.html`](activation_functions/af_explorer.html) | Interactive explorer for neural network activation functions: adjust parameters for ReLU, Leaky ReLU, ELU, Swish, Sigmoid, Tanh, Maxout, and Linear units with side-by-side function and derivative plots annotated for saturation and vanishing gradients |
 | [`dropout/dropout_explorer.html`](dropout/dropout_explorer.html) | Watch nodes randomly drop during training, then see the full network activate at inference with inverted-dropout weight scaling — exploring how dropout prevents overfitting by training an ensemble of subnetworks |
 | [`early_stopping/es_explorer.html`](early_stopping/es_explorer.html) | Watch training and validation loss diverge as a neural network overfits — step through epochs to find the optimal stopping point, and see how patience and model complexity affect when to halt training |
+| [`optimizers/optimizer_explorer.html`](optimizers/optimizer_explorer.html) | Watch SGD, Momentum, AdaGrad, RMSProp, and Adam navigate the Rosenbrock loss landscape — see why adaptive methods converge faster and how hyperparameters shape each optimizer's path |
 
 ### Cellular Automata
 

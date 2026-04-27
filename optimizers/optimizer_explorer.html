@@ -47,6 +47,7 @@
   --opt-adagrad:#7B3FC4;
   --opt-rmsprop:#E8630A;
   --opt-adam:#2e7d32;
+  --opt-adamw:#C62828;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{
@@ -147,6 +148,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 /* Conditional parameter sections — shown/hidden by JS */
 .cond-momentum{display:none}
 .cond-adam{display:none}
+.cond-adamw{display:none}
 
 /* ── Buttons ─────────────────────────────────────────────────────── */
 .ctrl-btns{display:flex;gap:.45rem;flex-wrap:wrap}
@@ -244,7 +246,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   <div class="hdr">
     <div>
       <h1>Optimization Algorithms — Interactive Explorer</h1>
-      <p class="subtitle">Watch SGD, Momentum, AdaGrad, RMSProp, and Adam navigate the same loss landscape — see why adaptive methods converge faster</p>
+      <p class="subtitle">Watch SGD, Momentum, AdaGrad, RMSProp, Adam, and AdamW navigate the same loss landscape — see why adaptive methods converge faster</p>
     </div>
   </div>
   <hr class="hdr-rule">
@@ -302,6 +304,13 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
           <span class="opt-abbr">m̂+v̂</span>
         </label>
 
+        <label class="opt-row active" style="--opt-color:var(--opt-adamw)">
+          <input class="opt-check" type="checkbox" id="chk-adamw" checked>
+          <span class="opt-dot"></span>
+          <span class="opt-name">AdamW</span>
+          <span class="opt-abbr">m+v+wd</span>
+        </label>
+
       </div>
     </div>
 
@@ -312,7 +321,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
       <!-- Learning rate -->
       <div class="srow">
         <span class="slbl">η</span>
-        <input type="range" id="sld-lr" min="0.001" max="0.1" step="0.001" value="0.01">
+        <input type="range" id="sld-lr" min="0.001" max="0.05" step="0.001" value="0.01">
         <span class="sval" id="val-lr">0.010</span>
       </div>
       <div class="hint-txt" id="lr-hint">Learning rate — scales every gradient step</div>
@@ -322,8 +331,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
         <div class="param-section-title" style="color:var(--opt-momentum)">Momentum</div>
         <div class="srow">
           <span class="slbl" style="color:var(--opt-momentum)">β</span>
-          <input type="range" id="sld-beta" min="0.0" max="0.99" step="0.01" value="0.9">
-          <span class="sval" id="val-beta">0.90</span>
+          <input type="range" id="sld-beta" min="0.0" max="0.99" step="0.01" value="0.85">
+          <span class="sval" id="val-beta">0.85</span>
         </div>
         <div class="hint-txt">Fraction of previous velocity to carry forward</div>
       </div>
@@ -343,6 +352,17 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
           <span class="sval" id="val-beta2">0.999</span>
         </div>
         <div class="hint-txt">2nd-moment (variance) decay rate</div>
+      </div>
+
+      <!-- AdamW λ — shown only when AdamW is active -->
+      <div class="param-section cond-adamw" id="section-adamw">
+        <div class="param-section-title" style="color:var(--opt-adamw)">AdamW</div>
+        <div class="srow">
+          <span class="slbl" style="color:var(--opt-adamw)">λ</span>
+          <input type="range" id="sld-lambda" min="0.001" max="0.1" step="0.001" value="0.01">
+          <span class="sval" id="val-lambda">0.010</span>
+        </div>
+        <div class="hint-txt">Weight decay — applied directly to weights, not through gradient</div>
       </div>
 
     </div>
@@ -376,11 +396,12 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
         Key Concepts <span id="concepts-arrow">▾</span>
       </div>
       <div class="concepts-body" id="concepts-body">
-        <div class="concepts-item"><strong>Why SGD zigzags:</strong> Vanilla SGD updates each parameter by the same learning rate regardless of gradient history. In narrow valleys the gradient oscillates between walls, causing slow, zigzagging descent toward the minimum.</div>
-        <div class="concepts-item"><strong>What Momentum adds:</strong> Momentum accumulates a velocity vector — a weighted average of past gradients. It accelerates in consistent directions and dampens oscillations, letting the optimizer "roll through" small bumps and converge faster.</div>
-        <div class="concepts-item"><strong>How AdaGrad adapts:</strong> AdaGrad divides each gradient by the square root of its accumulated squared history. Parameters that receive large, frequent gradients get smaller effective learning rates — useful for sparse data but G grows without bound, eventually freezing learning.</div>
-        <div class="concepts-item"><strong>Why RMSProp fixes AdaGrad:</strong> RMSProp replaces AdaGrad's running sum with an exponentially decaying average (controlled by ρ). This prevents the learning rate from decaying to zero, keeping the optimizer effective deep into training.</div>
-        <div class="concepts-item"><strong>What Adam combines:</strong> Adam maintains both a first moment (momentum, like Momentum SGD) and a second moment (variance, like RMSProp), with bias-correction in early steps. It tends to converge quickly and works well across a wide range of architectures and learning rates.</div>
+        <div class="concepts-item"><strong>SGD zigzags:</strong> takes steps proportional to gradient magnitude — large gradients in steep directions cause oscillation across the valley</div>
+        <div class="concepts-item"><strong>Momentum smooths:</strong> accumulates velocity in consistent directions, dampens oscillation — like a ball rolling downhill</div>
+        <div class="concepts-item"><strong>AdaGrad adapts:</strong> divides by accumulated gradient history per parameter — good for sparse gradients, but learning rate decays to zero eventually</div>
+        <div class="concepts-item"><strong>RMSProp fixes AdaGrad:</strong> uses exponential moving average instead of sum — prevents learning rate from decaying to zero</div>
+        <div class="concepts-item"><strong>Adam = Momentum + RMSProp:</strong> combines adaptive rates with momentum and bias correction — generally the best default optimizer</div>
+        <div class="concepts-item"><strong>AdamW decouples weight decay:</strong> standard Adam applies weight decay through the gradient (L2 regularization), which interacts with adaptive learning rates. AdamW applies it directly to weights — better regularization, now the default in PyTorch and most transformer training</div>
       </div>
     </div>
 
@@ -418,6 +439,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
           <span><span class="legend-dot" style="background:var(--opt-adagrad)"></span>AdaGrad</span>
           <span><span class="legend-dot" style="background:var(--opt-rmsprop)"></span>RMSProp</span>
           <span><span class="legend-dot" style="background:var(--opt-adam)"></span>Adam</span>
+          <span><span class="legend-dot" style="background:var(--opt-adamw)"></span>AdamW</span>
         </div>
       </div>
     </div>
@@ -445,6 +467,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
           <span><span class="legend-line" style="background:var(--opt-adagrad)"></span>AdaGrad</span>
           <span><span class="legend-line" style="background:var(--opt-rmsprop)"></span>RMSProp</span>
           <span><span class="legend-line" style="background:var(--opt-adam)"></span>Adam</span>
+          <span><span class="legend-line" style="background:var(--opt-adamw)"></span>AdamW</span>
         </div>
       </div>
     </div>
@@ -493,6 +516,13 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
           <span class="osr-badge inactive" id="badge-adam">idle</span>
         </div>
 
+        <div class="opt-status-row" id="status-adamw">
+          <span class="osr-dot" style="background:var(--opt-adamw)"></span>
+          <span class="osr-name">AdamW</span>
+          <span class="osr-loss" id="loss-adamw">—</span>
+          <span class="osr-badge inactive" id="badge-adamw">idle</span>
+        </div>
+
       </div>
 
       <!-- Steps to convergence grid -->
@@ -534,6 +564,691 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 </div><!-- end .explorer-grid -->
 
 </div><!-- end .wrap -->
+
+<script>
+(function(){
+'use strict';
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+const OPTS  = ['sgd','momentum','adagrad','rmsprop','adam','adamw'];
+const COL   = {sgd:'#888888',momentum:'#1A56A0',adagrad:'#7B3FC4',rmsprop:'#E8630A',adam:'#2e7d32',adamw:'#C62828'};
+const START = [-1.5, 1.5];
+const GMIN  = [1, 1];
+const MAX_STEPS  = 500;
+const GRAD_CLIP  = 1.0;      // clip gradient to unit norm — same clip for all optimizers
+const SPEED_MS   = [300, 80, 18];
+
+// Per-optimizer base learning rates tuned for Rosenbrock.
+// The global lr slider applies a multiplier: sliderValue / LR_BASE.
+const LR_BASE = 0.01;  // slider value that gives 1× multiplier
+const OPT_LR  = {sgd:0.002, momentum:0.0015, adagrad:0.25, rmsprop:0.03, adam:0.02, adamw:0.02};
+
+// SVG layout constants
+const LS = {W:560,H:420,ml:50,mt:20,mr:20,mb:35};
+LS.iw = LS.W-LS.ml-LS.mr; LS.ih = LS.H-LS.mt-LS.mb;
+
+const CV = {W:700,H:420,ml:52,mt:20,mr:20,mb:35};
+CV.iw = CV.W-CV.ml-CV.mr; CV.ih = CV.H-CV.mt-CV.mb;
+
+const GN = {W:200,H:120,ml:30,mt:8,mr:8,mb:20};
+GN.iw = GN.W-GN.ml-GN.mr; GN.ih = GN.H-GN.mt-GN.mb;
+
+const XD = [-2,2], YD = [-1,3];
+const GRID_N = 120;
+
+// ── Rosenbrock ────────────────────────────────────────────────────────────────
+const rosen  = (x,y) => (1-x)**2 + 100*(y-x*x)**2;
+const rosenG = (x,y) => [-2*(1-x)-400*x*(y-x*x), 200*(y-x*x)];
+
+// ── Data→pixel scales (shared by landscape + path drawing) ───────────────────
+const xSc = d3.scaleLinear().domain(XD).range([0, LS.iw]);
+const ySc = d3.scaleLinear().domain(YD).range([LS.ih, 0]);
+
+// ── Optimizer state ───────────────────────────────────────────────────────────
+let states = {};
+
+function readParams(){
+  return {
+    lr    : +document.getElementById('sld-lr').value,
+    beta  : +document.getElementById('sld-beta').value,
+    beta1 : +document.getElementById('sld-beta1').value,
+    beta2 : +document.getElementById('sld-beta2').value,
+    lambda: +document.getElementById('sld-lambda').value,
+  };
+}
+
+function initStates(){
+  const p = readParams();
+  const lrMult = p.lr / LR_BASE;
+  states = {
+    sgd:      {x:START[0],y:START[1], lr:OPT_LR.sgd*lrMult,
+               path:[START.slice()], grads:[], step:0, done:false, converged:false},
+    momentum: {x:START[0],y:START[1], lr:OPT_LR.momentum*lrMult, beta:p.beta, vx:0,vy:0,
+               path:[START.slice()], grads:[], step:0, done:false, converged:false},
+    adagrad:  {x:START[0],y:START[1], lr:OPT_LR.adagrad*lrMult, Gx:0,Gy:0,
+               path:[START.slice()], grads:[], step:0, done:false, converged:false},
+    rmsprop:  {x:START[0],y:START[1], lr:OPT_LR.rmsprop*lrMult, rho:0.9, Gx:0,Gy:0,
+               path:[START.slice()], grads:[], step:0, done:false, converged:false},
+    adam:     {x:START[0],y:START[1], lr:OPT_LR.adam*lrMult, b1:p.beta1, b2:p.beta2, eps:1e-8,
+               mx:0,my:0,vx:0,vy:0, t:0,
+               path:[START.slice()], grads:[], step:0, done:false, converged:false},
+    adamw:    {x:START[0],y:START[1], lr:OPT_LR.adamw*lrMult, b1:p.beta1, b2:p.beta2, lam:p.lambda, eps:1e-8,
+               mx:0,my:0,vx:0,vy:0, t:0,
+               path:[START.slice()], grads:[], step:0, done:false, converged:false},
+  };
+}
+
+function clipGrad(gx,gy){
+  const n = Math.sqrt(gx*gx+gy*gy);
+  return n > GRAD_CLIP ? [gx*GRAD_CLIP/n, gy*GRAD_CLIP/n] : [gx,gy];
+}
+
+function stepOpt(name){
+  const s = states[name];
+  if(!s || s.done) return;
+
+  const [rgx,rgy] = rosenG(s.x, s.y);
+  const [gx,gy]   = clipGrad(rgx,rgy);
+  s.grads.push(Math.sqrt(gx*gx+gy*gy));
+
+  const eps = 1e-8;
+  let dx=0, dy=0;
+
+  if(name==='sgd'){
+    dx = s.lr*gx;
+    dy = s.lr*gy;
+
+  } else if(name==='momentum'){
+    s.vx = s.beta*s.vx + gx;
+    s.vy = s.beta*s.vy + gy;
+    dx = s.lr*s.vx;
+    dy = s.lr*s.vy;
+
+  } else if(name==='adagrad'){
+    s.Gx += gx*gx; s.Gy += gy*gy;
+    dx = s.lr*gx / (Math.sqrt(s.Gx)+eps);
+    dy = s.lr*gy / (Math.sqrt(s.Gy)+eps);
+
+  } else if(name==='rmsprop'){
+    s.Gx = s.rho*s.Gx + (1-s.rho)*gx*gx;
+    s.Gy = s.rho*s.Gy + (1-s.rho)*gy*gy;
+    dx = s.lr*gx / (Math.sqrt(s.Gx)+eps);
+    dy = s.lr*gy / (Math.sqrt(s.Gy)+eps);
+
+  } else if(name==='adam'){
+    s.t++;
+    s.mx = s.b1*s.mx + (1-s.b1)*gx;
+    s.my = s.b1*s.my + (1-s.b1)*gy;
+    s.vx = s.b2*s.vx + (1-s.b2)*gx*gx;
+    s.vy = s.b2*s.vy + (1-s.b2)*gy*gy;
+    const mhx = s.mx/(1-s.b1**s.t), mhy = s.my/(1-s.b1**s.t);
+    const vhx = s.vx/(1-s.b2**s.t), vhy = s.vy/(1-s.b2**s.t);
+    dx = s.lr*mhx / (Math.sqrt(vhx)+eps);
+    dy = s.lr*mhy / (Math.sqrt(vhy)+eps);
+
+  } else if(name==='adamw'){
+    s.t++;
+    s.mx = s.b1*s.mx + (1-s.b1)*gx;
+    s.my = s.b1*s.my + (1-s.b1)*gy;
+    s.vx = s.b2*s.vx + (1-s.b2)*gx*gx;
+    s.vy = s.b2*s.vy + (1-s.b2)*gy*gy;
+    const mhxw = s.mx/(1-s.b1**s.t), mhyw = s.my/(1-s.b1**s.t);
+    const vhxw = s.vx/(1-s.b2**s.t), vhyw = s.vy/(1-s.b2**s.t);
+    // Decoupled weight decay: applied directly to weights, not through gradient
+    dx = s.lr*mhxw/(Math.sqrt(vhxw)+eps) + s.lr*s.lam*s.x;
+    dy = s.lr*mhyw/(Math.sqrt(vhyw)+eps) + s.lr*s.lam*s.y;
+  }
+
+  s.x = Math.max(XD[0], Math.min(XD[1], s.x-dx));
+  s.y = Math.max(YD[0], Math.min(YD[1], s.y-dy));
+  s.step++;
+  s.path.push([s.x, s.y]);
+
+  const loss = rosen(s.x, s.y);
+  if(loss < CONV_THRESH || s.step >= MAX_STEPS){
+    s.done = true;
+    s.converged = loss < CONV_THRESH;
+  }
+}
+
+// ── Landscape init ────────────────────────────────────────────────────────────
+let lsG, pathGroups={}, dotGroups={};
+
+function initLandscape(){
+  const svg = d3.select('#svg-landscape');
+  svg.selectAll('*').remove();
+
+  svg.append('defs').append('clipPath').attr('id','ls-clip')
+    .append('rect').attr('width',LS.iw).attr('height',LS.ih);
+
+  const g = svg.append('g').attr('transform',`translate(${LS.ml},${LS.mt})`);
+  lsG = g;
+
+  // Build grid values
+  const vals = new Float64Array(GRID_N*GRID_N);
+  for(let j=0;j<GRID_N;j++){
+    for(let i=0;i<GRID_N;i++){
+      const x = XD[0]+(XD[1]-XD[0])*i/(GRID_N-1);
+      const y = YD[0]+(YD[1]-YD[0])*j/(GRID_N-1);
+      vals[j*GRID_N+i] = rosen(x,y);
+    }
+  }
+
+  // Log-spaced thresholds — spreads visual detail near the narrow valley
+  const maxV = 2500, nT = 35;
+  const thresh = Array.from({length:nT},(_,k)=>Math.exp(k*Math.log(maxV+1)/(nT-1))-1);
+  const cData = d3.contours().size([GRID_N,GRID_N]).thresholds(thresh)(vals);
+
+  const colorSc = d3.scaleSequential()
+    .domain([0, Math.log(maxV+1)])
+    .interpolator(t => d3.interpolateRdYlBu(1-t));
+
+  // Grid coords [0,GRID_N]×[0,GRID_N] → SVG pixels.
+  // j=0 is y=YD[0] (data bottom) → SVG bottom; j=GRID_N is y=YD[1] (top) → SVG top.
+  const cxSc = d3.scaleLinear().domain([0,GRID_N]).range([0,LS.iw]);
+  const cySc = d3.scaleLinear().domain([0,GRID_N]).range([LS.ih,0]);
+  const proj = d3.geoTransform({point(px,py){ this.stream.point(cxSc(px),cySc(py)); }});
+  const cPath = d3.geoPath().projection(proj);
+
+  g.append('g').attr('class','contour-fill')
+    .selectAll('path').data(cData).enter().append('path')
+    .attr('d',cPath)
+    .attr('fill',d=>colorSc(Math.log(d.value+1)))
+    .attr('stroke','none');
+
+  // White contour lines at coarser levels
+  const nL=14;
+  const lineThresh = Array.from({length:nL},(_,k)=>Math.exp(k*Math.log(maxV+1)/(nL-1))-1);
+  const lData = d3.contours().size([GRID_N,GRID_N]).thresholds(lineThresh)(vals);
+  g.append('g').attr('class','contour-lines')
+    .selectAll('path').data(lData).enter().append('path')
+    .attr('d',cPath).attr('fill','none')
+    .attr('stroke','rgba(255,255,255,0.28)').attr('stroke-width',0.6);
+
+  // Axes
+  g.append('g').attr('class','x-axis').attr('transform',`translate(0,${LS.ih})`)
+    .call(d3.axisBottom(xSc).ticks(5).tickSize(3))
+    .call(a=>a.select('.domain').attr('stroke','#bbb'))
+    .call(a=>a.selectAll('text').style('font-family','IBM Plex Mono,monospace').style('font-size','9px').attr('fill','#aaa'));
+
+  g.append('g').attr('class','y-axis')
+    .call(d3.axisLeft(ySc).ticks(5).tickSize(3))
+    .call(a=>a.select('.domain').attr('stroke','#bbb'))
+    .call(a=>a.selectAll('text').style('font-family','IBM Plex Mono,monospace').style('font-size','9px').attr('fill','#aaa'));
+
+  // Subtle reference lines at x=0, y=0
+  g.append('line').attr('x1',xSc(0)).attr('x2',xSc(0)).attr('y1',0).attr('y2',LS.ih)
+    .attr('stroke','rgba(255,255,255,0.15)').attr('stroke-width',1).attr('stroke-dasharray','4,3');
+  g.append('line').attr('x1',0).attr('x2',LS.iw).attr('y1',ySc(0)).attr('y2',ySc(0))
+    .attr('stroke','rgba(255,255,255,0.15)').attr('stroke-width',1).attr('stroke-dasharray','4,3');
+
+  // Global minimum marker
+  const mx=xSc(GMIN[0]), my=ySc(GMIN[1]);
+  g.append('circle').attr('cx',mx).attr('cy',my).attr('r',8)
+    .attr('fill','none').attr('stroke','white').attr('stroke-width',1.5).attr('opacity',0.6);
+  g.append('circle').attr('cx',mx).attr('cy',my).attr('r',3)
+    .attr('fill','white').attr('opacity',0.9);
+  g.append('text').attr('x',mx+10).attr('y',my-5)
+    .text('min (1,1)').attr('fill','white').attr('opacity',0.7)
+    .attr('font-size','8.5px').attr('font-family','IBM Plex Mono,monospace');
+
+  // Per-optimizer path and dot groups (drawn on top of contours)
+  OPTS.forEach(name=>{
+    pathGroups[name] = g.append('g').attr('class',`pg-${name}`).attr('clip-path','url(#ls-clip)');
+    dotGroups[name]  = g.append('g').attr('class',`dg-${name}`);
+    // Starting position marker
+    dotGroups[name].append('circle').attr('class','start-dot')
+      .attr('cx',xSc(START[0])).attr('cy',ySc(START[1]))
+      .attr('r',3.5).attr('fill',COL[name]).attr('stroke','white').attr('stroke-width',1)
+      .attr('opacity',0.6);
+  });
+}
+
+// ── Draw optimizer paths on landscape ────────────────────────────────────────
+function drawPaths(){
+  const lineFn = d3.line()
+    .x(d=>xSc(d[0])).y(d=>ySc(d[1]))
+    .curve(d3.curveCatmullRom.alpha(0.5));
+
+  OPTS.forEach(name=>{
+    const s = states[name];
+    const on = document.getElementById(`chk-${name}`).checked;
+    pathGroups[name].selectAll('*').remove();
+    dotGroups[name].selectAll('.cur-dot').remove();
+
+    if(!s || !on) return;
+    const pts = s.path;
+    if(pts.length < 2) return;
+
+    const TAIL = 60;
+    const fadeStart = Math.max(0, pts.length-TAIL);
+
+    if(fadeStart > 0){
+      pathGroups[name].append('path')
+        .datum(pts.slice(0, fadeStart+1))
+        .attr('d',lineFn).attr('fill','none')
+        .attr('stroke',COL[name]).attr('stroke-width',1.5).attr('opacity',0.22)
+        .attr('stroke-linejoin','round').attr('stroke-linecap','round');
+    }
+    pathGroups[name].append('path')
+      .datum(pts.slice(fadeStart))
+      .attr('d',lineFn).attr('fill','none')
+      .attr('stroke',COL[name]).attr('stroke-width',2).attr('opacity',1)
+      .attr('stroke-linejoin','round').attr('stroke-linecap','round');
+
+    const cur = pts[pts.length-1];
+    dotGroups[name].append('circle').attr('class','cur-dot')
+      .attr('cx',xSc(cur[0])).attr('cy',ySc(cur[1]))
+      .attr('r',5).attr('fill',COL[name]).attr('stroke','white').attr('stroke-width',2);
+  });
+}
+
+// ── Convergence curves ────────────────────────────────────────────────────────
+let cvG, lineGroups={};
+
+function initCurves(){
+  const svg = d3.select('#svg-curves');
+  svg.selectAll('*').remove();
+  svg.append('defs').append('clipPath').attr('id','cv-clip')
+    .append('rect').attr('width',CV.iw).attr('height',CV.ih);
+  const g = svg.append('g').attr('transform',`translate(${CV.ml},${CV.mt})`);
+  cvG = g;
+  // Z-order: grid → axes → threshold line → optimizer lines → threshold dots → axis labels
+  g.append('g').attr('class','cv-y-grid');
+  g.append('g').attr('class','cv-x-axis').attr('transform',`translate(0,${CV.ih})`);
+  g.append('g').attr('class','cv-y-axis');
+  g.append('g').attr('class','cv-threshold-layer');
+  OPTS.forEach(n=>{ lineGroups[n]=g.append('g').attr('class',`cv-${n}`).attr('clip-path','url(#cv-clip)'); });
+  g.append('g').attr('class','cv-threshold-dots');
+  g.append('text').attr('x',CV.iw/2).attr('y',CV.ih+28)
+    .attr('text-anchor','middle').attr('font-size','9px').attr('fill','#aaa')
+    .attr('font-family','IBM Plex Mono,monospace').text('Step');
+  g.append('text').attr('transform',`rotate(-90)`).attr('x',-CV.ih/2).attr('y',-43)
+    .attr('text-anchor','middle').attr('font-size','9px').attr('fill','#aaa')
+    .attr('font-family','IBM Plex Mono,monospace').text('Loss (log scale)');
+}
+
+const CONV_THRESH = 0.01;  // convergence threshold for curves tab
+const LOG_MIN     = 5e-4;  // floor for log scale (prevents log(0))
+
+function drawCurves(){
+  const maxStep = Math.max(...OPTS.map(n=>states[n]?.step||0));
+  if(maxStep===0) return;
+
+  let allLoss=[];
+  OPTS.forEach(n=>{
+    const s=states[n];
+    if(s && document.getElementById(`chk-${n}`).checked)
+      s.path.forEach(([x,y])=>allLoss.push(Math.max(rosen(x,y), LOG_MIN)));
+  });
+  if(allLoss.length===0) return;
+
+  const yMaxLog = Math.max(...allLoss, 1);
+  const xScC = d3.scaleLinear().domain([0, Math.max(maxStep,10)]).range([0, CV.iw]);
+  const yScC = d3.scaleLog().domain([LOG_MIN, yMaxLog]).range([CV.ih, 0]).clamp(true);
+
+  // Y gridlines (faint horizontal lines for log ticks)
+  cvG.select('.cv-y-grid')
+    .call(d3.axisLeft(yScC).ticks(6).tickSize(-CV.iw).tickFormat(''))
+    .call(a=>a.select('.domain').remove())
+    .call(a=>a.selectAll('line').attr('stroke','#f0ede6').attr('stroke-width',1));
+
+  // Axes
+  cvG.select('.cv-x-axis').call(d3.axisBottom(xScC).ticks(6).tickSize(3))
+    .call(a=>a.select('.domain').attr('stroke','#ddd'))
+    .call(a=>a.selectAll('text').style('font-family','IBM Plex Mono,monospace').style('font-size','8px').attr('fill','#aaa'));
+  cvG.select('.cv-y-axis').call(d3.axisLeft(yScC).ticks(6,'~g').tickSize(3))
+    .call(a=>a.select('.domain').attr('stroke','#ddd'))
+    .call(a=>a.selectAll('text').style('font-family','IBM Plex Mono,monospace').style('font-size','8px').attr('fill','#aaa'));
+
+  // Convergence threshold line + label
+  const threshG = cvG.select('.cv-threshold-layer');
+  threshG.selectAll('*').remove();
+  const ty = yScC(CONV_THRESH);
+  if(ty >= 0 && ty <= CV.ih){
+    threshG.append('line')
+      .attr('x1',0).attr('x2',CV.iw).attr('y1',ty).attr('y2',ty)
+      .attr('stroke','#777').attr('stroke-width',1).attr('stroke-dasharray','5,3').attr('opacity',0.5);
+    threshG.append('text')
+      .attr('x',CV.iw-3).attr('y',ty-4)
+      .attr('text-anchor','end').attr('font-size','7.5px').attr('fill','#777')
+      .attr('font-family','IBM Plex Mono,monospace').attr('opacity',0.75)
+      .text('Convergence threshold (0.01)');
+  }
+
+  // Optimizer curves
+  OPTS.forEach(n=>{
+    lineGroups[n].selectAll('*').remove();
+    const s=states[n];
+    if(!s || !document.getElementById(`chk-${n}`).checked || s.path.length<2) return;
+    const data=s.path.map(([x,y],i)=>({i, loss:Math.max(rosen(x,y), LOG_MIN)}));
+    const lineFn=d3.line()
+      .x(d=>xScC(d.i)).y(d=>yScC(d.loss))
+      .defined(d=>isFinite(yScC(d.loss)))
+      .curve(d3.curveCatmullRom.alpha(0.5));
+    lineGroups[n].append('path').datum(data)
+      .attr('d',lineFn).attr('fill','none').attr('stroke',COL[n])
+      .attr('stroke-width',2).attr('opacity',0.85);
+  });
+
+  // Threshold-crossing dots (drawn last, on top of lines)
+  const dotsG = cvG.select('.cv-threshold-dots');
+  dotsG.selectAll('*').remove();
+  OPTS.forEach(n=>{
+    const s=states[n];
+    if(!s || !document.getElementById(`chk-${n}`).checked || s.path.length<2) return;
+    const crossIdx = s.path.findIndex(([x,y])=>rosen(x,y) <= CONV_THRESH);
+    if(crossIdx<0) return;
+    const [cx,cy_] = s.path[crossIdx];
+    dotsG.append('circle')
+      .attr('cx', xScC(crossIdx))
+      .attr('cy', yScC(Math.max(rosen(cx,cy_), LOG_MIN)))
+      .attr('r',5).attr('fill',COL[n]).attr('stroke','white').attr('stroke-width',2);
+  });
+}
+
+// ── Gradient norm mini chart ──────────────────────────────────────────────────
+let gnG;
+
+function initGradNorm(){
+  const svg = d3.select('#svg-gradnorm');
+  svg.selectAll('*').remove();
+  svg.append('defs').append('clipPath').attr('id','gn-clip')
+    .append('rect').attr('width',GN.iw).attr('height',GN.ih);
+  const g = svg.append('g').attr('transform',`translate(${GN.ml},${GN.mt})`);
+  gnG = g;
+  g.append('g').attr('class','gn-x-axis').attr('transform',`translate(0,${GN.ih})`);
+  g.append('g').attr('class','gn-y-axis');
+}
+
+function drawGradNorm(){
+  const maxStep = Math.max(...OPTS.map(n=>states[n]?.step||0));
+  if(maxStep===0) return;
+
+  let allGN=[];
+  OPTS.forEach(n=>{
+    const s=states[n];
+    if(s && document.getElementById(`chk-${n}`).checked) allGN.push(...s.grads);
+  });
+  const yMax = Math.min(Math.max(...allGN, 1)*1.05, GRAD_CLIP*1.05);
+
+  const xScG = d3.scaleLinear().domain([0, Math.max(maxStep,10)]).range([0, GN.iw]);
+  const yScG = d3.scaleLinear().domain([0, yMax]).range([GN.ih, 0]);
+
+  gnG.select('.gn-x-axis').call(d3.axisBottom(xScG).ticks(3).tickSize(2))
+    .call(a=>a.select('.domain').attr('stroke','#ddd'))
+    .call(a=>a.selectAll('text').style('font-family','IBM Plex Mono,monospace').style('font-size','7px').attr('fill','#aaa'));
+  gnG.select('.gn-y-axis').call(d3.axisLeft(yScG).ticks(3).tickSize(2))
+    .call(a=>a.select('.domain').attr('stroke','#ddd'))
+    .call(a=>a.selectAll('text').style('font-family','IBM Plex Mono,monospace').style('font-size','7px').attr('fill','#aaa'));
+
+  gnG.selectAll('.gn-line').remove();
+  OPTS.forEach(n=>{
+    const s=states[n];
+    if(!s || !document.getElementById(`chk-${n}`).checked || s.grads.length<2) return;
+    const lineFn=d3.line()
+      .x((_,i)=>xScG(i+1)).y(d=>yScG(Math.min(d,yMax)))
+      .curve(d3.curveCatmullRom.alpha(0.5));
+    gnG.append('path').datum(s.grads).attr('class','gn-line')
+      .attr('d',lineFn).attr('fill','none').attr('stroke',COL[n])
+      .attr('stroke-width',1.5).attr('opacity',0.82)
+      .attr('clip-path','url(#gn-clip)');
+  });
+}
+
+// ── Status panel ──────────────────────────────────────────────────────────────
+function updateStatus(){
+  const convSteps={};
+  OPTS.forEach(n=>{
+    const s=states[n];
+    const on=document.getElementById(`chk-${n}`).checked;
+    const lEl=document.getElementById(`loss-${n}`);
+    const bEl=document.getElementById(`badge-${n}`);
+    if(!on){
+      lEl.textContent='—'; bEl.textContent='off'; bEl.className='osr-badge inactive'; return;
+    }
+    if(!s){ lEl.textContent='—'; return; }
+    const loss=rosen(s.x,s.y);
+    lEl.textContent = loss<0.001 ? loss.toExponential(1) : loss<10 ? loss.toFixed(3) : loss.toFixed(1);
+    if(s.step===0){
+      bEl.textContent='idle'; bEl.className='osr-badge inactive';
+    } else if(s.done && s.converged){
+      bEl.textContent='done'; bEl.className='osr-badge converged';
+      convSteps[n]=s.step;
+    } else if(s.done && !s.converged){
+      bEl.textContent='max'; bEl.className='osr-badge diverged';
+    } else {
+      bEl.textContent='run'; bEl.className='osr-badge running';
+    }
+  });
+  const cNames=Object.keys(convSteps);
+  if(cNames.length>0){
+    const sorted=cNames.sort((a,b)=>convSteps[a]-convSteps[b]);
+    document.getElementById('steps-fastest').textContent=convSteps[sorted[0]];
+    document.getElementById('steps-slowest').textContent=
+      cNames.length>1 ? convSteps[sorted[sorted.length-1]] : '—';
+  }
+  const totalStep=Math.max(...OPTS.map(n=>states[n]?.step||0));
+  document.getElementById('stat-step').textContent=totalStep;
+  const active=OPTS.filter(n=>document.getElementById(`chk-${n}`).checked && states[n] && !states[n].done).length;
+  document.getElementById('stat-active').textContent=active;
+}
+
+// ── Annotations ───────────────────────────────────────────────────────────────
+function currentTab(){
+  const btn=document.querySelector('#tab-bar button.active');
+  return btn ? btn.dataset.tab : 'landscape';
+}
+
+function updateAnno(){
+  const box=document.getElementById('anno-box');
+  const step=Math.max(...OPTS.map(n=>states[n]?.step||0));
+  const enabled=OPTS.filter(n=>document.getElementById(`chk-${n}`).checked);
+  const done=enabled.filter(n=>states[n]?.done);
+  const tab=currentTab();
+
+  if(step===0){
+    box.className='anno-box neutral';
+    box.textContent='Select optimizers and press Play to watch each navigate the Rosenbrock banana-shaped valley toward the minimum at (1,1).';
+    return;
+  }
+
+  // Convergence curves tab — use tab-specific messages
+  if(tab==='curves'){
+    const adamDone = states['adam']?.done && states['adam']?.converged;
+    const sgdOn    = document.getElementById('chk-sgd').checked;
+    const sgdStall = sgdOn && states['sgd'] && !states['sgd'].done && step > 100;
+    if(adamDone){
+      box.className='anno-box good';
+      box.textContent="Adam's adaptive learning rates navigate the curved valley efficiently — combining momentum and RMSProp gives it an edge on this problem.";
+      return;
+    }
+    if(sgdStall){
+      box.className='anno-box warn';
+      box.textContent="SGD is struggling in the narrow Rosenbrock valley — equal learning rates in all directions cause zigzagging. Watch how its loss curve flattens while adaptive methods keep descending.";
+      return;
+    }
+    box.className='anno-box';
+    box.textContent='Convergence Curves tab — watch loss values on a log scale. Steeper descent = faster learning. Flat lines = stalled or converged. Dots mark where each optimizer crosses the threshold.';
+    return;
+  }
+
+  // Landscape tab
+  if(done.length===enabled.length && enabled.length>0){
+    const conv=done.filter(n=>states[n]?.converged);
+    box.className='anno-box good';
+    box.textContent = conv.length===enabled.length
+      ? 'All active optimizers converged to (1,1). Compare step counts — adaptive methods typically need far fewer steps than vanilla SGD.'
+      : `${conv.length}/${enabled.length} converged within 500 steps. SGD and AdaGrad may stall in the narrow valley; Adam and RMSProp handle it best.`;
+    return;
+  }
+  // When both Adam and AdamW are active — highlight the key pedagogical difference
+  const adamOn  = document.getElementById('chk-adam').checked;
+  const adamwOn = document.getElementById('chk-adamw').checked;
+  if(adamOn && adamwOn && step > 5){
+    box.className='anno-box';
+    box.textContent='AdamW and Adam take nearly identical paths on Rosenbrock — the difference shows up in generalization, not convergence speed. AdamW is preferred in practice.';
+    return;
+  }
+
+  if(step<=5){
+    box.className='anno-box';
+    box.textContent='First steps: all methods follow the gradient from (-1.5, 1.5). SGD takes pure steepest-descent; adaptive methods start accumulating gradient history for per-parameter scaling.';
+  } else if(step<=30){
+    box.className='anno-box';
+    box.textContent='Early phase: Momentum builds velocity along the banana valley; AdaGrad shrinks step sizes in high-curvature dimensions; Adam\'s bias-correction keeps early steps well-scaled. Watch the paths diverge.';
+  } else if(step<=120){
+    box.className='anno-box';
+    box.textContent='The narrow Rosenbrock valley reveals each optimizer\'s character. SGD zigzags between the walls; Momentum curves more smoothly; RMSProp and Adam take assured steps toward (1,1).';
+  } else {
+    box.className='anno-box';
+    box.textContent='Late training: AdaGrad\'s G keeps growing, eventually freezing learning. RMSProp\'s decaying average prevents that. Which optimizer is closest to the global minimum?';
+  }
+}
+
+function updateLabels(){
+  const step=Math.max(...OPTS.map(n=>states[n]?.step||0));
+  document.getElementById('landscape-label').textContent=`Loss Landscape — step ${step}`;
+  document.getElementById('curves-label').textContent=`Convergence Curves — step ${step}`;
+}
+
+// ── Full redraw ───────────────────────────────────────────────────────────────
+function redraw(){
+  drawPaths();
+  drawCurves();
+  drawGradNorm();
+  updateStatus();
+  updateAnno();
+  updateLabels();
+}
+
+// ── Animation ─────────────────────────────────────────────────────────────────
+let playing=false, animTimer=null;
+
+function stepAll(){
+  const p=readParams();
+  const lrMult=p.lr/LR_BASE;
+  OPTS.forEach(n=>{
+    const s=states[n];
+    if(!s) return;
+    s.lr=OPT_LR[n]*lrMult;   // per-optimizer default × slider multiplier
+    if(n==='momentum') s.beta=p.beta;
+    if(n==='adam'){ s.b1=p.beta1; s.b2=p.beta2; }
+    if(n==='adamw'){ s.b1=p.beta1; s.b2=p.beta2; s.lam=p.lambda; }
+  });
+  OPTS.forEach(n=>{
+    if(document.getElementById(`chk-${n}`).checked && states[n] && !states[n].done)
+      stepOpt(n);
+  });
+  redraw();
+}
+
+function isAllDone(){
+  return OPTS.every(n=>!document.getElementById(`chk-${n}`).checked || !states[n] || states[n].done);
+}
+
+function startPlay(){
+  if(playing) return;
+  playing=true;
+  const btn=document.getElementById('btn-play');
+  btn.textContent='⏸ Pause'; btn.classList.add('playing'); btn.classList.remove('primary');
+  const delay=SPEED_MS[+document.getElementById('sld-speed').value];
+  const tick=()=>{
+    stepAll();
+    if(!playing || isAllDone()){ stopPlay(); return; }
+    animTimer=setTimeout(tick, delay);
+  };
+  animTimer=setTimeout(tick, 0);
+}
+
+function stopPlay(){
+  playing=false;
+  clearTimeout(animTimer);
+  const btn=document.getElementById('btn-play');
+  btn.textContent='⏵ Play'; btn.classList.remove('playing'); btn.classList.add('primary');
+}
+
+function doReset(){
+  stopPlay();
+  initStates();
+  document.getElementById('steps-fastest').textContent='—';
+  document.getElementById('steps-slowest').textContent='—';
+  redraw();
+}
+
+// ── Slider display binding ────────────────────────────────────────────────────
+// resetOnChange: display updates on every 'input'; reset fires on 'change' (mouseup)
+function bindSlider(id, dispId, fmt, resetOnChange=false){
+  const sl=document.getElementById(id), dv=document.getElementById(dispId);
+  sl.addEventListener('input',()=>{ dv.textContent=fmt(+sl.value); });
+  if(resetOnChange) sl.addEventListener('change', doReset);
+}
+bindSlider('sld-lr',     'val-lr',     v=>v.toFixed(3), true);
+bindSlider('sld-beta',   'val-beta',   v=>v.toFixed(2), true);
+bindSlider('sld-beta1',  'val-beta1',  v=>v.toFixed(2), true);
+bindSlider('sld-beta2',  'val-beta2',  v=>v.toFixed(4), true);
+bindSlider('sld-lambda', 'val-lambda', v=>v.toFixed(3), true);
+document.getElementById('sld-speed').addEventListener('input',e=>{
+  document.getElementById('val-speed').textContent=['Slow','Med','Fast'][+e.target.value];
+  if(playing){ stopPlay(); startPlay(); }
+});
+
+// ── Control buttons ───────────────────────────────────────────────────────────
+document.getElementById('btn-play').addEventListener('click',()=>{
+  if(playing){ stopPlay(); return; }
+  if(isAllDone()) doReset();
+  startPlay();
+});
+document.getElementById('btn-step').addEventListener('click',()=>{ stopPlay(); stepAll(); });
+document.getElementById('btn-reset').addEventListener('click', doReset);
+
+// ── Checkboxes ────────────────────────────────────────────────────────────────
+OPTS.forEach(n=>{
+  document.getElementById(`chk-${n}`).addEventListener('change',e=>{
+    e.target.closest('.opt-row').classList.toggle('active', e.target.checked);
+    if(n==='momentum')
+      document.getElementById('section-momentum').style.display=e.target.checked?'block':'none';
+    if(n==='adam')
+      document.getElementById('section-adam').style.display=e.target.checked?'block':'none';
+    if(n==='adamw')
+      document.getElementById('section-adamw').style.display=e.target.checked?'block':'none';
+    redraw();
+  });
+});
+
+// ── Tab bar ───────────────────────────────────────────────────────────────────
+document.getElementById('tab-bar').addEventListener('click',e=>{
+  const btn=e.target.closest('button');
+  if(!btn) return;
+  document.querySelectorAll('#tab-bar button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const tab=btn.dataset.tab;
+  ['landscape','curves'].forEach(t=>{
+    document.getElementById(`panel-${t}`).classList.toggle('active', t===tab);
+  });
+});
+
+// ── Key Concepts toggle ───────────────────────────────────────────────────────
+document.getElementById('concepts-toggle').addEventListener('click',()=>{
+  const body=document.getElementById('concepts-body');
+  const arrow=document.getElementById('concepts-arrow');
+  body.classList.toggle('collapsed');
+  arrow.textContent=body.classList.contains('collapsed')?'▸':'▾';
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+initStates();
+initLandscape();
+initCurves();
+initGradNorm();
+// Conditional param sections default visible (checkboxes start checked)
+document.getElementById('section-momentum').style.display='block';
+document.getElementById('section-adam').style.display='block';
+document.getElementById('section-adamw').style.display='block';
+redraw();
+
+})();
+</script>
 
 <footer id="course-nav-footer" style="margin-top:1.5rem;padding:0.75rem 0 0 1rem;border-top:1px solid #E0DAC0;font-size:0.8rem;color:#78786A;text-align:left;">
   <a href="../" style="color:#2e7d32;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">&larr; All course visualizations</a>

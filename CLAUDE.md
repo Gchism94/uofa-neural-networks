@@ -177,6 +177,7 @@ Add a row to the appropriate table under `## Contents`:
 - `regularization/l1l2_explorer.html`
 - `dropout/dropout_explorer.html`
 - `early_stopping/es_explorer.html`
+- `optimizers/optimizer_explorer.html`
 
 ---
 
