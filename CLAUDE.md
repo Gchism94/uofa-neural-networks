@@ -178,6 +178,7 @@ Add a row to the appropriate table under `## Contents`:
 - `dropout/dropout_explorer.html`
 - `early_stopping/es_explorer.html`
 - `optimizers/optimizer_explorer.html`
+- `batch_norm/bn_explorer.html`
 
 ---
 

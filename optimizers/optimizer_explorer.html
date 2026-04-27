@@ -574,7 +574,7 @@ const OPTS  = ['sgd','momentum','adagrad','rmsprop','adam','adamw'];
 const COL   = {sgd:'#888888',momentum:'#1A56A0',adagrad:'#7B3FC4',rmsprop:'#E8630A',adam:'#2e7d32',adamw:'#C62828'};
 const START = [-1.5, 1.5];
 const GMIN  = [1, 1];
-const MAX_STEPS  = 500;
+const MAX_STEPS  = 1000;
 const GRAD_CLIP  = 1.0;      // clip gradient to unit norm — same clip for all optimizers
 const SPEED_MS   = [300, 80, 18];
 
@@ -1079,7 +1079,7 @@ function updateAnno(){
     box.className='anno-box good';
     box.textContent = conv.length===enabled.length
       ? 'All active optimizers converged to (1,1). Compare step counts — adaptive methods typically need far fewer steps than vanilla SGD.'
-      : `${conv.length}/${enabled.length} converged within 500 steps. SGD and AdaGrad may stall in the narrow valley; Adam and RMSProp handle it best.`;
+      : `${conv.length}/${enabled.length} converged within 1,000 steps. SGD and AdaGrad may stall in the narrow valley; Adam and RMSProp handle it best.`;
     return;
   }
   // When both Adam and AdamW are active — highlight the key pedagogical difference

@@ -84,6 +84,7 @@ as iframes.
 | [`dropout/dropout_explorer.html`](dropout/dropout_explorer.html) | Watch nodes randomly drop during training, then see the full network activate at inference with inverted-dropout weight scaling — exploring how dropout prevents overfitting by training an ensemble of subnetworks |
 | [`early_stopping/es_explorer.html`](early_stopping/es_explorer.html) | Watch training and validation loss diverge as a neural network overfits — step through epochs to find the optimal stopping point, and see how patience and model complexity affect when to halt training |
 | [`optimizers/optimizer_explorer.html`](optimizers/optimizer_explorer.html) | Watch SGD, Momentum, AdaGrad, RMSProp, and Adam navigate the Rosenbrock loss landscape — see why adaptive methods converge faster and how hyperparameters shape each optimizer's path |
+| [`batch_norm/bn_explorer.html`](batch_norm/bn_explorer.html) | See how batch norm stabilizes activation distributions and accelerates training by reducing internal covariate shift — step through the four normalization operations and watch training diverge without BN |
 
 ### Cellular Automata
 

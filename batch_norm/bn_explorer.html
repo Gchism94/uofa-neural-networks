@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<!-- Copyright © 2026 Greg T. Chism. University of Arizona, College of Information Science.
+     INFO 557: Neural Networks. MIT License. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Batch Normalization — Interactive Explorer | INFO 557: Neural Networks</title>
+<meta name="description" content="See how batch norm stabilizes activation distributions and accelerates training by reducing internal covariate shift — step through the four normalization operations and watch training diverge without BN.">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Batch Normalization — Interactive Explorer">
+<meta property="og:description" content="See how batch norm stabilizes activation distributions and accelerates training by reducing internal covariate shift — step through the four normalization operations and watch training diverge without BN.">
+<meta property="og:image" content="https://gchism94.github.io/uofa-neural-networks/batch_norm/bn_explorer-preview.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="600">
+<meta property="og:url" content="https://gchism94.github.io/uofa-neural-networks/batch_norm/bn_explorer.html">
+<meta property="fb:app_id" content="2385695445236853">
+
+<!-- Twitter/X card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Batch Normalization — Interactive Explorer">
+<meta name="twitter:description" content="See how batch norm stabilizes activation distributions and accelerates training by reducing internal covariate shift — step through the four normalization operations and watch training diverge without BN.">
+<meta name="twitter:image" content="https://gchism94.github.io/uofa-neural-networks/batch_norm/bn_explorer-preview.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+
+<style>
+/* ── Design tokens ──────────────────────────────────────────────── */
+:root{
+  --cream:#FAF7F0;--cream-mid:#F0EBE0;--cream-dk:#E2D9C5;
+  --g-dk:#1C3A0E;--g-mid:#2D5A1B;--g-lt:#4A8C2F;--g-pale:#C8E6A8;
+  --orange:#E8630A;--orange-lt:#F08C50;--orange-dk:#C0500A;
+  --blue:#1A56A0;--blue-pale:#D0E4F8;
+  --red:#B0321D;--red-pale:#F8DDD8;
+  --purple:#7B3FC4;--purple-pale:#E8D8F8;
+  --text:#1A1A1A;--text-muted:#888;--text-soft:#555;
+  --border:#C8BE9A;--border-lt:#DDD6BE;--shadow:rgba(44,90,27,.10);
+
+  /* BN comparison palette */
+  --bn-on:#2e7d32;
+  --bn-off:#E8630A;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:'Outfit',sans-serif;background:var(--cream);color:var(--text);
+  padding:1.25rem 1rem 2rem;min-height:100vh;line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:.85rem}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+.hdr{display:flex;justify-content:space-between;align-items:flex-start;column-gap:1rem;row-gap:.35rem;flex-wrap:wrap}
+.hdr>div:first-child{flex:1 1 auto;min-width:0}
+.hdr h1{font-size:clamp(1.25rem,2.2vw,1.6rem);font-weight:700;color:var(--g-dk);letter-spacing:-.02em;line-height:1.2}
+.hdr p.subtitle{font-size:.86rem;color:var(--text-muted);margin-top:.18rem}
+.hdr-rule{border:none;border-top:2.5px solid var(--g-dk);margin-top:.55rem}
+
+/* ── Fixed copyright ─────────────────────────────────────────────── */
+.cr-top{
+  position:fixed;top:.75rem;right:1rem;z-index:1000;
+  font-size:.72rem;color:var(--text-muted);text-align:right;
+  background:rgba(250,247,240,.92);padding:.2rem 1.5rem .2rem .5rem;
+  border-radius:5px;backdrop-filter:blur(4px);
+  border:1px solid var(--border-lt);white-space:nowrap;min-width:max-content;
+}
+.cr-top a{color:var(--orange);text-decoration:none}
+.cr-top a:hover{text-decoration:underline}
+
+/* ── Tab bar ─────────────────────────────────────────────────────── */
+.tab-bar{
+  display:flex;gap:.35rem;background:var(--cream-mid);
+  border:1px solid var(--border);border-radius:8px;
+  padding:.3rem;width:fit-content;
+}
+.tab-bar button{
+  font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:500;
+  padding:.3rem .9rem;border-radius:6px;cursor:pointer;
+  border:none;background:transparent;color:var(--text-soft);
+  transition:all .15s;
+}
+.tab-bar button:hover{background:white;color:var(--g-dk)}
+.tab-bar button.active{background:white;color:var(--g-dk);font-weight:600;
+  box-shadow:0 1px 4px var(--shadow);}
+
+/* ── Explorer grid ───────────────────────────────────────────────── */
+.explorer-grid{
+  display:grid;
+  grid-template-columns:260px 1fr 220px;
+  gap:.85rem;
+  align-items:start;
+}
+@media(max-width:980px){
+  .explorer-grid{grid-template-columns:260px 1fr}
+  .right-col{display:none}
+}
+@media(max-width:680px){
+  .explorer-grid{grid-template-columns:1fr}
+}
+.left-col{display:flex;flex-direction:column;gap:.75rem}
+.center-col{display:flex;flex-direction:column;gap:.75rem}
+.right-col{display:flex;flex-direction:column;gap:.75rem}
+
+/* ── Cards ───────────────────────────────────────────────────────── */
+.card{background:white;border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem;box-shadow:0 2px 8px var(--shadow)}
+.card-title{font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--g-dk);margin-bottom:.55rem}
+
+/* ── Selectors ───────────────────────────────────────────────────── */
+.sel-group{display:flex;gap:.3rem;flex-wrap:wrap;margin-bottom:.45rem}
+.sel-btn{
+  font-family:'Outfit',sans-serif;font-size:.75rem;font-weight:500;
+  padding:.25rem .6rem;border-radius:5px;cursor:pointer;
+  border:1.5px solid var(--border-lt);background:var(--cream);color:var(--text-soft);
+  transition:all .12s;
+}
+.sel-btn:hover{background:var(--cream-mid)}
+.sel-btn.active{background:var(--g-mid);border-color:var(--g-mid);color:white}
+
+/* ── BN toggle ───────────────────────────────────────────────────── */
+.bn-toggle{
+  display:flex;gap:0;border-radius:6px;overflow:hidden;
+  border:1.5px solid var(--border);margin-bottom:.45rem;
+}
+.bn-toggle button{
+  font-family:'Outfit',sans-serif;font-size:.78rem;font-weight:500;
+  padding:.3rem 0;flex:1;border:none;cursor:pointer;
+  background:var(--cream);color:var(--text-soft);transition:all .12s;
+}
+.bn-toggle button.on.active{background:var(--bn-on);color:white}
+.bn-toggle button.off.active{background:var(--bn-off);color:white}
+.bn-toggle button:not(.active):hover{background:var(--cream-mid)}
+
+/* ── Sliders ─────────────────────────────────────────────────────── */
+.srow{display:flex;align-items:center;gap:.45rem;margin-bottom:.2rem}
+.slbl{font-family:'IBM Plex Mono',monospace;font-size:.82rem;font-weight:500;color:var(--g-dk);min-width:28px}
+input[type=range]{flex:1;appearance:none;-webkit-appearance:none;height:4px;background:var(--cream-dk);border-radius:2px;cursor:pointer;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--g-mid);border:2.5px solid white;box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:pointer}
+.sval{font-family:'IBM Plex Mono',monospace;font-size:.76rem;color:var(--text-muted);min-width:44px;text-align:right}
+.hint-txt{font-size:.7rem;color:var(--text-muted);font-style:italic;margin-top:.15rem;padding-left:1.6rem}
+.param-lbl{font-size:.72rem;color:var(--text-soft);margin-bottom:.25rem;font-weight:500}
+
+/* ── Buttons ─────────────────────────────────────────────────────── */
+.ctrl-btns{display:flex;gap:.45rem;flex-wrap:wrap}
+.pbtn{
+  font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:600;
+  padding:.35rem .9rem;border-radius:6px;cursor:pointer;
+  border:1.5px solid var(--border);background:var(--cream);color:var(--g-dk);
+  transition:all .12s;
+}
+.pbtn:hover{background:var(--g-pale);border-color:var(--g-lt)}
+.pbtn.primary{background:var(--g-mid);border-color:var(--g-mid);color:white}
+.pbtn.primary:hover{background:var(--g-dk);border-color:var(--g-dk)}
+
+/* ── Annotation box ──────────────────────────────────────────────── */
+.anno-box{
+  border-radius:6px;padding:.55rem .75rem;font-size:.78rem;line-height:1.55;
+  background:var(--blue-pale);color:var(--blue);border-left:3px solid var(--blue);
+  min-height:3.5rem;
+}
+.anno-box.warn{background:var(--red-pale);color:var(--red);border-color:var(--red)}
+.anno-box.good{background:var(--g-pale);color:var(--g-dk);border-color:var(--g-mid)}
+.anno-box.neutral{background:var(--cream-mid);color:var(--text-soft);border-color:var(--border)}
+
+/* ── Key Concepts ────────────────────────────────────────────────── */
+.concepts-body{overflow:hidden;max-height:900px;transition:max-height .3s ease}
+.concepts-body.collapsed{max-height:0;margin-bottom:-.55rem}
+.concepts-item{font-size:.74rem;color:var(--text-soft);line-height:1.5;margin-bottom:.45rem;padding-left:.9rem;position:relative}
+.concepts-item:last-child{margin-bottom:0}
+.concepts-item::before{content:'●';color:#2e7d32;position:absolute;left:0;top:0}
+.concepts-item strong{color:#2e7d32;font-weight:600}
+
+/* ── Status bar ──────────────────────────────────────────────────── */
+.status-bar{
+  display:flex;gap:.6rem;flex-wrap:wrap;font-family:'IBM Plex Mono',monospace;
+  font-size:.72rem;color:var(--text-muted);
+}
+.stat-pill{
+  background:var(--cream-mid);border:1px solid var(--border-lt);
+  border-radius:12px;padding:.15rem .55rem;
+}
+.stat-pill span{color:var(--g-dk);font-weight:600}
+
+/* ── Chart wrappers ──────────────────────────────────────────────── */
+.chart-wrap{width:100%;aspect-ratio:4/3}
+.chart-wrap svg{width:100%;height:100%;display:block;border-radius:5px}
+.chart-wrap-wide{width:100%;aspect-ratio:5/3}
+.chart-wrap-wide svg{width:100%;height:100%;display:block;border-radius:5px}
+.chart-wrap-tall{width:100%;aspect-ratio:3/2}
+.chart-wrap-tall svg{width:100%;height:100%;display:block;border-radius:5px}
+
+/* ── Plot label ──────────────────────────────────────────────────── */
+.plot-label{font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);text-align:center;margin-bottom:.35rem}
+
+/* ── Legend ──────────────────────────────────────────────────────── */
+.legend{display:flex;gap:.75rem;flex-wrap:wrap;font-size:.72rem;color:var(--text-soft);margin-top:.45rem;align-items:center}
+.legend-dot{width:10px;height:10px;border-radius:50%;display:inline-block;vertical-align:middle;margin-right:.25rem;flex-shrink:0}
+.legend-line{width:18px;height:2.5px;display:inline-block;vertical-align:middle;margin-right:.2rem;border-radius:2px}
+
+/* ── Tab content panels ──────────────────────────────────────────── */
+.tab-panel{display:none}
+.tab-panel.active{display:flex;flex-direction:column;gap:.75rem}
+
+/* ── Distribution rows (Tab 1) ───────────────────────────────────── */
+.dist-row{display:flex;flex-direction:column;gap:.5rem}
+.dist-row-label{
+  font-size:.67rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+  padding:.2rem .6rem;border-radius:4px;width:fit-content;
+}
+.dist-row-label.bn-on{background:var(--g-pale);color:var(--g-dk)}
+.dist-row-label.bn-off{background:#FDDBC8;color:var(--orange-dk)}
+.dist-svg-row{display:flex;gap:.4rem;overflow-x:auto}
+.dist-cell{flex:1;min-width:80px}
+.dist-cell-lbl{font-size:.62rem;color:var(--text-muted);text-align:center;margin-bottom:.15rem;font-family:'IBM Plex Mono',monospace}
+
+/* ── BN steps diagram (Tab 2) ────────────────────────────────────── */
+.bn-steps-grid{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:.6rem;
+}
+@media(max-width:700px){
+  .bn-steps-grid{grid-template-columns:repeat(2,1fr)}
+}
+.bn-step-card{
+  background:var(--cream);border:1.5px solid var(--border-lt);border-radius:8px;
+  padding:.7rem .75rem;display:flex;flex-direction:column;gap:.35rem;
+}
+.bn-step-num{
+  font-family:'IBM Plex Mono',monospace;font-size:.62rem;font-weight:600;
+  color:white;background:var(--g-mid);border-radius:3px;
+  padding:.1rem .35rem;width:fit-content;
+}
+.bn-step-title{font-size:.78rem;font-weight:600;color:var(--g-dk)}
+.bn-step-formula{
+  font-family:'IBM Plex Mono',monospace;font-size:.72rem;color:var(--text-soft);
+  background:var(--cream-mid);border-radius:4px;padding:.3rem .45rem;
+  line-height:1.6;
+}
+.bn-step-desc{font-size:.7rem;color:var(--text-muted);line-height:1.45}
+.bn-step-svg{width:100%;aspect-ratio:4/3}
+.bn-step-svg svg{width:100%;height:100%;display:block;border-radius:4px}
+
+/* ── Training stability chart (Tab 3) ───────────────────────────── */
+.stability-row{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+@media(max-width:600px){
+  .stability-row{grid-template-columns:1fr}
+}
+.stability-cell-lbl{
+  font-size:.67rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+  text-align:center;margin-bottom:.3rem;
+}
+
+/* ── Right panel — layer stats ───────────────────────────────────── */
+.layer-stat-list{display:flex;flex-direction:column;gap:.4rem}
+.layer-stat-row{
+  background:var(--cream);border:1px solid var(--border-lt);border-radius:6px;
+  padding:.3rem .5rem;
+}
+.lsr-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.2rem}
+.lsr-name{font-size:.72rem;font-weight:600;color:var(--g-dk)}
+.lsr-badge{
+  font-size:.6rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
+  padding:.08rem .3rem;border-radius:5px;background:var(--g-pale);color:var(--g-dk);
+}
+.lsr-stats{display:grid;grid-template-columns:1fr 1fr;gap:.2rem .4rem}
+.lsr-stat{font-size:.66rem;color:var(--text-muted);font-family:'IBM Plex Mono',monospace}
+.lsr-stat span{color:var(--g-dk);font-weight:500}
+
+/* ── γ/β param panel ─────────────────────────────────────────────── */
+.param-grid{display:grid;grid-template-columns:1fr 1fr;gap:.35rem}
+.param-block{
+  background:var(--cream);border:1px solid var(--border-lt);border-radius:6px;
+  padding:.35rem .5rem;text-align:center;
+}
+.param-val{display:block;font-family:'IBM Plex Mono',monospace;font-size:.95rem;font-weight:600;color:var(--g-dk);line-height:1.2}
+.param-name{font-size:.6rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;margin-top:.06rem}
+
+/* ── Running stats panel ─────────────────────────────────────────── */
+.running-stat-row{
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:.7rem;padding:.25rem 0;border-bottom:1px solid var(--border-lt);
+}
+.running-stat-row:last-child{border-bottom:none}
+.running-stat-row .rsr-lbl{color:var(--text-muted);font-family:'IBM Plex Mono',monospace}
+.running-stat-row .rsr-val{color:var(--g-dk);font-weight:600;font-family:'IBM Plex Mono',monospace}
+</style>
+</head>
+<body>
+
+<div class="cr-top">© 2026 Greg T. Chism · <a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a></div>
+
+<div class="wrap">
+
+<header>
+  <div class="hdr">
+    <div>
+      <h1>Batch Normalization — Interactive Explorer</h1>
+      <p class="subtitle">See how batch norm stabilizes activation distributions and accelerates training by reducing internal covariate shift</p>
+    </div>
+  </div>
+  <hr class="hdr-rule">
+</header>
+
+<!-- Tab bar -->
+<div class="tab-bar" id="tab-bar">
+  <button class="active" data-tab="distributions">Layer Distributions</button>
+  <button data-tab="steps">Normalization Steps</button>
+  <button data-tab="stability">Training Stability</button>
+</div>
+
+<!-- Main explorer -->
+<div class="explorer-grid">
+
+  <!-- LEFT: Controls -->
+  <div class="left-col">
+
+    <!-- Network configuration -->
+    <div class="card">
+      <div class="card-title">Network Configuration</div>
+
+      <!-- Depth selector -->
+      <div class="param-lbl">Network Depth</div>
+      <div class="sel-group" id="depth-selector">
+        <button class="sel-btn active" data-depth="2">Shallow (2)</button>
+        <button class="sel-btn" data-depth="4">Medium (4)</button>
+        <button class="sel-btn" data-depth="8">Deep (8)</button>
+      </div>
+
+      <!-- Batch Norm toggle -->
+      <div class="param-lbl">Batch Normalization</div>
+      <div class="bn-toggle" id="bn-toggle">
+        <button class="on active" data-bn="on">BN On</button>
+        <button class="off" data-bn="off">BN Off</button>
+      </div>
+      <div class="hint-txt" style="margin-bottom:.5rem">Compare activation distributions with and without batch norm</div>
+
+      <!-- Batch size selector -->
+      <div class="param-lbl">Batch Size</div>
+      <div class="sel-group" id="batch-selector">
+        <button class="sel-btn" data-batch="16">16</button>
+        <button class="sel-btn active" data-batch="32">32</button>
+        <button class="sel-btn" data-batch="64">64</button>
+        <button class="sel-btn" data-batch="128">128</button>
+      </div>
+    </div>
+
+    <!-- Training parameters -->
+    <div class="card">
+      <div class="card-title">Training Parameters</div>
+
+      <!-- Learning rate -->
+      <div class="srow">
+        <span class="slbl">η</span>
+        <input type="range" id="sld-lr" min="0.001" max="0.1" step="0.001" value="0.01">
+        <span class="sval" id="val-lr">0.010</span>
+      </div>
+      <div class="hint-txt">Learning rate — try higher values to see BN's stabilizing effect</div>
+    </div>
+
+    <!-- Simulation controls -->
+    <div class="card">
+      <div class="card-title">Simulation</div>
+      <div class="ctrl-btns" style="margin-bottom:.45rem">
+        <button id="btn-play" class="pbtn primary" style="flex:1">⏵ Play</button>
+        <button id="btn-step" class="pbtn">⏭ Step</button>
+      </div>
+      <div class="ctrl-btns">
+        <button id="btn-reset" class="pbtn" style="flex:1">↺ Reset</button>
+      </div>
+      <div class="srow" style="margin-top:.5rem">
+        <span class="slbl" style="font-size:.72rem;min-width:42px">Speed</span>
+        <input type="range" id="sld-speed" min="0" max="2" step="1" value="1">
+        <span class="sval" id="val-speed">Med</span>
+      </div>
+    </div>
+
+    <!-- Annotation -->
+    <div class="card">
+      <div class="card-title">What's happening?</div>
+      <div class="anno-box neutral" id="anno-box">Select a depth, set a learning rate, and press Play to watch batch normalization stabilize activation distributions layer by layer.</div>
+    </div>
+
+    <!-- Key Concepts -->
+    <div class="card" id="card-concepts">
+      <div class="card-title" style="cursor:pointer;user-select:none" id="concepts-toggle">
+        Key Concepts <span id="concepts-arrow">▾</span>
+      </div>
+      <div class="concepts-body" id="concepts-body">
+        <div class="concepts-item"><strong>Internal covariate shift:</strong> as a network trains, earlier layers' parameters change — shifting the input distribution to each subsequent layer. Deeper layers must constantly adapt, slowing convergence and requiring careful initialization.</div>
+        <div class="concepts-item"><strong>Normalization step:</strong> for each mini-batch, BN computes the mean and variance of each feature, then normalizes to zero mean and unit variance. This keeps the input distribution to each layer stable regardless of upstream parameter changes.</div>
+        <div class="concepts-item"><strong>γ and β (scale and shift):</strong> learnable parameters that follow normalization. Without them, BN would force all activations to N(0,1), losing representational power. γ and β let the network learn the optimal scale and mean for each feature — including recovering the identity if that's best.</div>
+        <div class="concepts-item"><strong>Higher learning rates:</strong> normalized inputs reduce sensitivity to weight scale and initialization. Networks with BN can be trained with 5–10× higher learning rates without diverging — the stabilized distributions prevent gradient explosion and vanishing.</div>
+        <div class="concepts-item"><strong>Training vs. inference:</strong> during training, BN normalizes using the current mini-batch's mean and variance. During inference, it uses exponential moving averages of those statistics accumulated over training — so batch size doesn't affect inference.</div>
+      </div>
+    </div>
+
+    <!-- Status bar -->
+    <div class="status-bar">
+      <div class="stat-pill">Epoch <span id="stat-epoch">0</span></div>
+      <div class="stat-pill">Batch <span id="stat-batch">0</span></div>
+    </div>
+
+  </div>
+
+  <!-- CENTER: Tab content -->
+  <div class="center-col">
+
+    <!-- Tab 1: Layer Distributions -->
+    <div class="tab-panel active" id="panel-distributions">
+
+      <!-- With BN row -->
+      <div class="card">
+        <div class="plot-label">Activation Distributions — With Batch Norm</div>
+        <div class="dist-row">
+          <div class="dist-row-label bn-on">With BN</div>
+          <div class="dist-svg-row" id="dist-row-on">
+            <!-- Layer histogram cells rendered here by JS -->
+            <div class="dist-cell">
+              <div class="dist-cell-lbl">Layer 1</div>
+              <svg viewBox="0 0 100 70" style="width:100%;display:block;border-radius:4px">
+                <rect width="100" height="70" fill="#FDFAF5"/>
+                <text x="50" y="35" text-anchor="middle" dominant-baseline="middle"
+                      fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="8">histogram</text>
+              </svg>
+            </div>
+            <div class="dist-cell">
+              <div class="dist-cell-lbl">Layer 2</div>
+              <svg viewBox="0 0 100 70" style="width:100%;display:block;border-radius:4px">
+                <rect width="100" height="70" fill="#FDFAF5"/>
+                <text x="50" y="35" text-anchor="middle" dominant-baseline="middle"
+                      fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="8">histogram</text>
+              </svg>
+            </div>
+          </div>
+        </div>
+        <div class="legend" style="margin-top:.55rem">
+          <span><span class="legend-dot" style="background:var(--bn-on)"></span>With BN — activations stay near N(0,1)</span>
+        </div>
+      </div>
+
+      <!-- Without BN row -->
+      <div class="card">
+        <div class="plot-label">Activation Distributions — Without Batch Norm</div>
+        <div class="dist-row">
+          <div class="dist-row-label bn-off">Without BN</div>
+          <div class="dist-svg-row" id="dist-row-off">
+            <div class="dist-cell">
+              <div class="dist-cell-lbl">Layer 1</div>
+              <svg viewBox="0 0 100 70" style="width:100%;display:block;border-radius:4px">
+                <rect width="100" height="70" fill="#FDFAF5"/>
+                <text x="50" y="35" text-anchor="middle" dominant-baseline="middle"
+                      fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="8">histogram</text>
+              </svg>
+            </div>
+            <div class="dist-cell">
+              <div class="dist-cell-lbl">Layer 2</div>
+              <svg viewBox="0 0 100 70" style="width:100%;display:block;border-radius:4px">
+                <rect width="100" height="70" fill="#FDFAF5"/>
+                <text x="50" y="35" text-anchor="middle" dominant-baseline="middle"
+                      fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="8">histogram</text>
+              </svg>
+            </div>
+          </div>
+        </div>
+        <div class="legend" style="margin-top:.55rem">
+          <span><span class="legend-dot" style="background:var(--bn-off)"></span>Without BN — distributions drift and widen over training</span>
+        </div>
+      </div>
+
+    </div><!-- end panel-distributions -->
+
+    <!-- Tab 2: Normalization Steps -->
+    <div class="tab-panel" id="panel-steps">
+      <div class="card">
+        <div class="plot-label">The Four Batch Normalization Operations</div>
+        <div class="bn-steps-grid">
+
+          <!-- Step 1: Compute mean -->
+          <div class="bn-step-card">
+            <span class="bn-step-num">Step 1</span>
+            <div class="bn-step-title">Compute Batch Mean</div>
+            <div class="bn-step-formula">μ_B = (1/m) Σ x_i</div>
+            <div class="bn-step-svg">
+              <svg viewBox="0 0 120 90" preserveAspectRatio="none">
+                <rect width="120" height="90" fill="#FDFAF5"/>
+                <text x="60" y="42" text-anchor="middle" dominant-baseline="middle"
+                      fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="9">distribution</text>
+                <text x="60" y="58" text-anchor="middle" dominant-baseline="middle"
+                      fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="7">+ mean marker</text>
+              </svg>
+            </div>
+            <div class="bn-step-desc">Average activation across all m samples in the mini-batch for each feature dimension.</div>
+          </div>
+
+          <!-- Step 2: Subtract mean / compute variance -->
+          <div class="bn-step-card">
+            <span class="bn-step-num">Step 2</span>
+            <div class="bn-step-title">Compute Variance</div>
+            <div class="bn-step-formula">σ²_B = (1/m) Σ (x_i − μ_B)²</div>
+            <div class="bn-step-svg">
+              <svg viewBox="0 0 120 90" preserveAspectRatio="none">
+                <rect width="120" height="90" fill="#FDFAF5"/>
+                <text x="60" y="42" text-anchor="middle" dominant-baseline="middle"
+                      fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="9">centered dist.</text>
+                <text x="60" y="58" text-anchor="middle" dominant-baseline="middle"
+                      fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="7">+ spread markers</text>
+              </svg>
+            </div>
+            <div class="bn-step-desc">Measure spread after centering. Captures how much activations deviate from the mean.</div>
+          </div>
+
+          <!-- Step 3: Normalize -->
+          <div class="bn-step-card">
+            <span class="bn-step-num">Step 3</span>
+            <div class="bn-step-title">Normalize</div>
+            <div class="bn-step-formula">x̂_i = (x_i − μ_B) / √(σ²_B + ε)</div>
+            <div class="bn-step-svg">
+              <svg viewBox="0 0 120 90" preserveAspectRatio="none">
+                <rect width="120" height="90" fill="#FDFAF5"/>
+                <text x="60" y="42" text-anchor="middle" dominant-baseline="middle"
+                      fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="9">N(0,1) shape</text>
+                <text x="60" y="58" text-anchor="middle" dominant-baseline="middle"
+                      fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="7">before γ, β</text>
+              </svg>
+            </div>
+            <div class="bn-step-desc">Divide by standard deviation (with ε for numerical stability). Result has zero mean and unit variance.</div>
+          </div>
+
+          <!-- Step 4: Scale and shift -->
+          <div class="bn-step-card">
+            <span class="bn-step-num" style="background:var(--orange)">Step 4</span>
+            <div class="bn-step-title">Scale &amp; Shift</div>
+            <div class="bn-step-formula">y_i = γ · x̂_i + β</div>
+            <div class="bn-step-svg">
+              <svg viewBox="0 0 120 90" preserveAspectRatio="none">
+                <rect width="120" height="90" fill="#FDFAF5"/>
+                <text x="60" y="42" text-anchor="middle" dominant-baseline="middle"
+                      fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="9">N(β, γ²) shape</text>
+                <text x="60" y="58" text-anchor="middle" dominant-baseline="middle"
+                      fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="7">learned γ, β</text>
+              </svg>
+            </div>
+            <div class="bn-step-desc">Learnable γ and β restore representational power — the network can un-normalize if that's optimal.</div>
+          </div>
+
+        </div><!-- end bn-steps-grid -->
+
+        <!-- Step-through mini viz -->
+        <div style="margin-top:.75rem;border-top:1px solid var(--border-lt);padding-top:.65rem">
+          <div class="plot-label" style="margin-bottom:.5rem">Step-Through — single sample x through BN</div>
+          <svg id="svg-bn-walkthrough" viewBox="0 0 680 120" preserveAspectRatio="none"
+               style="width:100%;display:block;border-radius:5px;background:#FDFAF5">
+            <text x="340" y="55" text-anchor="middle" dominant-baseline="middle"
+                  fill="rgba(0,0,0,.2)" font-family="Outfit,sans-serif" font-size="12">
+              Step-through diagram renders here
+            </text>
+            <text x="340" y="75" text-anchor="middle" dominant-baseline="middle"
+                  fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="9">
+              x → (x − μ) → (x − μ)/σ → γ·x̂ + β
+            </text>
+          </svg>
+        </div>
+
+      </div>
+    </div><!-- end panel-steps -->
+
+    <!-- Tab 3: Training Stability -->
+    <div class="tab-panel" id="panel-stability">
+      <div class="card">
+        <div class="plot-label" id="stability-label">Training Stability — loss vs. epoch</div>
+        <div class="stability-row">
+          <div>
+            <div class="stability-cell-lbl" style="color:var(--bn-on)">With Batch Norm</div>
+            <div class="chart-wrap-tall">
+              <svg id="svg-loss-on" viewBox="0 0 320 240" preserveAspectRatio="none">
+                <rect width="320" height="240" fill="#FDFAF5"/>
+                <text x="160" y="110" text-anchor="middle" dominant-baseline="middle"
+                      fill="rgba(0,0,0,.2)" font-family="Outfit,sans-serif" font-size="11">
+                  Loss curve (BN On)
+                </text>
+                <text x="160" y="130" text-anchor="middle" dominant-baseline="middle"
+                      fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="8">
+                  smooth, stable descent
+                </text>
+              </svg>
+            </div>
+          </div>
+          <div>
+            <div class="stability-cell-lbl" style="color:var(--bn-off)">Without Batch Norm</div>
+            <div class="chart-wrap-tall">
+              <svg id="svg-loss-off" viewBox="0 0 320 240" preserveAspectRatio="none">
+                <rect width="320" height="240" fill="#FDFAF5"/>
+                <text x="160" y="110" text-anchor="middle" dominant-baseline="middle"
+                      fill="rgba(0,0,0,.2)" font-family="Outfit,sans-serif" font-size="11">
+                  Loss curve (BN Off)
+                </text>
+                <text x="160" y="130" text-anchor="middle" dominant-baseline="middle"
+                      fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="8">
+                  noisy, may diverge
+                </text>
+              </svg>
+            </div>
+          </div>
+        </div>
+        <div class="legend" style="justify-content:center">
+          <span><span class="legend-line" style="background:var(--bn-on)"></span>With BN</span>
+          <span><span class="legend-line" style="background:var(--bn-off)"></span>Without BN</span>
+          <span><span class="legend-line" style="background:var(--bn-on);opacity:.4;border-top:2px dashed var(--bn-on)"></span>Validation</span>
+        </div>
+      </div>
+    </div><!-- end panel-stability -->
+
+  </div><!-- end center-col -->
+
+  <!-- RIGHT: Layer statistics -->
+  <div class="right-col">
+
+    <!-- Per-layer mean/variance -->
+    <div class="card">
+      <div class="card-title">Layer Statistics</div>
+      <div class="layer-stat-list" id="layer-stat-list">
+
+        <div class="layer-stat-row">
+          <div class="lsr-header">
+            <span class="lsr-name">Layer 1</span>
+            <span class="lsr-badge">BN</span>
+          </div>
+          <div class="lsr-stats">
+            <div class="lsr-stat">μ <span id="l1-mean">—</span></div>
+            <div class="lsr-stat">σ² <span id="l1-var">—</span></div>
+          </div>
+        </div>
+
+        <div class="layer-stat-row">
+          <div class="lsr-header">
+            <span class="lsr-name">Layer 2</span>
+            <span class="lsr-badge">BN</span>
+          </div>
+          <div class="lsr-stats">
+            <div class="lsr-stat">μ <span id="l2-mean">—</span></div>
+            <div class="lsr-stat">σ² <span id="l2-var">—</span></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- γ / β learned parameters -->
+    <div class="card">
+      <div class="card-title">BN Parameters (Layer 1)</div>
+      <div class="param-grid">
+        <div class="param-block">
+          <span class="param-val" id="param-gamma">1.00</span>
+          <div class="param-name">γ (scale)</div>
+        </div>
+        <div class="param-block">
+          <span class="param-val" id="param-beta">0.00</span>
+          <div class="param-name">β (shift)</div>
+        </div>
+      </div>
+      <div style="font-size:.67rem;color:var(--text-muted);margin-top:.45rem;line-height:1.5;font-style:italic">
+        γ and β are learned — start at (1, 0) and adapt during training.
+      </div>
+    </div>
+
+    <!-- Running mean/variance (inference mode) -->
+    <div class="card">
+      <div class="card-title">Running Stats (Inference)</div>
+      <div class="running-stat-row">
+        <span class="rsr-lbl">μ_run</span>
+        <span class="rsr-val" id="run-mean">—</span>
+      </div>
+      <div class="running-stat-row">
+        <span class="rsr-lbl">σ²_run</span>
+        <span class="rsr-val" id="run-var">—</span>
+      </div>
+      <div class="running-stat-row">
+        <span class="rsr-lbl">momentum</span>
+        <span class="rsr-val">0.1</span>
+      </div>
+      <div style="font-size:.67rem;color:var(--text-muted);margin-top:.4rem;line-height:1.5;font-style:italic">
+        Exponential moving average of batch statistics — used at inference time.
+      </div>
+    </div>
+
+  </div><!-- end right-col -->
+
+</div><!-- end .explorer-grid -->
+
+</div><!-- end .wrap -->
+
+<footer id="course-nav-footer" style="margin-top:1.5rem;padding:0.75rem 0 0 1rem;border-top:1px solid #E0DAC0;font-size:0.8rem;color:#78786A;text-align:left;">
+  <a href="../" style="color:#2e7d32;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">&larr; All course visualizations</a>
+</footer>
+<script>
+if (window.self !== window.top) { var f = document.getElementById('course-nav-footer'); if (f) { f.style.display = 'none'; } }
+</script>
+
+</body>
+</html>
