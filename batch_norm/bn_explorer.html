@@ -285,6 +285,16 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 .running-stat-row:last-child{border-bottom:none}
 .running-stat-row .rsr-lbl{color:var(--text-muted);font-family:'IBM Plex Mono',monospace}
 .running-stat-row .rsr-val{color:var(--g-dk);font-weight:600;font-family:'IBM Plex Mono',monospace}
+
+/* ── BN step-through ─────────────────────────────────────────────── */
+.bnst-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--border-lt);transition:background .2s;cursor:pointer}
+.bnst-dot.active{background:var(--g-mid)}
+#bnst-table{border-collapse:collapse;width:100%}
+#bnst-table td{padding:.18rem .38rem;border:none}
+#bnst-table thead td{border-bottom:1px solid var(--border-lt);color:var(--text-muted);font-weight:500;text-align:center}
+#bnst-table thead td:first-child{text-align:left}
+#bnst-table tbody td{text-align:center}
+#bnst-table tbody td:first-child{text-align:left;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -388,11 +398,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
         Key Concepts <span id="concepts-arrow">▾</span>
       </div>
       <div class="concepts-body" id="concepts-body">
-        <div class="concepts-item"><strong>Internal covariate shift:</strong> as a network trains, earlier layers' parameters change — shifting the input distribution to each subsequent layer. Deeper layers must constantly adapt, slowing convergence and requiring careful initialization.</div>
-        <div class="concepts-item"><strong>Normalization step:</strong> for each mini-batch, BN computes the mean and variance of each feature, then normalizes to zero mean and unit variance. This keeps the input distribution to each layer stable regardless of upstream parameter changes.</div>
-        <div class="concepts-item"><strong>γ and β (scale and shift):</strong> learnable parameters that follow normalization. Without them, BN would force all activations to N(0,1), losing representational power. γ and β let the network learn the optimal scale and mean for each feature — including recovering the identity if that's best.</div>
-        <div class="concepts-item"><strong>Higher learning rates:</strong> normalized inputs reduce sensitivity to weight scale and initialization. Networks with BN can be trained with 5–10× higher learning rates without diverging — the stabilized distributions prevent gradient explosion and vanishing.</div>
-        <div class="concepts-item"><strong>Training vs. inference:</strong> during training, BN normalizes using the current mini-batch's mean and variance. During inference, it uses exponential moving averages of those statistics accumulated over training — so batch size doesn't affect inference.</div>
+        <div class="concepts-item"><strong>Internal covariate shift:</strong> as training progresses, the distribution of each layer's inputs changes — forcing later layers to constantly adapt. BN fixes this by normalizing each layer's output.</div>
+        <div class="concepts-item"><strong>Normalization step:</strong> subtract the batch mean and divide by batch standard deviation — centers and scales activations to approximately N(0,1).</div>
+        <div class="concepts-item"><strong>Learnable γ and β:</strong> after normalizing, scale by γ and shift by β — lets the network learn the optimal distribution for each layer rather than forcing N(0,1).</div>
+        <div class="concepts-item"><strong>Training vs inference:</strong> during training, BN uses the current mini-batch statistics. During inference, it uses running averages accumulated during training.</div>
+        <div class="concepts-item"><strong>Why BN helps:</strong> stable distributions allow higher learning rates, reduce sensitivity to initialization, and act as mild regularization.</div>
       </div>
     </div>
 
@@ -474,8 +484,54 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     <!-- Tab 2: Normalization Steps -->
     <div class="tab-panel" id="panel-steps">
       <div class="card">
-        <div class="plot-label">The Four Batch Normalization Operations</div>
-        <div class="bn-steps-grid">
+
+        <!-- Step header -->
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem;flex-wrap:wrap;margin-bottom:.6rem">
+          <div>
+            <div id="bnst-num" class="bn-step-num">Step 1 of 4</div>
+            <div id="bnst-title" class="bn-step-title" style="margin-top:.25rem;font-size:.88rem">Compute Batch Mean</div>
+          </div>
+          <div style="display:flex;gap:.4rem">
+            <button id="bnst-prev" class="pbtn" disabled>← Prev</button>
+            <button id="bnst-next" class="pbtn primary">Next →</button>
+          </div>
+        </div>
+
+        <!-- Formula + description -->
+        <div id="bnst-formula" class="bn-step-formula" style="font-size:.78rem;margin-bottom:.4rem">μ_B = (1/m) Σ xᵢ = 0.7500</div>
+        <div id="bnst-desc" class="bn-step-desc" style="margin-bottom:.65rem">Average all m=8 activations in the mini-batch.</div>
+
+        <!-- Number-line SVG -->
+        <svg id="svg-bnst" viewBox="0 0 620 140" preserveAspectRatio="xMidYMid meet"
+             style="width:100%;display:block;border-radius:5px;background:#FDFAF5;overflow:visible"></svg>
+
+        <!-- Values table -->
+        <div style="margin-top:.55rem;overflow-x:auto">
+          <table id="bnst-table" style="font-family:'IBM Plex Mono',monospace;font-size:.68rem;min-width:480px">
+            <thead><tr id="bnst-thead"></tr></thead>
+            <tbody>
+              <tr id="bnst-row-raw" style="color:var(--text-soft)"></tr>
+              <tr id="bnst-row-cur" style="font-weight:600"></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Training vs Inference note -->
+        <div id="bnst-inf-note" class="anno-box neutral" style="margin-top:.6rem;display:none;font-size:.75rem">
+          <strong style="color:var(--g-dk)">Training vs. Inference:</strong> During training BN uses the current mini-batch statistics (μ_B, σ²_B). During inference it uses running averages accumulated during training — so predictions are independent of batch size and composition.
+        </div>
+
+        <!-- Progress dots -->
+        <div style="display:flex;gap:.35rem;justify-content:center;margin-top:.65rem" id="bnst-dots">
+          <span class="bnst-dot" data-s="1"></span>
+          <span class="bnst-dot" data-s="2"></span>
+          <span class="bnst-dot" data-s="3"></span>
+          <span class="bnst-dot" data-s="4"></span>
+        </div>
+
+      </div>
+    </div><!-- end panel-steps — PLACEHOLDER grid below deleted -->
+    <div style="display:none"><div class="bn-steps-grid">
 
           <!-- Step 1: Compute mean -->
           <div class="bn-step-card">
@@ -545,71 +601,32 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
             <div class="bn-step-desc">Learnable γ and β restore representational power — the network can un-normalize if that's optimal.</div>
           </div>
 
-        </div><!-- end bn-steps-grid -->
-
-        <!-- Step-through mini viz -->
-        <div style="margin-top:.75rem;border-top:1px solid var(--border-lt);padding-top:.65rem">
-          <div class="plot-label" style="margin-bottom:.5rem">Step-Through — single sample x through BN</div>
-          <svg id="svg-bn-walkthrough" viewBox="0 0 680 120" preserveAspectRatio="none"
-               style="width:100%;display:block;border-radius:5px;background:#FDFAF5">
-            <text x="340" y="55" text-anchor="middle" dominant-baseline="middle"
-                  fill="rgba(0,0,0,.2)" font-family="Outfit,sans-serif" font-size="12">
-              Step-through diagram renders here
-            </text>
-            <text x="340" y="75" text-anchor="middle" dominant-baseline="middle"
-                  fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="9">
-              x → (x − μ) → (x − μ)/σ → γ·x̂ + β
-            </text>
-          </svg>
-        </div>
-
-      </div>
-    </div><!-- end panel-steps -->
+        </div><!-- end hidden static grid --></div><!-- end hidden wrapper -->
 
     <!-- Tab 3: Training Stability -->
     <div class="tab-panel" id="panel-stability">
+
+      <!-- Combined loss chart -->
       <div class="card">
-        <div class="plot-label" id="stability-label">Training Stability — loss vs. epoch</div>
-        <div class="stability-row">
-          <div>
-            <div class="stability-cell-lbl" style="color:var(--bn-on)">With Batch Norm</div>
-            <div class="chart-wrap-tall">
-              <svg id="svg-loss-on" viewBox="0 0 320 240" preserveAspectRatio="none">
-                <rect width="320" height="240" fill="#FDFAF5"/>
-                <text x="160" y="110" text-anchor="middle" dominant-baseline="middle"
-                      fill="rgba(0,0,0,.2)" font-family="Outfit,sans-serif" font-size="11">
-                  Loss curve (BN On)
-                </text>
-                <text x="160" y="130" text-anchor="middle" dominant-baseline="middle"
-                      fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="8">
-                  smooth, stable descent
-                </text>
-              </svg>
-            </div>
-          </div>
-          <div>
-            <div class="stability-cell-lbl" style="color:var(--bn-off)">Without Batch Norm</div>
-            <div class="chart-wrap-tall">
-              <svg id="svg-loss-off" viewBox="0 0 320 240" preserveAspectRatio="none">
-                <rect width="320" height="240" fill="#FDFAF5"/>
-                <text x="160" y="110" text-anchor="middle" dominant-baseline="middle"
-                      fill="rgba(0,0,0,.2)" font-family="Outfit,sans-serif" font-size="11">
-                  Loss curve (BN Off)
-                </text>
-                <text x="160" y="130" text-anchor="middle" dominant-baseline="middle"
-                      fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="8">
-                  noisy, may diverge
-                </text>
-              </svg>
-            </div>
-          </div>
-        </div>
-        <div class="legend" style="justify-content:center">
+        <div class="plot-label">Training Loss vs. Epoch</div>
+        <div id="stability-anno" class="anno-box good" style="margin-bottom:.5rem;font-size:.75rem">Press Play to animate — With BN (green, solid) converges faster and more smoothly. Try Deep (8 layers) to see a dramatic gap.</div>
+        <svg id="svg-loss-combined" style="width:100%;display:block;border-radius:5px"></svg>
+        <div class="legend" style="margin-top:.35rem">
           <span><span class="legend-line" style="background:var(--bn-on)"></span>With BN</span>
-          <span><span class="legend-line" style="background:var(--bn-off)"></span>Without BN</span>
-          <span><span class="legend-line" style="background:var(--bn-on);opacity:.4;border-top:2px dashed var(--bn-on)"></span>Validation</span>
+          <span><span class="legend-line" style="background:var(--bn-off);border-top:2px dashed var(--bn-off)"></span>Without BN</span>
         </div>
       </div>
+
+      <!-- Gradient norm chart -->
+      <div class="card">
+        <div class="plot-label">Gradient Norm vs. Epoch</div>
+        <svg id="svg-grad-norm" style="width:100%;display:block;border-radius:5px"></svg>
+        <div class="legend" style="margin-top:.35rem">
+          <span><span class="legend-line" style="background:var(--bn-on)"></span>With BN — stable</span>
+          <span><span class="legend-line" style="background:var(--bn-off)"></span>Without BN — spiky</span>
+        </div>
+      </div>
+
     </div><!-- end panel-stability -->
 
   </div><!-- end center-col -->
@@ -694,6 +711,38 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 <script>
 (function(){
 'use strict';
+
+// ── BN Step-through sample data ───────────────────────────────────
+const BN_RAW   = [1.0, -1.0, 2.0, 0.5, -1.5, 3.0, 0.0, 2.0];
+const BN_MEAN  = BN_RAW.reduce((a,b)=>a+b,0)/BN_RAW.length;             // 0.75
+const BN_CENT  = BN_RAW.map(x=>+(x-BN_MEAN).toFixed(4));
+const BN_VAR   = BN_CENT.reduce((a,b)=>a+b*b,0)/BN_CENT.length;        // 2.125
+const BN_STD   = Math.sqrt(BN_VAR+1e-5);                                // ~1.4577
+const BN_NORM  = BN_CENT.map(x=>+(x/BN_STD).toFixed(4));
+const BN_GAMMA = 1.2, BN_BETA = 0.10;
+const BN_OUT   = BN_NORM.map(x=>+(BN_GAMMA*x+BN_BETA).toFixed(4));
+const CIRCLE_COLORS=['#e41a1c','#ff7f00','#4daf4a','#984ea3','#a65628','#f781bf','#1A56A0','#2e7d32'];
+
+const BN_STEPS_DATA=[
+  {step:1, title:'Compute Batch Mean',
+   formula:`μ_B = (1/m) Σ xᵢ = ${BN_MEAN.toFixed(4)}`,
+   desc:`Average all m=8 activations. A dashed line marks μ_B=${BN_MEAN.toFixed(4)}.`,
+   rowLabel:'Step 1: xᵢ (raw)', values:BN_RAW, highlight:'mean'},
+  {step:2, title:'Subtract Mean — Center',
+   formula:`x̂ᵢ = xᵢ − μ_B`,
+   desc:`Each circle shifts left by μ_B=${BN_MEAN.toFixed(4)}. Distribution is now centered at zero.`,
+   rowLabel:'Step 2: xᵢ−μ_B', values:BN_CENT, highlight:'center'},
+  {step:3, title:'Normalize to Unit Variance',
+   formula:`x̂ᵢ = (xᵢ−μ_B) / √(σ²_B+ε)   [σ²_B=${BN_VAR.toFixed(3)}, σ_B=${BN_STD.toFixed(4)}]`,
+   desc:`Divide by σ_B≈${BN_STD.toFixed(4)}. Result has zero mean and unit variance. Dashed lines at ±1σ.`,
+   rowLabel:'Step 3: x̂ᵢ (normalized)', values:BN_NORM, highlight:'norm'},
+  {step:4, title:'Scale & Shift with γ, β',
+   formula:`yᵢ = γ·x̂ᵢ + β   [γ=${BN_GAMMA}, β=${BN_BETA}]`,
+   desc:`Learnable γ=${BN_GAMMA} and β=${BN_BETA} restore representational power — network can un-normalize to any distribution.`,
+   rowLabel:`Step 4: γx̂ᵢ+β (output)`, values:BN_OUT, highlight:'scale'}
+];
+
+let bnStep=1;
 
 // ── Constants ──────────────────────────────────────────────────────
 const EPOCHS   = 100;
@@ -781,17 +830,27 @@ function precompute(){
     data.push(layerData);
   }
 
-  const lossOn = [], lossOff = [];
+  const lossOn=[], lossOff=[], gradOn=[], gradOff=[];
+  const rngGrad = makeRng(999);
   const hiLR = lr > 0.04;
-  for(let e = 0; e < EPOCHS; e++){
-    const t = e / (EPOCHS - 1);
-    const n = rngLoss() - 0.5;
-    lossOn.push(Math.max(0.015, 2.1 * Math.exp(-4.5 * t) + 0.04 + 0.03 * n));
+  const df = depth===8 ? 2.5 : depth===4 ? 1.5 : 1.0;  // depth factor
+
+  for(let e=0; e<EPOCHS; e++){
+    const t = e/(EPOCHS-1);
+    const n = rngLoss()-0.5, m = rngLoss()-0.5;
+    lossOn.push(Math.max(0.015, 2.1*Math.exp(-4.5*t)+0.04+0.03*n));
     const offScale = hiLR ? 1.2 : 0.9;
-    const offNoise = hiLR ? 0.22 : 0.12;
-    lossOff.push(Math.max(0.02, 2.1 * Math.exp(-2.2 * offScale * t) + 0.12 + offNoise * (rngLoss() - 0.5) * (1 + t)));
+    const offNoise = (hiLR ? 0.22 : 0.12)*df;
+    lossOff.push(Math.max(0.02, 2.1*Math.exp(-2.2*offScale*t)+0.12*df+offNoise*(rngLoss()-0.5)*(1+t)));
+    // Gradient norms
+    const gn=rngGrad()-0.5, go=rngGrad()-0.5;
+    gradOn.push(Math.max(0.05, 1.4*Math.exp(-3*t)+0.28+0.10*gn));
+    const baseG = hiLR ? 2.8 : 2.0;
+    const gNoise = (hiLR ? 0.7 : 0.35)*df;
+    const spike = (depth>=4 && e>25 && rngGrad()>0.82) ? df*2.2*rngGrad() : 0;
+    gradOff.push(Math.max(0.08, baseG*(0.7+0.8*t*df)*Math.max(0.25, 1+gNoise*go)+spike));
   }
-  return { data, lossOn, lossOff };
+  return { data, lossOn, lossOff, gradOn, gradOff };
 }
 
 // ── Build histogram grid DOM ───────────────────────────────────────
@@ -928,50 +987,88 @@ function updateAnno(){
   box.textContent = msg;
 }
 
-// ── Training stability chart ───────────────────────────────────────
+// ── Training stability charts (combined) ──────────────────────────
 function renderStability(){
   if(!precomp) return;
-  const P = { t:20, r:12, b:28, l:38 };
-  const VW = 320, VH = 240;
-  const iw = VW - P.l - P.r, ih = VH - P.t - P.b;
-  ['on','off'].forEach(mode => {
-    const svgEl  = document.getElementById(`svg-loss-${mode}`);
-    const losses = mode === 'on' ? precomp.lossOn : precomp.lossOff;
-    const color  = mode === 'on' ? COL_ON : COL_OFF;
-    const svg    = d3.select(svgEl);
+  const emax = Math.min(epoch, EPOCHS-1);
+
+  function drawDualChart(svgId, dataOn, dataOff, yLabel, withAnno){
+    const el = document.getElementById(svgId);
+    if(!el) return;
+    const pw = el.parentElement ? el.parentElement.clientWidth : 560;
+    const VW = Math.max(240, pw||560), VH = Math.round(VW*0.38);
+    el.setAttribute('viewBox',`0 0 ${VW} ${VH}`);
+    el.setAttribute('height', VH);
+    const P={t:28, r:18, b:30, l:46};
+    const iw=VW-P.l-P.r, ih=VH-P.t-P.b;
+    const svg=d3.select(el);
     svg.selectAll('*').remove();
+    const defs=svg.append('defs');
+    defs.append('marker').attr('id',svgId+'-arr')
+      .attr('markerWidth',7).attr('markerHeight',7)
+      .attr('refX',6).attr('refY',3).attr('orient','auto')
+      .append('path').attr('d','M0,0 L0,6 L6,3 z').attr('fill',COL_ON);
     svg.append('rect').attr('width',VW).attr('height',VH).attr('fill','#FDFAF5');
-    const g    = svg.append('g').attr('transform',`translate(${P.l},${P.t})`);
-    const xSc  = d3.scaleLinear().domain([0, EPOCHS-1]).range([0, iw]);
-    const yMax = d3.max(losses) * 1.08;
-    const ySc  = d3.scaleLinear().domain([0, yMax]).range([ih, 0]);
+    const g=svg.append('g').attr('transform',`translate(${P.l},${P.t})`);
+    const yMax=d3.max([...dataOn,...dataOff])*1.12;
+    const xSc=d3.scaleLinear().domain([0,EPOCHS-1]).range([0,iw]);
+    const ySc=d3.scaleLinear().domain([0,yMax]).range([ih,0]);
     g.append('g').attr('transform',`translate(0,${ih})`)
      .call(d3.axisBottom(xSc).ticks(5).tickSize(-ih).tickFormat(''))
-     .call(a => { a.select('.domain').remove(); a.selectAll('line').attr('stroke','#EFEFEF'); });
-    g.append('g')
-     .call(d3.axisLeft(ySc).ticks(4).tickSize(-iw).tickFormat(''))
-     .call(a => { a.select('.domain').remove(); a.selectAll('line').attr('stroke','#EFEFEF'); });
+     .call(a=>{a.select('.domain').remove();a.selectAll('line').attr('stroke','#EFEFEF');});
+    g.append('g').call(d3.axisLeft(ySc).ticks(4).tickSize(-iw).tickFormat(''))
+     .call(a=>{a.select('.domain').remove();a.selectAll('line').attr('stroke','#EFEFEF');});
     g.append('g').attr('transform',`translate(0,${ih})`)
      .call(d3.axisBottom(xSc).ticks(5))
-     .call(a => { a.select('.domain').attr('stroke','#CCC'); a.selectAll('text').attr('font-size',8).attr('fill','#888'); });
-    g.append('g')
-     .call(d3.axisLeft(ySc).ticks(4))
-     .call(a => { a.select('.domain').attr('stroke','#CCC'); a.selectAll('text').attr('font-size',8).attr('fill','#888'); });
-    const lineFn = d3.line().x((_,i) => xSc(i)).y(d => ySc(d));
-    g.append('path').datum(losses).attr('fill','none').attr('stroke',color)
-     .attr('stroke-width',1.2).attr('opacity',0.2).attr('d',lineFn);
-    if(epoch > 0){
-      g.append('path').datum(losses.slice(0, epoch+1)).attr('fill','none')
-       .attr('stroke',color).attr('stroke-width',2).attr('d',lineFn);
-      g.append('circle').attr('cx',xSc(epoch)).attr('cy',ySc(losses[epoch]))
-       .attr('r',4).attr('fill',color).attr('stroke','white').attr('stroke-width',1.5);
+     .call(a=>{a.select('.domain').attr('stroke','#CCC');a.selectAll('text').attr('font-size',8).attr('fill','#888');});
+    g.append('g').call(d3.axisLeft(ySc).ticks(4))
+     .call(a=>{a.select('.domain').attr('stroke','#CCC');a.selectAll('text').attr('font-size',8).attr('fill','#888');});
+    const lineFn=d3.line().x((_,i)=>xSc(i)).y(d=>ySc(d)).curve(d3.curveCatmullRom);
+    // Ghost full paths
+    g.append('path').datum(dataOn).attr('fill','none').attr('stroke',COL_ON).attr('stroke-width',1).attr('opacity',0.15).attr('d',lineFn);
+    g.append('path').datum(dataOff).attr('fill','none').attr('stroke',COL_OFF).attr('stroke-width',1).attr('opacity',0.15).attr('d',lineFn);
+    if(emax>0){
+      const nOn=dataOn.slice(0,emax+1), nOff=dataOff.slice(0,emax+1);
+      const areaFn=d3.area().x((_,i)=>xSc(i)).y0(ih).y1(d=>ySc(d)).curve(d3.curveCatmullRom);
+      g.append('path').datum(nOn).attr('fill',COL_ON).attr('opacity',0.07).attr('d',areaFn);
+      g.append('path').datum(nOn).attr('fill','none').attr('stroke',COL_ON).attr('stroke-width',2.5).attr('d',lineFn);
+      g.append('path').datum(nOff).attr('fill','none').attr('stroke',COL_OFF).attr('stroke-width',2)
+       .attr('stroke-dasharray','5,3').attr('d',lineFn);
+      g.append('circle').attr('cx',xSc(emax)).attr('cy',ySc(dataOn[emax])).attr('r',4)
+       .attr('fill',COL_ON).attr('stroke','white').attr('stroke-width',1.5);
+      g.append('circle').attr('cx',xSc(emax)).attr('cy',ySc(dataOff[emax])).attr('r',4)
+       .attr('fill',COL_OFF).attr('stroke','white').attr('stroke-width',1.5);
+      if(withAnno && emax>=20){
+        const ae=18, ax=xSc(ae), ay=ySc(dataOn[ae]);
+        g.append('line').attr('x1',ax+6).attr('y1',ay-6).attr('x2',ax+50).attr('y2',ay-32)
+         .attr('stroke',COL_ON).attr('stroke-width',1).attr('marker-end',`url(#${svgId}-arr)`);
+        g.append('text').attr('x',ax+54).attr('y',ay-34).attr('font-size',8).attr('fill',COL_ON)
+         .attr('font-family','Outfit,sans-serif').attr('font-weight','600').text('BN enables higher LRs');
+      }
     }
-    g.append('text').attr('x',iw/2).attr('y',ih+24).attr('text-anchor','middle')
+    g.append('text').attr('x',iw/2).attr('y',ih+22).attr('text-anchor','middle')
      .attr('font-size',9).attr('fill','#999').attr('font-family','Outfit,sans-serif').text('Epoch');
-    g.append('text').attr('transform','rotate(-90)').attr('x',-ih/2).attr('y',-30)
+    g.append('text').attr('transform','rotate(-90)').attr('x',-ih/2).attr('y',-36)
      .attr('text-anchor','middle').attr('font-size',9).attr('fill','#999')
-     .attr('font-family','Outfit,sans-serif').text('Loss');
-  });
+     .attr('font-family','Outfit,sans-serif').text(yLabel);
+  }
+
+  drawDualChart('svg-loss-combined', precomp.lossOn, precomp.lossOff, 'Loss', true);
+  drawDualChart('svg-grad-norm', precomp.gradOn, precomp.gradOff, 'Gradient Norm', false);
+
+  const annoEl=document.getElementById('stability-anno');
+  if(annoEl){
+    if(epoch===0){
+      annoEl.textContent='Press Play to animate — With BN (green, solid) converges faster and more smoothly. Try Deep (8 layers) to see a dramatic gap.';
+      annoEl.className='anno-box good';
+    } else if(epoch>50){
+      annoEl.textContent=`Epoch ${epoch}: BN loss=${precomp.lossOn[epoch].toFixed(3)}, No-BN loss=${precomp.lossOff[epoch].toFixed(3)} (gap +${(precomp.lossOff[epoch]-precomp.lossOn[epoch]).toFixed(3)}). Without BN, training is noisier and stalls higher.`;
+      annoEl.className='anno-box good';
+    } else {
+      annoEl.textContent=`Epoch ${epoch}: BN=${precomp.lossOn[epoch].toFixed(3)} vs No-BN=${precomp.lossOff[epoch].toFixed(3)}. Gradient norm shows BN keeps gradients stable.`;
+      annoEl.className='anno-box neutral';
+    }
+  }
 }
 
 // ── Status / full render ───────────────────────────────────────────
@@ -1072,6 +1169,7 @@ document.getElementById('tab-bar').addEventListener('click', e => {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.getElementById(`panel-${btn.dataset.tab}`).classList.add('active');
   if(btn.dataset.tab === 'stability') renderStability();
+  if(btn.dataset.tab === 'steps') drawBNStepThrough(bnStep);
 });
 
 document.getElementById('concepts-toggle').addEventListener('click', () => {
@@ -1081,119 +1179,115 @@ document.getElementById('concepts-toggle').addEventListener('click', () => {
   arrow.textContent = body.classList.contains('collapsed') ? '▸' : '▾';
 });
 
-// ── Static diagrams for Normalization Steps tab ────────────────────
-function drawBNStepDiagrams(){
-  const stepSvgs = document.querySelectorAll('#panel-steps .bn-step-svg svg');
-
-  // Step 1 — raw distribution + mean marker
-  (function(svgEl){
-    const svg = d3.select(svgEl);
-    svg.selectAll('*').remove();
-    svg.append('rect').attr('width',120).attr('height',90).attr('fill','#FDFAF5');
-    const bins = d3.range(20).map(i => { const x = -3 + i*0.32 - 3 + 3; return Math.round(40*Math.exp(-0.5*((i*0.32-1.8-3+3)/1.4)**2)); });
-    const xSc = d3.scaleLinear().domain([0,20]).range([10,110]);
-    const ySc = d3.scaleLinear().domain([0,d3.max(bins)||1]).range([72,14]);
-    svg.selectAll('rect.b').data(bins).enter().append('rect').attr('class','b')
-      .attr('x',(_,i)=>xSc(i)).attr('width',(110-10)/20-0.5)
-      .attr('y',d=>ySc(d)).attr('height',d=>72-ySc(d)).attr('fill',COL_OFF).attr('opacity',0.65);
-    const muX = xSc(20*(4.8/12));
-    svg.append('line').attr('x1',muX).attr('y1',14).attr('x2',muX).attr('y2',72)
-      .attr('stroke','#1A56A0').attr('stroke-width',1.5).attr('stroke-dasharray','3,2');
-    svg.append('text').attr('x',muX+3).attr('y',22)
-      .attr('font-family','IBM Plex Mono,monospace').attr('font-size',7).attr('fill','#1A56A0').text('μ_B');
-  })(stepSvgs[0]);
-
-  // Step 2 — centered distribution + ±σ markers
-  (function(svgEl){
-    const svg = d3.select(svgEl);
-    svg.selectAll('*').remove();
-    svg.append('rect').attr('width',120).attr('height',90).attr('fill','#FDFAF5');
-    const bins = d3.range(20).map(i => { const x = -3+i*0.32; return Math.round(40*Math.exp(-0.5*(x/1.4)**2)); });
-    const xSc = d3.scaleLinear().domain([0,20]).range([10,110]);
-    const ySc = d3.scaleLinear().domain([0,d3.max(bins)||1]).range([72,14]);
-    svg.selectAll('rect.b').data(bins).enter().append('rect').attr('class','b')
-      .attr('x',(_,i)=>xSc(i)).attr('width',(110-10)/20-0.5)
-      .attr('y',d=>ySc(d)).attr('height',d=>72-ySc(d)).attr('fill',COL_OFF).attr('opacity',0.65);
-    const sdX = (110-10)*(1.4/6.4);
-    [[60-sdX,'−σ'],[60+sdX,'+σ']].forEach(([x,lbl])=>{
-      svg.append('line').attr('x1',x).attr('y1',20).attr('x2',x).attr('y2',72)
-        .attr('stroke','#7B3FC4').attr('stroke-width',1.2).attr('stroke-dasharray','2,2');
-      svg.append('text').attr('x',x).attr('y',16).attr('text-anchor','middle')
-        .attr('font-family','IBM Plex Mono,monospace').attr('font-size',7).attr('fill','#7B3FC4').text(lbl);
-    });
-  })(stepSvgs[1]);
-
-  // Step 3 — normalized N(0,1)
-  (function(svgEl){
-    const svg = d3.select(svgEl);
-    svg.selectAll('*').remove();
-    svg.append('rect').attr('width',120).attr('height',90).attr('fill','#FDFAF5');
-    const bins = d3.range(20).map(i => { const x = -3+i*0.32; return Math.round(44*Math.exp(-0.5*x**2)); });
-    const xSc = d3.scaleLinear().domain([0,20]).range([10,110]);
-    const ySc = d3.scaleLinear().domain([0,d3.max(bins)||1]).range([72,14]);
-    svg.selectAll('rect.b').data(bins).enter().append('rect').attr('class','b')
-      .attr('x',(_,i)=>xSc(i)).attr('width',(110-10)/20-0.5)
-      .attr('y',d=>ySc(d)).attr('height',d=>72-ySc(d)).attr('fill',COL_ON).attr('opacity',0.65);
-    svg.append('text').attr('x',60).attr('y',84).attr('text-anchor','middle')
-      .attr('font-family','IBM Plex Mono,monospace').attr('font-size',7).attr('fill',COL_ON).text('N(0,1)');
-  })(stepSvgs[2]);
-
-  // Step 4 — scaled/shifted by γ, β
-  (function(svgEl){
-    const svg = d3.select(svgEl);
-    svg.selectAll('*').remove();
-    svg.append('rect').attr('width',120).attr('height',90).attr('fill','#FDFAF5');
-    const bins = d3.range(20).map(i => { const x = -3+i*0.32; return Math.round(32*Math.exp(-0.5*((x-0.4)/1.35)**2)); });
-    const xSc = d3.scaleLinear().domain([0,20]).range([10,110]);
-    const ySc = d3.scaleLinear().domain([0,d3.max(bins)||1]).range([72,14]);
-    svg.selectAll('rect.b').data(bins).enter().append('rect').attr('class','b')
-      .attr('x',(_,i)=>xSc(i)).attr('width',(110-10)/20-0.5)
-      .attr('y',d=>ySc(d)).attr('height',d=>72-ySc(d)).attr('fill',COL_ON).attr('opacity',0.65);
-    svg.append('text').attr('x',60).attr('y',84).attr('text-anchor','middle')
-      .attr('font-family','IBM Plex Mono,monospace').attr('font-size',7).attr('fill',COL_ON).text('N(β, γ²)');
-  })(stepSvgs[3]);
-
-  // BN walkthrough SVG
-  (function(){
-    const svg = d3.select('#svg-bn-walkthrough');
-    svg.selectAll('*').remove();
-    svg.append('rect').attr('width',680).attr('height',120).attr('fill','#FDFAF5');
-    const defs = svg.append('defs');
-    defs.append('marker').attr('id','wk-arr').attr('markerWidth',6).attr('markerHeight',6)
-      .attr('refX',5).attr('refY',3).attr('orient','auto')
-      .append('path').attr('d','M0,0 L0,6 L6,3 z').attr('fill','#CCC');
-    const stages = [
-      {label:'x',       color:'#888',    desc:'raw input',     val:'2.41'},
-      {label:'x − μ_B', color:COL_OFF,   desc:'centered',      val:'0.61'},
-      {label:'x̂',       color:'#1A56A0', desc:'normalized',    val:'0.44'},
-      {label:'γx̂ + β',  color:COL_ON,    desc:'scaled/shifted',val:'0.53'},
-    ];
-    const ops = ['− μ_B','÷ σ_B','× γ, + β'];
-    const xs  = [90, 245, 400, 555];
-    stages.forEach((s, i) => {
-      svg.append('circle').attr('cx',xs[i]).attr('cy',58).attr('r',26)
-        .attr('fill','white').attr('stroke',s.color).attr('stroke-width',2);
-      svg.append('text').attr('x',xs[i]).attr('y',53).attr('text-anchor','middle')
-        .attr('font-family','IBM Plex Mono,monospace').attr('font-size',10)
-        .attr('fill',s.color).attr('font-weight','600').text(s.val);
-      svg.append('text').attr('x',xs[i]).attr('y',67).attr('text-anchor','middle')
-        .attr('font-family','Outfit,sans-serif').attr('font-size',9).attr('fill',s.color).text(s.label);
-      svg.append('text').attr('x',xs[i]).attr('y',97).attr('text-anchor','middle')
-        .attr('font-family','Outfit,sans-serif').attr('font-size',9).attr('fill','#BBBBBB').text(s.desc);
-      if(i < stages.length - 1){
-        svg.append('line').attr('x1',xs[i]+28).attr('y1',58).attr('x2',xs[i+1]-28).attr('y2',58)
-          .attr('stroke','#CCC').attr('stroke-width',1.5).attr('marker-end','url(#wk-arr)');
-        svg.append('text').attr('x',(xs[i]+xs[i+1])/2).attr('y',50).attr('text-anchor','middle')
-          .attr('font-family','IBM Plex Mono,monospace').attr('font-size',8.5).attr('fill','#BBBBBB')
-          .text(ops[i]);
-      }
-    });
-  })();
+// ── BN Step-through ────────────────────────────────────────────────
+function drawBNStepThrough(step){
+  const sd=BN_STEPS_DATA[step-1];
+  document.getElementById('bnst-num').textContent=`Step ${step} of 4`;
+  document.getElementById('bnst-title').textContent=sd.title;
+  document.getElementById('bnst-formula').textContent=sd.formula;
+  document.getElementById('bnst-desc').textContent=sd.desc;
+  document.querySelectorAll('.bnst-dot').forEach(d=>d.classList.toggle('active',+d.dataset.s===step));
+  const prevBtn=document.getElementById('bnst-prev');
+  const nextBtn=document.getElementById('bnst-next');
+  if(prevBtn) prevBtn.disabled=(step===1);
+  if(nextBtn){ nextBtn.disabled=(step===4); nextBtn.textContent=step===4?'✓ Done':'Next →'; }
+  const note=document.getElementById('bnst-inf-note');
+  if(note) note.style.display=step===4?'':'none';
+  buildBNTable(step, sd);
+  drawBNNumberLine(step, sd);
 }
+
+function buildBNTable(step, sd){
+  const thead=document.getElementById('bnst-thead');
+  const traw=document.getElementById('bnst-row-raw');
+  const tcur=document.getElementById('bnst-row-cur');
+  if(!thead) return;
+  const hdr='<td></td>'+BN_RAW.map((_,i)=>`<td>${i+1}</td>`).join('');
+  thead.innerHTML=hdr;
+  traw.innerHTML=`<td>xᵢ (raw)</td>`+BN_RAW.map(v=>`<td>${v.toFixed(2)}</td>`).join('');
+  const stepColors=['','#C62828','#C62828','#1A56A0',COL_ON];
+  const cc=stepColors[step]||COL_ON;
+  tcur.style.color=cc;
+  tcur.innerHTML=`<td style="color:${cc}">${sd.rowLabel}</td>`+
+    sd.values.map(v=>`<td>${v.toFixed(3)}</td>`).join('');
+}
+
+function drawBNNumberLine(step, sd){
+  const svgEl=document.getElementById('svg-bnst');
+  if(!svgEl) return;
+  const VW=620, VH=140;
+  const xMin=-3.8, xMax=3.8;
+  const axY=100, circY=62, R=13;
+  const xSc=d3.scaleLinear().domain([xMin,xMax]).range([30,VW-20]);
+  const stepColors=['','#C62828','#C62828','#1A56A0',COL_ON];
+  const labelColor=stepColors[step]||COL_ON;
+  const svg=d3.select(svgEl);
+  svg.selectAll('*').remove();
+  svg.append('rect').attr('width',VW).attr('height',VH).attr('fill','#FDFAF5');
+  svg.append('line').attr('x1',28).attr('y1',axY).attr('x2',VW-18).attr('y2',axY)
+    .attr('stroke','#CCC').attr('stroke-width',1);
+  // Zero dashed line
+  svg.append('line').attr('x1',xSc(0)).attr('y1',axY-6).attr('x2',xSc(0)).attr('y2',circY-R-3)
+    .attr('stroke','#DDD').attr('stroke-width',0.8).attr('stroke-dasharray','3,2');
+  // Tick marks -3..3
+  for(let v=-3;v<=3;v++){
+    const tx=xSc(v);
+    svg.append('line').attr('x1',tx).attr('y1',axY-3).attr('x2',tx).attr('y2',axY+3)
+      .attr('stroke','#BBB').attr('stroke-width',1);
+    svg.append('text').attr('x',tx).attr('y',axY+14).attr('text-anchor','middle')
+      .attr('font-family','IBM Plex Mono,monospace').attr('font-size',9).attr('fill','#AAA').text(v);
+  }
+  // Step 1: mean line
+  if(sd.highlight==='mean'){
+    const mx=xSc(BN_MEAN);
+    svg.append('line').attr('x1',mx).attr('y1',axY-14).attr('x2',mx).attr('y2',circY-R-2)
+      .attr('stroke','#1A56A0').attr('stroke-width',1.5).attr('stroke-dasharray','4,2');
+    svg.append('text').attr('x',mx+3).attr('y',axY-18).attr('font-family','IBM Plex Mono,monospace')
+      .attr('font-size',8.5).attr('fill','#1A56A0').attr('font-weight','600').text(`μ_B=${BN_MEAN}`);
+  }
+  // Step 3: ±1σ lines
+  if(sd.highlight==='norm'){
+    [-1,1].forEach(s=>{
+      const sx=xSc(s);
+      svg.append('line').attr('x1',sx).attr('y1',axY-11).attr('x2',sx).attr('y2',circY-R-2)
+        .attr('stroke','#7B3FC4').attr('stroke-width',1.2).attr('stroke-dasharray','3,2');
+      svg.append('text').attr('x',sx).attr('y',axY-15).attr('text-anchor','middle')
+        .attr('font-family','IBM Plex Mono,monospace').attr('font-size',8).attr('fill','#7B3FC4')
+        .text(s<0?'−1σ':'+1σ');
+    });
+  }
+  // Step 4: annotation
+  if(sd.highlight==='scale'){
+    svg.append('text').attr('x',VW/2).attr('y',VH-6).attr('text-anchor','middle')
+      .attr('font-family','IBM Plex Mono,monospace').attr('font-size',8.5).attr('fill',COL_ON)
+      .attr('font-weight','600').text(`γ=${BN_GAMMA}  β=${BN_BETA}  →  N(${BN_BETA}, ${BN_GAMMA}²)`);
+  }
+  // Circles
+  sd.values.forEach((v,i)=>{
+    const cx=Math.max(30+R+2, Math.min(VW-20-R-2, xSc(v)));
+    svg.append('circle').attr('cx',cx).attr('cy',circY).attr('r',R)
+      .attr('fill','white').attr('stroke',CIRCLE_COLORS[i]).attr('stroke-width',2);
+    svg.append('text').attr('x',cx).attr('y',circY+1).attr('text-anchor','middle')
+      .attr('dominant-baseline','middle').attr('font-family','IBM Plex Mono,monospace')
+      .attr('font-size',8.5).attr('fill',CIRCLE_COLORS[i]).attr('font-weight','600').text(i+1);
+    const dispV=step===1?v.toFixed(1):v.toFixed(3);
+    svg.append('text').attr('x',cx).attr('y',circY+R+11).attr('text-anchor','middle')
+      .attr('font-family','IBM Plex Mono,monospace').attr('font-size',7).attr('fill',labelColor)
+      .text(dispV);
+  });
+}
+
+// ── BN step navigation ─────────────────────────────────────────────
+document.getElementById('bnst-prev').addEventListener('click',()=>{
+  if(bnStep>1){bnStep--;drawBNStepThrough(bnStep);}
+});
+document.getElementById('bnst-next').addEventListener('click',()=>{
+  if(bnStep<4){bnStep++;drawBNStepThrough(bnStep);}
+});
 
 // ── Boot ───────────────────────────────────────────────────────────
 doReset();
-drawBNStepDiagrams();
+drawBNStepThrough(bnStep);
 
 })();
 </script>
