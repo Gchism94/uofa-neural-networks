@@ -691,6 +691,513 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 
 </div><!-- end .wrap -->
 
+<script>
+(function(){
+'use strict';
+
+// ── Constants ──────────────────────────────────────────────────────
+const EPOCHS   = 100;
+const N_BINS   = 22;
+const BIN_MIN  = -6, BIN_MAX = 6;
+const SPEED_MS = [700, 280, 80];
+const COL_ON   = '#2e7d32';
+const COL_OFF  = '#C62828';
+const N_SAMP   = 400;
+
+// ── State ──────────────────────────────────────────────────────────
+let depth     = 2;
+let bnOn      = true;
+let batchSize = 32;
+let lr        = 0.01;
+let epoch     = 0;
+let playing   = false;
+let timer     = null;
+let precomp   = null;
+
+// ── Seeded PRNG (mulberry32) ───────────────────────────────────────
+function makeRng(seed){
+  return function(){
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function normalSamples(rng, mu, sigma, n){
+  const out = [];
+  for(let i = 0; i < n; i += 2){
+    const u1 = Math.max(1e-10, rng());
+    const u2 = rng();
+    const r  = Math.sqrt(-2 * Math.log(u1));
+    out.push(mu + sigma * r * Math.cos(2 * Math.PI * u2));
+    if(i + 1 < n) out.push(mu + sigma * r * Math.sin(2 * Math.PI * u2));
+  }
+  return out;
+}
+
+function toBins(samples){
+  const counts = new Array(N_BINS).fill(0);
+  const w = (BIN_MAX - BIN_MIN) / N_BINS;
+  for(const v of samples){
+    const i = Math.floor((v - BIN_MIN) / w);
+    if(i >= 0 && i < N_BINS) counts[i]++;
+  }
+  return counts;
+}
+
+// ── Pre-compute distributions (all epochs × layers) ────────────────
+function precompute(){
+  const rng     = makeRng(42);
+  const rngLoss = makeRng(137);
+  const gamTarget = d3.range(depth).map(l => 1.0 + 0.12 * (l + 1));
+  const betTarget = d3.range(depth).map(l => 0.06 * (l + 1) * (l % 2 === 0 ? 1 : -1));
+  const runMeanArr = new Array(depth).fill(0);
+  const runVarArr  = new Array(depth).fill(1);
+  const data = [];
+
+  for(let e = 0; e < EPOCHS; e++){
+    const t = e / (EPOCHS - 1);
+    const layerData = [];
+    for(let l = 0; l < depth; l++){
+      const mu_off  = 0.45 * (l + 1) * t * (1 + 0.25 * Math.sin(e * 0.28 + l * 1.1));
+      const std_off = 1.0 + 0.55 * (l + 1) * t;
+      const binsOff = toBins(normalSamples(rng, mu_off, std_off, N_SAMP));
+      const gamma   = 1.0 + (gamTarget[l] - 1.0) * Math.pow(t, 0.6);
+      const beta    = betTarget[l] * Math.pow(t, 0.6);
+      const sOn     = normalSamples(rng, beta, gamma, N_SAMP);
+      const binsOn  = toBins(sOn);
+      const bSlice  = sOn.slice(0, batchSize);
+      const bMu     = bSlice.reduce((a, b) => a + b, 0) / bSlice.length;
+      const bVar    = bSlice.reduce((a, b) => a + (b - bMu) ** 2, 0) / bSlice.length;
+      runMeanArr[l] = 0.9 * runMeanArr[l] + 0.1 * bMu;
+      runVarArr[l]  = 0.9 * runVarArr[l]  + 0.1 * bVar;
+      layerData.push({
+        mu_on: beta, var_on: gamma * gamma, binsOn,
+        mu_off, var_off: std_off * std_off, binsOff,
+        gamma, beta, runMean: runMeanArr[l], runVar: runVarArr[l]
+      });
+    }
+    data.push(layerData);
+  }
+
+  const lossOn = [], lossOff = [];
+  const hiLR = lr > 0.04;
+  for(let e = 0; e < EPOCHS; e++){
+    const t = e / (EPOCHS - 1);
+    const n = rngLoss() - 0.5;
+    lossOn.push(Math.max(0.015, 2.1 * Math.exp(-4.5 * t) + 0.04 + 0.03 * n));
+    const offScale = hiLR ? 1.2 : 0.9;
+    const offNoise = hiLR ? 0.22 : 0.12;
+    lossOff.push(Math.max(0.02, 2.1 * Math.exp(-2.2 * offScale * t) + 0.12 + offNoise * (rngLoss() - 0.5) * (1 + t)));
+  }
+  return { data, lossOn, lossOff };
+}
+
+// ── Build histogram grid DOM ───────────────────────────────────────
+function buildGrid(id){
+  const container = document.getElementById(id);
+  container.innerHTML = '';
+  for(let l = 0; l < depth; l++){
+    const cell = document.createElement('div');
+    cell.className = 'dist-cell';
+    const lbl = document.createElement('div');
+    lbl.className = 'dist-cell-lbl';
+    lbl.textContent = `Layer ${l + 1}`;
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 100 68');
+    svg.style.cssText = 'width:100%;display:block;border-radius:4px';
+    cell.appendChild(lbl);
+    cell.appendChild(svg);
+    container.appendChild(cell);
+  }
+}
+
+// ── Render one histogram cell ──────────────────────────────────────
+function drawCell(svgEl, bins, color){
+  const VW = 100, VH = 68;
+  const P  = { t: 5, r: 3, b: 14, l: 3 };
+  const iw = VW - P.l - P.r, ih = VH - P.t - P.b;
+  const maxBin = d3.max(bins) || 1;
+  const xSc = d3.scaleLinear().domain([0, N_BINS]).range([0, iw]);
+  const ySc = d3.scaleLinear().domain([0, maxBin]).range([ih, 0]);
+  const bw  = iw / N_BINS - 0.4;
+  const svg = d3.select(svgEl);
+  let g = svg.select('g.hg');
+
+  if(g.empty()){
+    svg.selectAll('*').remove();
+    svg.append('rect').attr('width', VW).attr('height', VH).attr('fill', '#FDFAF5');
+    const zx = P.l + xSc(N_BINS / 2);
+    svg.append('line').attr('x1', zx).attr('y1', P.t).attr('x2', zx).attr('y2', P.t + ih)
+      .attr('stroke','#DDD').attr('stroke-width',0.6).attr('stroke-dasharray','2,2');
+    svg.append('line').attr('x1', P.l).attr('y1', P.t + ih).attr('x2', P.l + iw).attr('y2', P.t + ih)
+      .attr('stroke','#C8C8C8').attr('stroke-width',0.5);
+    ['−3','0','+3'].forEach((txt, i) => {
+      svg.append('text').attr('x', P.l + iw * [0.17, 0.5, 0.83][i]).attr('y', VH - 2)
+        .attr('text-anchor','middle').attr('font-family','IBM Plex Mono,monospace')
+        .attr('font-size',5).attr('fill','#AAAAAA').text(txt);
+    });
+    g = svg.append('g').attr('class','hg').attr('transform',`translate(${P.l},${P.t})`);
+  }
+
+  const bars = g.selectAll('rect.b').data(bins);
+  bars.enter().append('rect').attr('class','b').merge(bars)
+    .attr('x',      (_, i) => xSc(i) + 0.2)
+    .attr('width',  bw)
+    .attr('y',      d => ySc(d))
+    .attr('height', d => Math.max(0, ih - ySc(d)))
+    .attr('fill', color).attr('opacity', 0.72);
+  bars.exit().remove();
+}
+
+// ── Update both histogram rows ─────────────────────────────────────
+function updateRows(){
+  if(!precomp) return;
+  const ld = precomp.data[epoch];
+  ['dist-row-on','dist-row-off'].forEach(id => {
+    const color = id === 'dist-row-on' ? COL_ON : COL_OFF;
+    const key   = id === 'dist-row-on' ? 'binsOn' : 'binsOff';
+    document.getElementById(id).querySelectorAll('.dist-cell').forEach((cell, l) => {
+      if(l < ld.length) drawCell(cell.querySelector('svg'), ld[l][key], color);
+    });
+  });
+}
+
+// ── Update right panel ─────────────────────────────────────────────
+function updatePanel(){
+  if(!precomp) return;
+  const ld   = precomp.data[epoch];
+  const list = document.getElementById('layer-stat-list');
+  if(list.querySelectorAll('.layer-stat-row').length !== depth){
+    list.innerHTML = '';
+    for(let l = 0; l < depth; l++){
+      const row = document.createElement('div');
+      row.className = 'layer-stat-row';
+      row.innerHTML = `<div class="lsr-header"><span class="lsr-name">Layer ${l+1}</span><span class="lsr-badge" id="badge-l${l}"></span></div><div class="lsr-stats"><div class="lsr-stat">μ <span id="lstat-mu-${l}">—</span></div><div class="lsr-stat">σ² <span id="lstat-var-${l}">—</span></div></div>`;
+      list.appendChild(row);
+    }
+  }
+  for(let l = 0; l < depth; l++){
+    const d  = ld[l];
+    const mu = bnOn ? d.mu_on  : d.mu_off;
+    const va = bnOn ? d.var_on : d.var_off;
+    const mEl = document.getElementById(`lstat-mu-${l}`);
+    const vEl = document.getElementById(`lstat-var-${l}`);
+    const bEl = document.getElementById(`badge-l${l}`);
+    if(mEl) mEl.textContent = mu.toFixed(3);
+    if(vEl) vEl.textContent = va.toFixed(3);
+    if(bEl){ bEl.textContent = bnOn ? 'BN' : ''; bEl.style.background = bnOn ? '' : 'transparent'; }
+  }
+  document.getElementById('param-gamma').textContent = ld[0].gamma.toFixed(3);
+  document.getElementById('param-beta').textContent  = ld[0].beta.toFixed(3);
+  document.getElementById('run-mean').textContent    = ld[0].runMean.toFixed(3);
+  document.getElementById('run-var').textContent     = ld[0].runVar.toFixed(3);
+}
+
+// ── Annotation ─────────────────────────────────────────────────────
+function updateAnno(){
+  const box = document.getElementById('anno-box');
+  let msg, cls;
+  if(epoch === 0){
+    msg = 'All layers start near N(0,1). Press Play to begin training and watch activation distributions shift over epochs.';
+    cls = 'neutral';
+  } else if(epoch < 20){
+    msg = bnOn
+      ? 'Early training (1–20): with BN, layers stay tightly normalized. γ and β are beginning to learn the optimal scale and shift.'
+      : 'Early training (1–20): without BN, deeper layers are already drifting — means shift and variance grows with depth.';
+    cls = 'neutral';
+  } else if(epoch < 60){
+    if(bnOn){
+      msg = 'Mid-training (20–60): BN keeps all layers near N(0,1) despite upstream weight changes. γ and β continue adapting; running stats are stabilizing.';
+      cls = 'good';
+    } else {
+      msg = 'Mid-training (20–60): internal covariate shift is clearly visible. Without BN, later layers see unstable input statistics — gradients become unreliable.';
+      cls = 'warn';
+    }
+  } else {
+    if(bnOn){
+      msg = 'Late training: BN-stabilized distributions enable reliable deep-network training. Running mean and variance are ready for use at inference time.';
+      cls = 'good';
+    } else {
+      msg = 'Late training: without BN, distributions in deep layers have drifted significantly. A higher learning rate would have caused divergence long before now.';
+      cls = 'warn';
+    }
+  }
+  box.className = `anno-box ${cls}`;
+  box.textContent = msg;
+}
+
+// ── Training stability chart ───────────────────────────────────────
+function renderStability(){
+  if(!precomp) return;
+  const P = { t:20, r:12, b:28, l:38 };
+  const VW = 320, VH = 240;
+  const iw = VW - P.l - P.r, ih = VH - P.t - P.b;
+  ['on','off'].forEach(mode => {
+    const svgEl  = document.getElementById(`svg-loss-${mode}`);
+    const losses = mode === 'on' ? precomp.lossOn : precomp.lossOff;
+    const color  = mode === 'on' ? COL_ON : COL_OFF;
+    const svg    = d3.select(svgEl);
+    svg.selectAll('*').remove();
+    svg.append('rect').attr('width',VW).attr('height',VH).attr('fill','#FDFAF5');
+    const g    = svg.append('g').attr('transform',`translate(${P.l},${P.t})`);
+    const xSc  = d3.scaleLinear().domain([0, EPOCHS-1]).range([0, iw]);
+    const yMax = d3.max(losses) * 1.08;
+    const ySc  = d3.scaleLinear().domain([0, yMax]).range([ih, 0]);
+    g.append('g').attr('transform',`translate(0,${ih})`)
+     .call(d3.axisBottom(xSc).ticks(5).tickSize(-ih).tickFormat(''))
+     .call(a => { a.select('.domain').remove(); a.selectAll('line').attr('stroke','#EFEFEF'); });
+    g.append('g')
+     .call(d3.axisLeft(ySc).ticks(4).tickSize(-iw).tickFormat(''))
+     .call(a => { a.select('.domain').remove(); a.selectAll('line').attr('stroke','#EFEFEF'); });
+    g.append('g').attr('transform',`translate(0,${ih})`)
+     .call(d3.axisBottom(xSc).ticks(5))
+     .call(a => { a.select('.domain').attr('stroke','#CCC'); a.selectAll('text').attr('font-size',8).attr('fill','#888'); });
+    g.append('g')
+     .call(d3.axisLeft(ySc).ticks(4))
+     .call(a => { a.select('.domain').attr('stroke','#CCC'); a.selectAll('text').attr('font-size',8).attr('fill','#888'); });
+    const lineFn = d3.line().x((_,i) => xSc(i)).y(d => ySc(d));
+    g.append('path').datum(losses).attr('fill','none').attr('stroke',color)
+     .attr('stroke-width',1.2).attr('opacity',0.2).attr('d',lineFn);
+    if(epoch > 0){
+      g.append('path').datum(losses.slice(0, epoch+1)).attr('fill','none')
+       .attr('stroke',color).attr('stroke-width',2).attr('d',lineFn);
+      g.append('circle').attr('cx',xSc(epoch)).attr('cy',ySc(losses[epoch]))
+       .attr('r',4).attr('fill',color).attr('stroke','white').attr('stroke-width',1.5);
+    }
+    g.append('text').attr('x',iw/2).attr('y',ih+24).attr('text-anchor','middle')
+     .attr('font-size',9).attr('fill','#999').attr('font-family','Outfit,sans-serif').text('Epoch');
+    g.append('text').attr('transform','rotate(-90)').attr('x',-ih/2).attr('y',-30)
+     .attr('text-anchor','middle').attr('font-size',9).attr('fill','#999')
+     .attr('font-family','Outfit,sans-serif').text('Loss');
+  });
+}
+
+// ── Status / full render ───────────────────────────────────────────
+function currentTab(){
+  const btn = document.querySelector('#tab-bar button.active');
+  return btn ? btn.dataset.tab : 'distributions';
+}
+
+function render(){
+  updateRows();
+  updatePanel();
+  document.getElementById('stat-epoch').textContent = epoch;
+  document.getElementById('stat-batch').textContent = batchSize;
+  updateAnno();
+  if(currentTab() === 'stability') renderStability();
+}
+
+// ── Playback ───────────────────────────────────────────────────────
+function stepEpoch(){
+  if(epoch >= EPOCHS - 1){ stopPlay(); return; }
+  epoch++;
+  render();
+}
+
+function startPlay(){
+  if(playing) return;
+  playing = true;
+  document.getElementById('btn-play').textContent = '⏸ Pause';
+  const ms = SPEED_MS[+document.getElementById('sld-speed').value];
+  timer = setInterval(stepEpoch, ms);
+}
+
+function stopPlay(){
+  playing = false;
+  document.getElementById('btn-play').textContent = '⏵ Play';
+  if(timer){ clearInterval(timer); timer = null; }
+}
+
+function doReset(){
+  stopPlay();
+  epoch = 0;
+  lr    = +document.getElementById('sld-lr').value;
+  precomp = precompute();
+  buildGrid('dist-row-on');
+  buildGrid('dist-row-off');
+  document.getElementById('layer-stat-list').innerHTML = '';
+  render();
+}
+
+// ── Event wiring ───────────────────────────────────────────────────
+document.getElementById('btn-play').addEventListener('click', () => playing ? stopPlay() : startPlay());
+document.getElementById('btn-step').addEventListener('click', () => { stopPlay(); stepEpoch(); });
+document.getElementById('btn-reset').addEventListener('click', doReset);
+
+const lrSld = document.getElementById('sld-lr');
+lrSld.addEventListener('input', () => { document.getElementById('val-lr').textContent = (+lrSld.value).toFixed(3); });
+lrSld.addEventListener('change', doReset);
+
+const spdSld = document.getElementById('sld-speed');
+spdSld.addEventListener('input', () => {
+  document.getElementById('val-speed').textContent = ['Slow','Med','Fast'][+spdSld.value];
+  if(playing){ stopPlay(); startPlay(); }
+});
+
+document.getElementById('depth-selector').addEventListener('click', e => {
+  const btn = e.target.closest('.sel-btn');
+  if(!btn) return;
+  document.querySelectorAll('#depth-selector .sel-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  depth = +btn.dataset.depth;
+  doReset();
+});
+
+document.getElementById('bn-toggle').addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if(!btn) return;
+  document.querySelectorAll('#bn-toggle button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  bnOn = btn.dataset.bn === 'on';
+  if(precomp) updatePanel();
+  updateAnno();
+});
+
+document.getElementById('batch-selector').addEventListener('click', e => {
+  const btn = e.target.closest('.sel-btn');
+  if(!btn) return;
+  document.querySelectorAll('#batch-selector .sel-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  batchSize = +btn.dataset.batch;
+  doReset();
+});
+
+document.getElementById('tab-bar').addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if(!btn) return;
+  document.querySelectorAll('#tab-bar button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(`panel-${btn.dataset.tab}`).classList.add('active');
+  if(btn.dataset.tab === 'stability') renderStability();
+});
+
+document.getElementById('concepts-toggle').addEventListener('click', () => {
+  const body  = document.getElementById('concepts-body');
+  const arrow = document.getElementById('concepts-arrow');
+  body.classList.toggle('collapsed');
+  arrow.textContent = body.classList.contains('collapsed') ? '▸' : '▾';
+});
+
+// ── Static diagrams for Normalization Steps tab ────────────────────
+function drawBNStepDiagrams(){
+  const stepSvgs = document.querySelectorAll('#panel-steps .bn-step-svg svg');
+
+  // Step 1 — raw distribution + mean marker
+  (function(svgEl){
+    const svg = d3.select(svgEl);
+    svg.selectAll('*').remove();
+    svg.append('rect').attr('width',120).attr('height',90).attr('fill','#FDFAF5');
+    const bins = d3.range(20).map(i => { const x = -3 + i*0.32 - 3 + 3; return Math.round(40*Math.exp(-0.5*((i*0.32-1.8-3+3)/1.4)**2)); });
+    const xSc = d3.scaleLinear().domain([0,20]).range([10,110]);
+    const ySc = d3.scaleLinear().domain([0,d3.max(bins)||1]).range([72,14]);
+    svg.selectAll('rect.b').data(bins).enter().append('rect').attr('class','b')
+      .attr('x',(_,i)=>xSc(i)).attr('width',(110-10)/20-0.5)
+      .attr('y',d=>ySc(d)).attr('height',d=>72-ySc(d)).attr('fill',COL_OFF).attr('opacity',0.65);
+    const muX = xSc(20*(4.8/12));
+    svg.append('line').attr('x1',muX).attr('y1',14).attr('x2',muX).attr('y2',72)
+      .attr('stroke','#1A56A0').attr('stroke-width',1.5).attr('stroke-dasharray','3,2');
+    svg.append('text').attr('x',muX+3).attr('y',22)
+      .attr('font-family','IBM Plex Mono,monospace').attr('font-size',7).attr('fill','#1A56A0').text('μ_B');
+  })(stepSvgs[0]);
+
+  // Step 2 — centered distribution + ±σ markers
+  (function(svgEl){
+    const svg = d3.select(svgEl);
+    svg.selectAll('*').remove();
+    svg.append('rect').attr('width',120).attr('height',90).attr('fill','#FDFAF5');
+    const bins = d3.range(20).map(i => { const x = -3+i*0.32; return Math.round(40*Math.exp(-0.5*(x/1.4)**2)); });
+    const xSc = d3.scaleLinear().domain([0,20]).range([10,110]);
+    const ySc = d3.scaleLinear().domain([0,d3.max(bins)||1]).range([72,14]);
+    svg.selectAll('rect.b').data(bins).enter().append('rect').attr('class','b')
+      .attr('x',(_,i)=>xSc(i)).attr('width',(110-10)/20-0.5)
+      .attr('y',d=>ySc(d)).attr('height',d=>72-ySc(d)).attr('fill',COL_OFF).attr('opacity',0.65);
+    const sdX = (110-10)*(1.4/6.4);
+    [[60-sdX,'−σ'],[60+sdX,'+σ']].forEach(([x,lbl])=>{
+      svg.append('line').attr('x1',x).attr('y1',20).attr('x2',x).attr('y2',72)
+        .attr('stroke','#7B3FC4').attr('stroke-width',1.2).attr('stroke-dasharray','2,2');
+      svg.append('text').attr('x',x).attr('y',16).attr('text-anchor','middle')
+        .attr('font-family','IBM Plex Mono,monospace').attr('font-size',7).attr('fill','#7B3FC4').text(lbl);
+    });
+  })(stepSvgs[1]);
+
+  // Step 3 — normalized N(0,1)
+  (function(svgEl){
+    const svg = d3.select(svgEl);
+    svg.selectAll('*').remove();
+    svg.append('rect').attr('width',120).attr('height',90).attr('fill','#FDFAF5');
+    const bins = d3.range(20).map(i => { const x = -3+i*0.32; return Math.round(44*Math.exp(-0.5*x**2)); });
+    const xSc = d3.scaleLinear().domain([0,20]).range([10,110]);
+    const ySc = d3.scaleLinear().domain([0,d3.max(bins)||1]).range([72,14]);
+    svg.selectAll('rect.b').data(bins).enter().append('rect').attr('class','b')
+      .attr('x',(_,i)=>xSc(i)).attr('width',(110-10)/20-0.5)
+      .attr('y',d=>ySc(d)).attr('height',d=>72-ySc(d)).attr('fill',COL_ON).attr('opacity',0.65);
+    svg.append('text').attr('x',60).attr('y',84).attr('text-anchor','middle')
+      .attr('font-family','IBM Plex Mono,monospace').attr('font-size',7).attr('fill',COL_ON).text('N(0,1)');
+  })(stepSvgs[2]);
+
+  // Step 4 — scaled/shifted by γ, β
+  (function(svgEl){
+    const svg = d3.select(svgEl);
+    svg.selectAll('*').remove();
+    svg.append('rect').attr('width',120).attr('height',90).attr('fill','#FDFAF5');
+    const bins = d3.range(20).map(i => { const x = -3+i*0.32; return Math.round(32*Math.exp(-0.5*((x-0.4)/1.35)**2)); });
+    const xSc = d3.scaleLinear().domain([0,20]).range([10,110]);
+    const ySc = d3.scaleLinear().domain([0,d3.max(bins)||1]).range([72,14]);
+    svg.selectAll('rect.b').data(bins).enter().append('rect').attr('class','b')
+      .attr('x',(_,i)=>xSc(i)).attr('width',(110-10)/20-0.5)
+      .attr('y',d=>ySc(d)).attr('height',d=>72-ySc(d)).attr('fill',COL_ON).attr('opacity',0.65);
+    svg.append('text').attr('x',60).attr('y',84).attr('text-anchor','middle')
+      .attr('font-family','IBM Plex Mono,monospace').attr('font-size',7).attr('fill',COL_ON).text('N(β, γ²)');
+  })(stepSvgs[3]);
+
+  // BN walkthrough SVG
+  (function(){
+    const svg = d3.select('#svg-bn-walkthrough');
+    svg.selectAll('*').remove();
+    svg.append('rect').attr('width',680).attr('height',120).attr('fill','#FDFAF5');
+    const defs = svg.append('defs');
+    defs.append('marker').attr('id','wk-arr').attr('markerWidth',6).attr('markerHeight',6)
+      .attr('refX',5).attr('refY',3).attr('orient','auto')
+      .append('path').attr('d','M0,0 L0,6 L6,3 z').attr('fill','#CCC');
+    const stages = [
+      {label:'x',       color:'#888',    desc:'raw input',     val:'2.41'},
+      {label:'x − μ_B', color:COL_OFF,   desc:'centered',      val:'0.61'},
+      {label:'x̂',       color:'#1A56A0', desc:'normalized',    val:'0.44'},
+      {label:'γx̂ + β',  color:COL_ON,    desc:'scaled/shifted',val:'0.53'},
+    ];
+    const ops = ['− μ_B','÷ σ_B','× γ, + β'];
+    const xs  = [90, 245, 400, 555];
+    stages.forEach((s, i) => {
+      svg.append('circle').attr('cx',xs[i]).attr('cy',58).attr('r',26)
+        .attr('fill','white').attr('stroke',s.color).attr('stroke-width',2);
+      svg.append('text').attr('x',xs[i]).attr('y',53).attr('text-anchor','middle')
+        .attr('font-family','IBM Plex Mono,monospace').attr('font-size',10)
+        .attr('fill',s.color).attr('font-weight','600').text(s.val);
+      svg.append('text').attr('x',xs[i]).attr('y',67).attr('text-anchor','middle')
+        .attr('font-family','Outfit,sans-serif').attr('font-size',9).attr('fill',s.color).text(s.label);
+      svg.append('text').attr('x',xs[i]).attr('y',97).attr('text-anchor','middle')
+        .attr('font-family','Outfit,sans-serif').attr('font-size',9).attr('fill','#BBBBBB').text(s.desc);
+      if(i < stages.length - 1){
+        svg.append('line').attr('x1',xs[i]+28).attr('y1',58).attr('x2',xs[i+1]-28).attr('y2',58)
+          .attr('stroke','#CCC').attr('stroke-width',1.5).attr('marker-end','url(#wk-arr)');
+        svg.append('text').attr('x',(xs[i]+xs[i+1])/2).attr('y',50).attr('text-anchor','middle')
+          .attr('font-family','IBM Plex Mono,monospace').attr('font-size',8.5).attr('fill','#BBBBBB')
+          .text(ops[i]);
+      }
+    });
+  })();
+}
+
+// ── Boot ───────────────────────────────────────────────────────────
+doReset();
+drawBNStepDiagrams();
+
+})();
+</script>
+
 <footer id="course-nav-footer" style="margin-top:1.5rem;padding:0.75rem 0 0 1rem;border-top:1px solid #E0DAC0;font-size:0.8rem;color:#78786A;text-align:left;">
   <a href="../" style="color:#2e7d32;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">&larr; All course visualizations</a>
 </footer>
