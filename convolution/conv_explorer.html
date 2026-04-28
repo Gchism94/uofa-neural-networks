@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<!-- Copyright © 2026 Greg T. Chism. University of Arizona, College of Information Science.
+     INFO 557: Neural Networks. MIT License. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Convolutional Filters — Interactive Explorer | INFO 557: Neural Networks</title>
+<meta name="description" content="Watch filters slide across inputs to produce feature maps — see how stride, padding, and pooling transform spatial data in convolutional neural networks.">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Convolutional Filters — Interactive Explorer">
+<meta property="og:description" content="Watch filters slide across inputs to produce feature maps — see how stride, padding, and pooling transform spatial data in convolutional neural networks.">
+<meta property="og:image" content="https://gchism94.github.io/uofa-neural-networks/convolution/conv_explorer-preview.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="600">
+<meta property="og:url" content="https://gchism94.github.io/uofa-neural-networks/convolution/conv_explorer.html">
+<meta property="fb:app_id" content="2385695445236853">
+
+<!-- Twitter/X card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Convolutional Filters — Interactive Explorer">
+<meta name="twitter:description" content="Watch filters slide across inputs to produce feature maps — see how stride, padding, and pooling transform spatial data in convolutional neural networks.">
+<meta name="twitter:image" content="https://gchism94.github.io/uofa-neural-networks/convolution/conv_explorer-preview.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+
+<style>
+/* ── Design tokens ──────────────────────────────────────────────── */
+:root{
+  --cream:#FAF7F0;--cream-mid:#F0EBE0;--cream-dk:#E2D9C5;
+  --g-dk:#1C3A0E;--g-mid:#2D5A1B;--g-lt:#4A8C2F;--g-pale:#C8E6A8;
+  --orange:#E8630A;--orange-lt:#F08C50;--orange-dk:#C0500A;
+  --blue:#1A56A0;--blue-pale:#D0E4F8;
+  --red:#B0321D;--red-pale:#F8DDD8;
+  --purple:#7B3FC4;--purple-pale:#E8D8F8;
+  --yellow:#B08000;--yellow-pale:#FBF0C8;--yellow-hi:#D4A017;
+  --text:#1A1A1A;--text-muted:#888;--text-soft:#555;
+  --border:#C8BE9A;--border-lt:#DDD6BE;--shadow:rgba(44,90,27,.10);
+  /* Conv-specific accent colours */
+  --in-c:#E8630A;--in-pale:#FDE8D8;
+  --k-c:#1A56A0;--k-pale:#D0E4F8;
+  --out-c:#2D5A1B;--out-pale:#C8E6A8;
+  --pool-c:#7B3FC4;--pool-pale:#E8D8F8;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:'Outfit',sans-serif;background:var(--cream);color:var(--text);
+  padding:1.25rem 1rem 2rem;min-height:100vh;line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:.85rem}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+.hdr{display:flex;justify-content:space-between;align-items:flex-start;column-gap:1rem;row-gap:.35rem;flex-wrap:wrap}
+.hdr>div:first-child{flex:1 1 auto;min-width:0}
+.hdr h1{font-size:clamp(1.25rem,2.2vw,1.6rem);font-weight:700;color:var(--g-dk);letter-spacing:-.02em;line-height:1.2}
+.hdr p.subtitle{font-size:.86rem;color:var(--text-muted);margin-top:.18rem}
+.hdr-rule{border:none;border-top:2.5px solid var(--g-dk);margin-top:.55rem}
+
+/* ── Fixed copyright ─────────────────────────────────────────────── */
+.cr-top{
+  position:fixed;top:.75rem;right:1rem;z-index:1000;
+  font-size:.72rem;color:var(--text-muted);text-align:right;
+  background:rgba(250,247,240,.92);padding:.2rem 1.5rem .2rem .5rem;
+  border-radius:5px;backdrop-filter:blur(4px);
+  border:1px solid var(--border-lt);white-space:nowrap;min-width:max-content;
+}
+.cr-top a{color:var(--orange);text-decoration:none}
+.cr-top a:hover{text-decoration:underline}
+
+/* ── Tab bar ─────────────────────────────────────────────────────── */
+.tab-bar{
+  display:flex;gap:.35rem;background:var(--cream-mid);
+  border:1px solid var(--border);border-radius:8px;
+  padding:.3rem;width:fit-content;
+}
+.tab-bar button{
+  font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:500;
+  padding:.3rem .9rem;border-radius:6px;cursor:pointer;
+  border:none;background:transparent;color:var(--text-soft);
+  transition:all .15s;
+}
+.tab-bar button:hover{background:white;color:var(--g-dk)}
+.tab-bar button.active{background:white;color:var(--g-dk);font-weight:600;
+  box-shadow:0 1px 4px var(--shadow);}
+
+/* ── Explorer grid ───────────────────────────────────────────────── */
+.explorer-grid{
+  display:grid;
+  grid-template-columns:260px 1fr 220px;
+  gap:.85rem;
+  align-items:start;
+}
+@media(max-width:980px){
+  .explorer-grid{grid-template-columns:260px 1fr}
+  .right-col{display:none}
+}
+@media(max-width:680px){
+  .explorer-grid{grid-template-columns:1fr}
+}
+.left-col{display:flex;flex-direction:column;gap:.75rem}
+.center-col{display:flex;flex-direction:column;gap:.75rem}
+.right-col{display:flex;flex-direction:column;gap:.75rem}
+
+/* ── Cards ───────────────────────────────────────────────────────── */
+.card{background:white;border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem;box-shadow:0 2px 8px var(--shadow)}
+.card-title{font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--g-dk);margin-bottom:.55rem}
+
+/* ── Selectors ───────────────────────────────────────────────────── */
+.sel-group{display:flex;gap:.3rem;flex-wrap:wrap;margin-bottom:.45rem}
+.sel-btn{
+  font-family:'Outfit',sans-serif;font-size:.75rem;font-weight:500;
+  padding:.25rem .6rem;border-radius:5px;cursor:pointer;
+  border:1.5px solid var(--border-lt);background:var(--cream);color:var(--text-soft);
+  transition:all .12s;
+}
+.sel-btn:hover{background:var(--cream-mid)}
+.sel-btn.active{background:var(--g-mid);border-color:var(--g-mid);color:white}
+
+/* ── Toggle groups ───────────────────────────────────────────────── */
+.toggle-grp{
+  display:flex;gap:0;border-radius:6px;overflow:hidden;
+  border:1.5px solid var(--border);margin-bottom:.45rem;
+}
+.toggle-grp button{
+  font-family:'Outfit',sans-serif;font-size:.78rem;font-weight:500;
+  padding:.28rem 0;flex:1;border:none;cursor:pointer;
+  background:var(--cream);color:var(--text-soft);transition:all .12s;
+}
+.toggle-grp button.active{background:var(--g-mid);color:white}
+.toggle-grp button:not(.active):hover{background:var(--cream-mid)}
+
+/* ── Sliders ─────────────────────────────────────────────────────── */
+.srow{display:flex;align-items:center;gap:.45rem;margin-bottom:.2rem}
+.slbl{font-family:'IBM Plex Mono',monospace;font-size:.82rem;font-weight:500;color:var(--g-dk);min-width:28px}
+input[type=range]{flex:1;appearance:none;-webkit-appearance:none;height:4px;background:var(--cream-dk);border-radius:2px;cursor:pointer;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--g-mid);border:2.5px solid white;box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:pointer}
+.sval{font-family:'IBM Plex Mono',monospace;font-size:.76rem;color:var(--text-muted);min-width:44px;text-align:right}
+.hint-txt{font-size:.7rem;color:var(--text-muted);font-style:italic;margin-top:.15rem;padding-left:.05rem}
+.param-lbl{font-size:.72rem;color:var(--text-soft);margin-bottom:.25rem;font-weight:500}
+
+/* ── Buttons ─────────────────────────────────────────────────────── */
+.ctrl-btns{display:flex;gap:.45rem;flex-wrap:wrap}
+.pbtn{
+  font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:600;
+  padding:.35rem .9rem;border-radius:6px;cursor:pointer;
+  border:1.5px solid var(--border);background:var(--cream);color:var(--g-dk);
+  transition:all .12s;
+}
+.pbtn:hover{background:var(--g-pale);border-color:var(--g-lt)}
+.pbtn.primary{background:var(--g-mid);border-color:var(--g-mid);color:white}
+.pbtn.primary:hover{background:var(--g-dk);border-color:var(--g-dk)}
+
+/* ── Annotation box ──────────────────────────────────────────────── */
+.anno-box{
+  border-radius:6px;padding:.55rem .75rem;font-size:.78rem;line-height:1.55;
+  background:var(--blue-pale);color:var(--blue);border-left:3px solid var(--blue);
+  min-height:3.2rem;
+}
+.anno-box.warn{background:var(--red-pale);color:var(--red);border-color:var(--red)}
+.anno-box.good{background:var(--g-pale);color:var(--g-dk);border-color:var(--g-mid)}
+.anno-box.neutral{background:var(--cream-mid);color:var(--text-soft);border-color:var(--border)}
+
+/* ── Key Concepts ────────────────────────────────────────────────── */
+.concepts-body{overflow:hidden;max-height:900px;transition:max-height .3s ease}
+.concepts-body.collapsed{max-height:0;margin-bottom:-.55rem}
+.concepts-item{font-size:.74rem;color:var(--text-soft);line-height:1.5;margin-bottom:.45rem;padding-left:.9rem;position:relative}
+.concepts-item:last-child{margin-bottom:0}
+.concepts-item::before{content:'●';color:#2e7d32;position:absolute;left:0;top:0}
+.concepts-item strong{color:#2e7d32;font-weight:600}
+
+/* ── Status bar ──────────────────────────────────────────────────── */
+.status-bar{
+  display:flex;gap:.6rem;flex-wrap:wrap;font-family:'IBM Plex Mono',monospace;
+  font-size:.72rem;color:var(--text-muted);
+}
+.stat-pill{
+  background:var(--cream-mid);border:1px solid var(--border-lt);
+  border-radius:12px;padding:.15rem .55rem;
+}
+.stat-pill span{color:var(--g-dk);font-weight:600}
+
+/* ── Plot label ──────────────────────────────────────────────────── */
+.plot-label{font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);text-align:center;margin-bottom:.5rem}
+
+/* ── Legend ──────────────────────────────────────────────────────── */
+.legend{display:flex;gap:.75rem;flex-wrap:wrap;font-size:.72rem;color:var(--text-soft);margin-top:.5rem;align-items:center}
+.legend-dot{width:10px;height:10px;border-radius:50%;display:inline-block;vertical-align:middle;margin-right:.25rem;flex-shrink:0}
+
+/* ── Tab content panels ──────────────────────────────────────────── */
+.tab-panel{display:none}
+.tab-panel.active{display:flex;flex-direction:column;gap:.75rem}
+
+/* ── Grid cells (pixel grids, kernel grids) ─────────────────────── */
+.px-grid{
+  display:inline-grid;
+  gap:1px;background:var(--border-lt);
+  border:1.5px solid var(--border-lt);border-radius:5px;overflow:hidden;
+}
+.px-cell{
+  width:26px;height:26px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'IBM Plex Mono',monospace;font-size:.6rem;font-weight:500;
+  background:white;color:var(--text-soft);
+  transition:background .10s,color .10s;
+  user-select:none;
+}
+/* Highlight states */
+.px-cell.hi-input  {background:var(--in-pale);color:var(--in-c);font-weight:700}
+.px-cell.hi-kernel {background:var(--k-pale);color:var(--k-c);font-weight:700}
+.px-cell.hi-output {background:var(--out-pale);color:var(--out-c);font-weight:700}
+.px-cell.hi-current{background:var(--g-mid);color:white;font-weight:700}
+.px-cell.hi-pad    {background:#F5F5F5;color:#CCC}
+.px-cell.hi-pool   {background:var(--pool-pale);color:var(--pool-c);font-weight:700}
+.px-cell.hi-poolmax{background:var(--pool-c);color:white;font-weight:700}
+
+/* Editable custom kernel cells */
+.px-cell.editable{padding:0;background:var(--k-pale)}
+.px-cell.editable input{
+  width:100%;height:100%;border:none;background:transparent;text-align:center;
+  font-family:'IBM Plex Mono',monospace;font-size:.62rem;font-weight:600;
+  color:var(--k-c);outline:none;cursor:text;padding:0;
+}
+.px-cell.editable input:focus{background:white}
+
+/* Larger cells for custom kernel editor */
+.px-cell.lg{width:36px;height:36px;font-size:.68rem}
+
+/* Panel headers */
+.panel-hdr{
+  font-size:.67rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--text-muted);text-align:center;margin-bottom:.45rem;
+  display:flex;align-items:center;justify-content:center;gap:.3rem;
+}
+.p-badge{
+  font-size:.59rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;
+  padding:.08rem .35rem;border-radius:4px;
+}
+.pb-in   {background:var(--in-pale);color:var(--in-c)}
+.pb-k    {background:var(--k-pale);color:var(--k-c)}
+.pb-out  {background:var(--out-pale);color:var(--out-c)}
+.pb-pool {background:var(--pool-pale);color:var(--pool-c)}
+
+/* Grid containers */
+.grid-ctr{display:flex;flex-direction:column;align-items:center;gap:.3rem}
+.grid-shape{font-family:'IBM Plex Mono',monospace;font-size:.63rem;color:var(--text-muted);text-align:center}
+
+/* ── Three-panel layout (Tab 1) ──────────────────────────────────── */
+.conv-row{
+  display:flex;align-items:flex-start;justify-content:center;
+  gap:.65rem;flex-wrap:wrap;
+}
+.conv-op{
+  align-self:flex-start;
+  padding-top:10px; /* vertically aligns with grid center */
+  font-size:1.1rem;color:var(--border);font-weight:700;flex-shrink:0;
+}
+
+/* ── Custom kernel wrap ──────────────────────────────────────────── */
+.custom-k-wrap{display:none;margin-top:.4rem}
+.custom-k-wrap.show{display:block}
+.custom-k-inner{display:flex;justify-content:center}
+
+/* ── Pooling panel (Tab 2) ───────────────────────────────────────── */
+.pool-row{
+  display:flex;align-items:flex-start;justify-content:center;
+  gap:.65rem;flex-wrap:wrap;
+}
+
+/* ── CNN Architecture (Tab 3) ────────────────────────────────────── */
+.arch-scroll{width:100%;overflow-x:auto;padding-bottom:.5rem}
+.arch-row{
+  display:flex;align-items:flex-start;gap:0;
+  min-width:640px;
+}
+.arch-item{
+  display:flex;flex-direction:column;align-items:center;gap:.25rem;
+  flex-shrink:0;
+}
+.arch-box{
+  border-radius:6px;padding:.45rem .6rem;text-align:center;
+  border:1.5px solid var(--border-lt);font-size:.72rem;font-weight:600;
+  color:var(--g-dk);background:white;min-width:54px;
+  box-shadow:0 1px 4px var(--shadow);line-height:1.2;
+}
+.arch-box.b-input  {background:var(--in-pale);border-color:var(--orange-lt);color:var(--orange-dk)}
+.arch-box.b-conv   {background:var(--k-pale);border-color:var(--k-c);color:var(--k-c)}
+.arch-box.b-relu   {background:var(--yellow-pale);border-color:var(--yellow-hi);color:var(--yellow)}
+.arch-box.b-pool   {background:var(--pool-pale);border-color:var(--pool-c);color:var(--pool-c)}
+.arch-box.b-flat   {background:var(--cream-mid);border-color:var(--border);color:var(--text-soft)}
+.arch-box.b-fc     {background:var(--out-pale);border-color:var(--g-lt);color:var(--g-dk)}
+.arch-box.b-out    {background:var(--g-mid);border-color:var(--g-dk);color:white}
+.arch-lbl {font-size:.6rem;color:var(--text-muted);text-align:center;font-family:'IBM Plex Mono',monospace;line-height:1.3}
+.arch-shape{font-size:.59rem;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;font-style:italic}
+.arch-arr{
+  flex-shrink:0;align-self:flex-start;
+  margin-top:9px; /* aligns arrow with mid of arch-box */
+  width:20px;height:2px;background:var(--border);position:relative;
+}
+.arch-arr::after{
+  content:'';position:absolute;right:-5px;top:-4px;
+  border:5px solid transparent;border-left-color:var(--border);
+}
+
+/* ── Right panel ─────────────────────────────────────────────────── */
+.stat-row{
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:.7rem;padding:.2rem 0;border-bottom:1px solid var(--border-lt);
+}
+.stat-row:last-child{border-bottom:none}
+.stat-row .sr-lbl{color:var(--text-muted);font-family:'IBM Plex Mono',monospace}
+.stat-row .sr-val{color:var(--g-dk);font-weight:600;font-family:'IBM Plex Mono',monospace}
+
+.dp-row{
+  display:grid;grid-template-columns:1fr .5rem 1fr .5rem 1fr;
+  gap:.1rem .15rem;align-items:center;margin-bottom:.18rem;
+  font-family:'IBM Plex Mono',monospace;font-size:.62rem;
+}
+.dp-v{
+  background:var(--cream);border:1px solid var(--border-lt);border-radius:3px;
+  padding:.08rem .2rem;text-align:center;color:var(--text-soft);
+}
+.dp-v.hi{background:var(--k-pale);color:var(--k-c)}
+.dp-v.in{background:var(--in-pale);color:var(--in-c)}
+.dp-op{color:var(--text-muted);text-align:center;font-size:.65rem}
+.dp-sum{
+  border-top:1.5px solid var(--border);margin-top:.25rem;padding-top:.2rem;
+  font-family:'IBM Plex Mono',monospace;font-size:.7rem;font-weight:600;
+  color:var(--g-dk);text-align:right;
+}
+
+.shape-formula{
+  font-family:'IBM Plex Mono',monospace;font-size:.64rem;color:var(--text-soft);
+  background:var(--cream-mid);border-radius:4px;padding:.3rem .45rem;
+  line-height:1.7;margin-top:.35rem;
+}
+</style>
+</head>
+<body>
+
+<div class="cr-top">© 2026 Greg T. Chism · <a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a></div>
+
+<div class="wrap">
+
+<header>
+  <div class="hdr">
+    <div>
+      <h1>Convolutional Filters — Interactive Explorer</h1>
+      <p class="subtitle">Watch filters slide across inputs to produce feature maps — see how stride, padding, and pooling transform spatial data</p>
+    </div>
+  </div>
+  <hr class="hdr-rule">
+</header>
+
+<!-- Tab bar -->
+<div class="tab-bar" id="tab-bar">
+  <button class="active" data-tab="filters">Filter &amp; Feature Maps</button>
+  <button data-tab="pooling">Pooling</button>
+  <button data-tab="architecture">CNN Architecture</button>
+</div>
+
+<!-- Main explorer -->
+<div class="explorer-grid">
+
+  <!-- ══ LEFT: Controls ═══════════════════════════════════════════ -->
+  <div class="left-col">
+
+    <!-- Filter type -->
+    <div class="card">
+      <div class="card-title">Filter</div>
+
+      <div class="param-lbl">Filter Type</div>
+      <div class="sel-group" id="filter-selector">
+        <button class="sel-btn active" data-filter="edge">Edge (Sobel)</button>
+        <button class="sel-btn" data-filter="blur">Blur</button>
+        <button class="sel-btn" data-filter="sharpen">Sharpen</button>
+        <button class="sel-btn" data-filter="custom">Custom</button>
+      </div>
+
+      <!-- Custom kernel editor — hidden unless Custom selected -->
+      <div class="custom-k-wrap" id="custom-k-wrap">
+        <div class="param-lbl">Edit Custom Kernel</div>
+        <div class="custom-k-inner" id="custom-k-inner">
+          <!-- 3×3 editable grid -->
+          <div class="px-grid" id="custom-kernel-grid" style="grid-template-columns:repeat(3,36px)">
+            <div class="px-cell editable lg"><input type="number" value="0"  step="1" min="-9" max="9" tabindex="1"></div>
+            <div class="px-cell editable lg"><input type="number" value="0"  step="1" min="-9" max="9" tabindex="2"></div>
+            <div class="px-cell editable lg"><input type="number" value="0"  step="1" min="-9" max="9" tabindex="3"></div>
+            <div class="px-cell editable lg"><input type="number" value="0"  step="1" min="-9" max="9" tabindex="4"></div>
+            <div class="px-cell editable lg"><input type="number" value="1"  step="1" min="-9" max="9" tabindex="5"></div>
+            <div class="px-cell editable lg"><input type="number" value="0"  step="1" min="-9" max="9" tabindex="6"></div>
+            <div class="px-cell editable lg"><input type="number" value="0"  step="1" min="-9" max="9" tabindex="7"></div>
+            <div class="px-cell editable lg"><input type="number" value="0"  step="1" min="-9" max="9" tabindex="8"></div>
+            <div class="px-cell editable lg"><input type="number" value="0"  step="1" min="-9" max="9" tabindex="9"></div>
+          </div>
+        </div>
+        <div class="hint-txt" style="margin-top:.3rem">Values applied on next Reset</div>
+      </div>
+
+      <div class="param-lbl" style="margin-top:.4rem">Kernel Size</div>
+      <div class="toggle-grp" id="kernel-size-toggle">
+        <button class="active" data-k="3">3×3</button>
+        <button data-k="5">5×5</button>
+      </div>
+    </div>
+
+    <!-- Conv parameters -->
+    <div class="card">
+      <div class="card-title">Conv Parameters</div>
+
+      <div class="param-lbl">Stride</div>
+      <div class="sel-group" id="stride-selector">
+        <button class="sel-btn active" data-stride="1">1</button>
+        <button class="sel-btn"        data-stride="2">2</button>
+        <button class="sel-btn"        data-stride="3">3</button>
+      </div>
+
+      <div class="param-lbl">Padding</div>
+      <div class="toggle-grp" id="padding-toggle">
+        <button class="active" data-pad="none">None</button>
+        <button                data-pad="same">Same</button>
+      </div>
+      <div class="hint-txt" id="pad-hint">Valid: output = ⌊(in − k) / s⌋ + 1</div>
+    </div>
+
+    <!-- Pooling parameters -->
+    <div class="card">
+      <div class="card-title">Pooling</div>
+
+      <div class="param-lbl">Pool Type</div>
+      <div class="toggle-grp" id="pool-type-toggle">
+        <button class="active" data-pool="max">Max</button>
+        <button                data-pool="avg">Average</button>
+      </div>
+
+      <div class="param-lbl">Pool Size</div>
+      <div class="toggle-grp" id="pool-size-toggle">
+        <button class="active" data-ps="2">2×2</button>
+        <button                data-ps="3">3×3</button>
+      </div>
+    </div>
+
+    <!-- Simulation controls -->
+    <div class="card">
+      <div class="card-title">Simulation</div>
+      <div class="ctrl-btns" style="margin-bottom:.45rem">
+        <button id="btn-play"  class="pbtn primary" style="flex:1">⏵ Play</button>
+        <button id="btn-step"  class="pbtn">⏭ Step</button>
+      </div>
+      <div class="ctrl-btns">
+        <button id="btn-reset" class="pbtn" style="flex:1">↺ Reset</button>
+      </div>
+      <div class="srow" style="margin-top:.5rem">
+        <span class="slbl" style="font-size:.72rem;min-width:42px">Speed</span>
+        <input type="range" id="sld-speed" min="0" max="2" step="1" value="1">
+        <span class="sval"  id="val-speed">Med</span>
+      </div>
+    </div>
+
+    <!-- Annotation -->
+    <div class="card">
+      <div class="card-title">What's happening?</div>
+      <div class="anno-box neutral" id="anno-box">Select a filter and press Play to watch the kernel slide across the input — each step computes a dot product to fill one output cell.</div>
+    </div>
+
+    <!-- Key Concepts -->
+    <div class="card" id="card-concepts">
+      <div class="card-title" style="cursor:pointer;user-select:none" id="concepts-toggle">
+        Key Concepts <span id="concepts-arrow">▾</span>
+      </div>
+      <div class="concepts-body" id="concepts-body">
+        <div class="concepts-item"><strong>Convolution:</strong> slide a kernel across the input, computing a dot product at each position. The output at (r, c) sums the element-wise products of the kernel and the overlapping input patch.</div>
+        <div class="concepts-item"><strong>Stride:</strong> how many pixels the kernel moves per step. Stride 1 gives the largest output; stride 2 halves it. Higher stride = smaller feature map = more compression.</div>
+        <div class="concepts-item"><strong>Padding:</strong> zeros added around the input border. "Same" padding keeps output size equal to input size. "None" (valid) shrinks it by (k−1) pixels per side.</div>
+        <div class="concepts-item"><strong>Pooling:</strong> down-samples a feature map by taking the max or average of each non-overlapping window — reduces spatial size, builds translation invariance, cuts computation.</div>
+        <div class="concepts-item"><strong>Feature detection:</strong> edge kernels respond to intensity gradients; blur kernels smooth; sharpen kernels amplify detail. Learned CNN kernels discover task-specific features automatically.</div>
+      </div>
+    </div>
+
+    <!-- Status bar -->
+    <div class="status-bar">
+      <div class="stat-pill">Step <span id="stat-step">0</span></div>
+      <div class="stat-pill">(<span id="stat-row">—</span>,<span id="stat-col">—</span>)</div>
+    </div>
+
+  </div><!-- end left-col -->
+
+  <!-- ══ CENTER: Tab panels ════════════════════════════════════════ -->
+  <div class="center-col">
+
+    <!-- ─ Tab 1: Filter & Feature Maps ──────────────────────────── -->
+    <div class="tab-panel active" id="panel-filters">
+      <div class="card">
+        <div class="plot-label">Convolution Step-Through</div>
+
+        <!-- Three panels: Input · Kernel · Output -->
+        <div class="conv-row" id="conv-row">
+
+          <!-- Input grid -->
+          <div class="grid-ctr">
+            <div class="panel-hdr">
+              Input <span class="p-badge pb-in" id="input-badge">8×8</span>
+            </div>
+            <div class="px-grid" id="input-grid" style="grid-template-columns:repeat(8,26px)">
+              <!-- 64 cells rendered by JS; placeholder shown until then -->
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+            </div>
+            <div class="grid-shape" id="input-shape-lbl">8 × 8 input</div>
+          </div>
+
+          <div class="conv-op">⊛</div>
+
+          <!-- Kernel -->
+          <div class="grid-ctr">
+            <div class="panel-hdr">
+              Kernel <span class="p-badge pb-k" id="kernel-badge">3×3</span>
+            </div>
+            <div class="px-grid" id="kernel-grid" style="grid-template-columns:repeat(3,26px)">
+              <!-- 9 cells rendered by JS -->
+              <div class="px-cell hi-kernel">·</div><div class="px-cell hi-kernel">·</div><div class="px-cell hi-kernel">·</div>
+              <div class="px-cell hi-kernel">·</div><div class="px-cell hi-kernel">·</div><div class="px-cell hi-kernel">·</div>
+              <div class="px-cell hi-kernel">·</div><div class="px-cell hi-kernel">·</div><div class="px-cell hi-kernel">·</div>
+            </div>
+            <div class="grid-shape" id="kernel-shape-lbl">3 × 3 kernel</div>
+          </div>
+
+          <div class="conv-op" style="padding-top:10px">→</div>
+
+          <!-- Output feature map -->
+          <div class="grid-ctr">
+            <div class="panel-hdr">
+              Feature Map <span class="p-badge pb-out" id="output-badge">6×6</span>
+            </div>
+            <div class="px-grid" id="output-grid" style="grid-template-columns:repeat(6,26px)">
+              <!-- 36 cells rendered by JS -->
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+            </div>
+            <div class="grid-shape" id="output-shape-lbl">6 × 6 feature map</div>
+          </div>
+
+        </div><!-- end conv-row -->
+
+        <div class="legend" style="justify-content:center">
+          <span><span class="legend-dot" style="background:var(--in-c)"></span>Kernel window on input</span>
+          <span><span class="legend-dot" style="background:var(--k-c)"></span>Kernel weights</span>
+          <span><span class="legend-dot" style="background:var(--out-c)"></span>Computed output cell</span>
+          <span><span class="legend-dot" style="background:var(--g-mid)"></span>Current position</span>
+        </div>
+      </div>
+    </div><!-- end panel-filters -->
+
+    <!-- ─ Tab 2: Pooling ─────────────────────────────────────────── -->
+    <div class="tab-panel" id="panel-pooling">
+      <div class="card">
+        <div class="plot-label">Pooling Operation</div>
+
+        <div class="pool-row" id="pool-row">
+
+          <!-- Feature map input to pooling -->
+          <div class="grid-ctr">
+            <div class="panel-hdr">
+              Feature Map <span class="p-badge pb-out" id="pool-in-badge">6×6</span>
+            </div>
+            <div class="px-grid" id="pool-input-grid" style="grid-template-columns:repeat(6,26px)">
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+            </div>
+            <div class="grid-shape" id="pool-in-shape">6 × 6 feature map</div>
+          </div>
+
+          <div class="conv-op" style="padding-top:10px">→</div>
+
+          <!-- Pooled output -->
+          <div class="grid-ctr">
+            <div class="panel-hdr">
+              Pooled <span class="p-badge pb-pool" id="pool-out-badge">3×3</span>
+            </div>
+            <div class="px-grid" id="pool-output-grid" style="grid-template-columns:repeat(3,26px)">
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+              <div class="px-cell">·</div><div class="px-cell">·</div><div class="px-cell">·</div>
+            </div>
+            <div class="grid-shape" id="pool-out-shape">3 × 3 output</div>
+          </div>
+
+        </div><!-- end pool-row -->
+
+        <div class="legend" style="justify-content:center">
+          <span><span class="legend-dot" style="background:var(--pool-pale);border:1.5px solid var(--pool-c)"></span>Pool window</span>
+          <span><span class="legend-dot" style="background:var(--pool-c)"></span>Selected value (max / avg)</span>
+        </div>
+
+        <!-- Pool type annotation -->
+        <div class="anno-box neutral" id="pool-anno" style="margin-top:.6rem;font-size:.75rem">
+          MaxPool 2×2 — takes the largest value from each 2×2 non-overlapping window. Preserves the strongest activation while halving spatial dimensions.
+        </div>
+      </div>
+    </div><!-- end panel-pooling -->
+
+    <!-- ─ Tab 3: CNN Architecture ────────────────────────────────── -->
+    <div class="tab-panel" id="panel-architecture">
+      <div class="card">
+        <div class="plot-label">Typical CNN Pipeline</div>
+
+        <div class="arch-scroll">
+          <div class="arch-row" id="arch-row">
+
+            <div class="arch-item">
+              <div class="arch-box b-input">Input</div>
+              <div class="arch-lbl">Image</div>
+              <div class="arch-shape">8×8×1</div>
+            </div>
+            <div class="arch-arr"></div>
+
+            <div class="arch-item">
+              <div class="arch-box b-conv">Conv1</div>
+              <div class="arch-lbl">3×3 / 8 ch</div>
+              <div class="arch-shape">6×6×8</div>
+            </div>
+            <div class="arch-arr"></div>
+
+            <div class="arch-item">
+              <div class="arch-box b-relu">ReLU</div>
+              <div class="arch-lbl">activation</div>
+              <div class="arch-shape">6×6×8</div>
+            </div>
+            <div class="arch-arr"></div>
+
+            <div class="arch-item">
+              <div class="arch-box b-pool">Pool1</div>
+              <div class="arch-lbl">MaxPool 2×2</div>
+              <div class="arch-shape">3×3×8</div>
+            </div>
+            <div class="arch-arr"></div>
+
+            <div class="arch-item">
+              <div class="arch-box b-conv">Conv2</div>
+              <div class="arch-lbl">3×3 / 16 ch</div>
+              <div class="arch-shape">1×1×16</div>
+            </div>
+            <div class="arch-arr"></div>
+
+            <div class="arch-item">
+              <div class="arch-box b-relu">ReLU</div>
+              <div class="arch-lbl">activation</div>
+              <div class="arch-shape">1×1×16</div>
+            </div>
+            <div class="arch-arr"></div>
+
+            <div class="arch-item">
+              <div class="arch-box b-flat">Flatten</div>
+              <div class="arch-lbl">reshape</div>
+              <div class="arch-shape">16</div>
+            </div>
+            <div class="arch-arr"></div>
+
+            <div class="arch-item">
+              <div class="arch-box b-fc">FC</div>
+              <div class="arch-lbl">Dense 10</div>
+              <div class="arch-shape">10</div>
+            </div>
+            <div class="arch-arr"></div>
+
+            <div class="arch-item">
+              <div class="arch-box b-out">Output</div>
+              <div class="arch-lbl">Softmax</div>
+              <div class="arch-shape">10 classes</div>
+            </div>
+
+          </div><!-- end arch-row -->
+        </div><!-- end arch-scroll -->
+
+        <!-- Shape formula -->
+        <div style="margin-top:.7rem;border-top:1px solid var(--border-lt);padding-top:.6rem">
+          <div class="param-lbl">Output Shape Formula</div>
+          <div class="shape-formula" id="arch-formula">
+            out_size = ⌊(in + 2·pad − kernel) / stride⌋ + 1<br>
+            Example (3×3 kernel, stride 1, no pad, 8×8 input):<br>
+            &nbsp;&nbsp;⌊(8 + 0 − 3) / 1⌋ + 1 = <strong>6</strong>
+          </div>
+        </div>
+
+        <!-- Layer legend -->
+        <div class="legend" style="justify-content:center;margin-top:.55rem">
+          <span><span class="legend-dot" style="background:var(--in-pale);border:1.5px solid var(--orange-lt)"></span>Input</span>
+          <span><span class="legend-dot" style="background:var(--k-pale);border:1.5px solid var(--k-c)"></span>Conv</span>
+          <span><span class="legend-dot" style="background:var(--yellow-pale);border:1.5px solid var(--yellow-hi)"></span>ReLU</span>
+          <span><span class="legend-dot" style="background:var(--pool-pale);border:1.5px solid var(--pool-c)"></span>Pool</span>
+          <span><span class="legend-dot" style="background:var(--out-pale);border:1.5px solid var(--g-lt)"></span>FC</span>
+          <span><span class="legend-dot" style="background:var(--g-mid)"></span>Output</span>
+        </div>
+      </div>
+    </div><!-- end panel-architecture -->
+
+  </div><!-- end center-col -->
+
+  <!-- ══ RIGHT: Step-by-step panel ════════════════════════════════ -->
+  <div class="right-col">
+
+    <!-- Kernel position -->
+    <div class="card">
+      <div class="card-title">Kernel Position</div>
+      <div class="stat-row">
+        <span class="sr-lbl">Row</span>
+        <span class="sr-val" id="rp-row">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="sr-lbl">Col</span>
+        <span class="sr-val" id="rp-col">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="sr-lbl">Step</span>
+        <span class="sr-val" id="rp-step">0 / 0</span>
+      </div>
+    </div>
+
+    <!-- Receptive field -->
+    <div class="card">
+      <div class="card-title">Receptive Field</div>
+      <div id="rf-display" style="display:flex;justify-content:center;margin-bottom:.3rem">
+        <!-- 3×3 or 5×5 patch rendered by JS -->
+        <div class="px-grid" id="rf-grid" style="grid-template-columns:repeat(3,26px)">
+          <div class="px-cell hi-input">·</div><div class="px-cell hi-input">·</div><div class="px-cell hi-input">·</div>
+          <div class="px-cell hi-input">·</div><div class="px-cell hi-input">·</div><div class="px-cell hi-input">·</div>
+          <div class="px-cell hi-input">·</div><div class="px-cell hi-input">·</div><div class="px-cell hi-input">·</div>
+        </div>
+      </div>
+      <div style="font-size:.64rem;color:var(--text-muted);text-align:center;font-style:italic">Input patch under kernel</div>
+    </div>
+
+    <!-- Dot product -->
+    <div class="card">
+      <div class="card-title">Dot Product</div>
+      <div id="dp-display">
+        <div style="font-size:.68rem;color:var(--text-muted);font-style:italic;text-align:center;padding:.4rem 0;line-height:1.6">
+          Press Step or Play<br>to see computation
+        </div>
+      </div>
+      <div class="dp-sum" id="dp-total" style="display:none">Σ = —</div>
+    </div>
+
+    <!-- Output shape calculator -->
+    <div class="card">
+      <div class="card-title">Shape Calculator</div>
+      <div class="stat-row">
+        <span class="sr-lbl">Input</span>
+        <span class="sr-val" id="sc-input">8×8</span>
+      </div>
+      <div class="stat-row">
+        <span class="sr-lbl">Kernel</span>
+        <span class="sr-val" id="sc-kernel">3×3</span>
+      </div>
+      <div class="stat-row">
+        <span class="sr-lbl">Stride</span>
+        <span class="sr-val" id="sc-stride">1</span>
+      </div>
+      <div class="stat-row">
+        <span class="sr-lbl">Padding</span>
+        <span class="sr-val" id="sc-pad">None</span>
+      </div>
+      <div class="stat-row" style="border-top:1.5px solid var(--border);margin-top:.2rem;padding-top:.2rem">
+        <span class="sr-lbl" style="color:var(--g-dk);font-weight:600">Output</span>
+        <span class="sr-val" style="color:var(--g-dk)" id="sc-output">6×6</span>
+      </div>
+      <div class="shape-formula" id="sc-formula">
+        ⌊(8 + 0 − 3) / 1⌋ + 1 = 6
+      </div>
+    </div>
+
+  </div><!-- end right-col -->
+
+</div><!-- end .explorer-grid -->
+
+</div><!-- end .wrap -->
+
+<script>
+/* Stage 1 — minimal interactivity only (tab switching, toggles, collapsible).
+   Full convolution simulation added in Stage 2. */
+(function(){
+'use strict';
+
+/* Tab switching */
+document.getElementById('tab-bar').addEventListener('click', function(e){
+  var btn = e.target.closest('button');
+  if(!btn || !btn.dataset.tab) return;
+  document.querySelectorAll('#tab-bar button').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+  document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('active'); });
+  document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+});
+
+/* Key Concepts collapse */
+document.getElementById('concepts-toggle').addEventListener('click', function(){
+  var body  = document.getElementById('concepts-body');
+  var arrow = document.getElementById('concepts-arrow');
+  body.classList.toggle('collapsed');
+  arrow.textContent = body.classList.contains('collapsed') ? '▸' : '▾';
+});
+
+/* Filter selector — show/hide custom kernel editor */
+document.getElementById('filter-selector').addEventListener('click', function(e){
+  var btn = e.target.closest('.sel-btn');
+  if(!btn) return;
+  document.querySelectorAll('#filter-selector .sel-btn').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+  document.getElementById('custom-k-wrap').classList.toggle('show', btn.dataset.filter === 'custom');
+});
+
+/* Generic toggle-grp handler */
+document.querySelectorAll('.toggle-grp').forEach(function(grp){
+  grp.addEventListener('click', function(e){
+    var btn = e.target.closest('button');
+    if(!btn) return;
+    grp.querySelectorAll('button').forEach(function(b){ b.classList.remove('active'); });
+    btn.classList.add('active');
+  });
+});
+
+/* Generic sel-group handler (stride) */
+document.getElementById('stride-selector').addEventListener('click', function(e){
+  var btn = e.target.closest('.sel-btn');
+  if(!btn) return;
+  document.querySelectorAll('#stride-selector .sel-btn').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+});
+
+/* Speed label update */
+document.getElementById('sld-speed').addEventListener('input', function(){
+  document.getElementById('val-speed').textContent = ['Slow','Med','Fast'][+this.value];
+});
+
+/* Padding hint update */
+document.getElementById('padding-toggle').addEventListener('click', function(e){
+  var btn = e.target.closest('button');
+  if(!btn) return;
+  var hint = document.getElementById('pad-hint');
+  hint.textContent = btn.dataset.pad === 'same'
+    ? 'Same: output size = input size (zero-pad borders)'
+    : 'Valid: output = ⌊(in − k) / s⌋ + 1';
+});
+
+/* Pool type annotation update */
+document.getElementById('pool-type-toggle').addEventListener('click', function(e){
+  var btn = e.target.closest('button');
+  if(!btn) return;
+  var anno = document.getElementById('pool-anno');
+  if(btn.dataset.pool === 'max'){
+    anno.textContent = 'MaxPool 2×2 — takes the largest value from each 2×2 non-overlapping window. Preserves the strongest activation while halving spatial dimensions.';
+  } else {
+    anno.textContent = 'AvgPool 2×2 — takes the average of each 2×2 non-overlapping window. Produces a smoother, more spatially averaged representation.';
+  }
+});
+
+})();
+</script>
+
+<footer id="course-nav-footer" style="margin-top:1.5rem;padding:0.75rem 0 0 1rem;border-top:1px solid #E0DAC0;font-size:0.8rem;color:#78786A;text-align:left;">
+  <a href="../" style="color:#2e7d32;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">&larr; All course visualizations</a>
+</footer>
+<script>
+if (window.self !== window.top) { var f = document.getElementById('course-nav-footer'); if (f) { f.style.display = 'none'; } }
+</script>
+
+</body>
+</html>
