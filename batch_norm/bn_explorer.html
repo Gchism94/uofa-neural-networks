@@ -295,6 +295,12 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 #bnst-table thead td:first-child{text-align:left}
 #bnst-table tbody td{text-align:center}
 #bnst-table tbody td:first-child{text-align:left;white-space:nowrap}
+
+/* ── Stability chart sizing ──────────────────────────────────────── */
+#svg-loss-combined,#svg-grad-norm{min-height:160px;background:#FDFAF5;border-radius:5px}
+
+/* ── Legend dashed override ──────────────────────────────────────── */
+.legend-dash{width:22px;height:0;border-top:2.5px dashed;display:inline-block;vertical-align:middle;margin-right:.25rem}
 </style>
 </head>
 <body>
@@ -447,6 +453,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
         </div>
         <div class="legend" style="margin-top:.55rem">
           <span><span class="legend-dot" style="background:var(--bn-on)"></span>With BN — activations stay near N(0,1)</span>
+          <span style="color:var(--text-muted);font-style:italic">Both rows share the same x-axis [−6, +6] — compare the drift directly</span>
         </div>
       </div>
 
@@ -491,9 +498,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
             <div id="bnst-num" class="bn-step-num">Step 1 of 4</div>
             <div id="bnst-title" class="bn-step-title" style="margin-top:.25rem;font-size:.88rem">Compute Batch Mean</div>
           </div>
-          <div style="display:flex;gap:.4rem">
+          <div style="display:flex;gap:.4rem;flex-wrap:wrap">
             <button id="bnst-prev" class="pbtn" disabled>← Prev</button>
             <button id="bnst-next" class="pbtn primary">Next →</button>
+            <button id="bnst-reset" class="pbtn" title="Restart from Step 1">↺ Reset</button>
           </div>
         </div>
 
@@ -613,7 +621,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
         <svg id="svg-loss-combined" style="width:100%;display:block;border-radius:5px"></svg>
         <div class="legend" style="margin-top:.35rem">
           <span><span class="legend-line" style="background:var(--bn-on)"></span>With BN</span>
-          <span><span class="legend-line" style="background:var(--bn-off);border-top:2px dashed var(--bn-off)"></span>Without BN</span>
+          <span><span class="legend-dash" style="border-color:var(--bn-off)"></span>Without BN</span>
         </div>
       </div>
 
@@ -837,7 +845,7 @@ function precompute(){
 
   for(let e=0; e<EPOCHS; e++){
     const t = e/(EPOCHS-1);
-    const n = rngLoss()-0.5, m = rngLoss()-0.5;
+    const n = rngLoss()-0.5;
     lossOn.push(Math.max(0.015, 2.1*Math.exp(-4.5*t)+0.04+0.03*n));
     const offScale = hiLR ? 1.2 : 0.9;
     const offNoise = (hiLR ? 0.22 : 0.12)*df;
@@ -995,8 +1003,11 @@ function renderStability(){
   function drawDualChart(svgId, dataOn, dataOff, yLabel, withAnno){
     const el = document.getElementById(svgId);
     if(!el) return;
-    const pw = el.parentElement ? el.parentElement.clientWidth : 560;
-    const VW = Math.max(240, pw||560), VH = Math.round(VW*0.38);
+    // getBoundingClientRect gives true rendered width even inside flex containers
+    const bcr = el.getBoundingClientRect();
+    const pw  = bcr.width > 10 ? bcr.width
+                : (el.parentElement ? el.parentElement.clientWidth : 0);
+    const VW = Math.max(280, pw||580), VH = Math.round(VW*0.40);
     el.setAttribute('viewBox',`0 0 ${VW} ${VH}`);
     el.setAttribute('height', VH);
     const P={t:28, r:18, b:30, l:46};
@@ -1023,17 +1034,25 @@ function renderStability(){
      .call(a=>{a.select('.domain').attr('stroke','#CCC');a.selectAll('text').attr('font-size',8).attr('fill','#888');});
     g.append('g').call(d3.axisLeft(ySc).ticks(4))
      .call(a=>{a.select('.domain').attr('stroke','#CCC');a.selectAll('text').attr('font-size',8).attr('fill','#888');});
-    const lineFn=d3.line().x((_,i)=>xSc(i)).y(d=>ySc(d)).curve(d3.curveCatmullRom);
+    // Loss uses smooth curve; grad norm uses linear to emphasise spikes
+    const smoothFn = d3.line().x((_,i)=>xSc(i)).y(d=>ySc(d)).curve(d3.curveCatmullRom);
+    const spikeFn  = d3.line().x((_,i)=>xSc(i)).y(d=>ySc(d));
+    const lineFn   = withAnno ? smoothFn : spikeFn;
+    const offFn    = withAnno ? smoothFn : spikeFn;
     // Ghost full paths
-    g.append('path').datum(dataOn).attr('fill','none').attr('stroke',COL_ON).attr('stroke-width',1).attr('opacity',0.15).attr('d',lineFn);
-    g.append('path').datum(dataOff).attr('fill','none').attr('stroke',COL_OFF).attr('stroke-width',1).attr('opacity',0.15).attr('d',lineFn);
+    g.append('path').datum(dataOn).attr('fill','none').attr('stroke',COL_ON)
+     .attr('stroke-width',1).attr('opacity',0.13).attr('d',smoothFn);
+    g.append('path').datum(dataOff).attr('fill','none').attr('stroke',COL_OFF)
+     .attr('stroke-width',1).attr('opacity',0.13).attr('d',offFn);
     if(emax>0){
       const nOn=dataOn.slice(0,emax+1), nOff=dataOff.slice(0,emax+1);
-      const areaFn=d3.area().x((_,i)=>xSc(i)).y0(ih).y1(d=>ySc(d)).curve(d3.curveCatmullRom);
-      g.append('path').datum(nOn).attr('fill',COL_ON).attr('opacity',0.07).attr('d',areaFn);
+      if(withAnno){
+        const areaFn=d3.area().x((_,i)=>xSc(i)).y0(ih).y1(d=>ySc(d)).curve(d3.curveCatmullRom);
+        g.append('path').datum(nOn).attr('fill',COL_ON).attr('opacity',0.07).attr('d',areaFn);
+      }
       g.append('path').datum(nOn).attr('fill','none').attr('stroke',COL_ON).attr('stroke-width',2.5).attr('d',lineFn);
-      g.append('path').datum(nOff).attr('fill','none').attr('stroke',COL_OFF).attr('stroke-width',2)
-       .attr('stroke-dasharray','5,3').attr('d',lineFn);
+      g.append('path').datum(nOff).attr('fill','none').attr('stroke',COL_OFF).attr('stroke-width',withAnno?2:1.5)
+       .attr('stroke-dasharray', withAnno ? '5,3' : 'none').attr('d',offFn);
       g.append('circle').attr('cx',xSc(emax)).attr('cy',ySc(dataOn[emax])).attr('r',4)
        .attr('fill',COL_ON).attr('stroke','white').attr('stroke-width',1.5);
       g.append('circle').attr('cx',xSc(emax)).attr('cy',ySc(dataOff[emax])).attr('r',4)
@@ -1054,7 +1073,7 @@ function renderStability(){
   }
 
   drawDualChart('svg-loss-combined', precomp.lossOn, precomp.lossOff, 'Loss', true);
-  drawDualChart('svg-grad-norm', precomp.gradOn, precomp.gradOff, 'Gradient Norm', false);
+  drawDualChart('svg-grad-norm',     precomp.gradOn, precomp.gradOff, 'Gradient Norm', false);
 
   const annoEl=document.getElementById('stability-anno');
   if(annoEl){
@@ -1083,7 +1102,8 @@ function render(){
   document.getElementById('stat-epoch').textContent = epoch;
   document.getElementById('stat-batch').textContent = batchSize;
   updateAnno();
-  if(currentTab() === 'stability') renderStability();
+  const tab = currentTab();
+  if(tab === 'stability') renderStability();
 }
 
 // ── Playback ───────────────────────────────────────────────────────
@@ -1116,6 +1136,10 @@ function doReset(){
   buildGrid('dist-row-off');
   document.getElementById('layer-stat-list').innerHTML = '';
   render();
+  // Re-render whichever tab is currently visible
+  const tab = currentTab();
+  if(tab === 'stability') renderStability();
+  if(tab === 'steps') drawBNStepThrough(bnStep);
 }
 
 // ── Event wiring ───────────────────────────────────────────────────
@@ -1283,6 +1307,18 @@ document.getElementById('bnst-prev').addEventListener('click',()=>{
 });
 document.getElementById('bnst-next').addEventListener('click',()=>{
   if(bnStep<4){bnStep++;drawBNStepThrough(bnStep);}
+});
+document.getElementById('bnst-reset').addEventListener('click',()=>{
+  bnStep=1; drawBNStepThrough(1);
+});
+
+// ── Resize handler ────────────────────────────────────────────────
+let resizeTimer=null;
+window.addEventListener('resize',()=>{
+  clearTimeout(resizeTimer);
+  resizeTimer=setTimeout(()=>{
+    if(currentTab()==='stability' && precomp) renderStability();
+  },120);
 });
 
 // ── Boot ───────────────────────────────────────────────────────────
