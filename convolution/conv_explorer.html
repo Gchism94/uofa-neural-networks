@@ -339,6 +339,23 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   background:var(--cream-mid);border-radius:4px;padding:.3rem .45rem;
   line-height:1.7;margin-top:.35rem;
 }
+
+/* ── Input pattern select ────────────────────────────────────────── */
+select.param-sel{
+  width:100%;font-family:'Outfit',sans-serif;font-size:.78rem;
+  padding:.28rem .45rem;border:1.5px solid var(--border);border-radius:6px;
+  background:var(--cream);color:var(--text-soft);margin-bottom:.45rem;
+  cursor:pointer;outline:none;appearance:none;-webkit-appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right .55rem center;
+  padding-right:1.8rem;
+}
+select.param-sel:focus{border-color:var(--g-mid)}
+
+/* ── RF cell highlight (inset shadow, no layout shift) ───────────── */
+.px-cell.rf-hi{box-shadow:inset 0 0 0 2.5px var(--in-c);z-index:1;position:relative}
+.px-cell.out-cur{background:#2D5A1B !important;color:white !important;
+  box-shadow:inset 0 0 0 2px #1C3A0E;z-index:1;position:relative}
 </style>
 </head>
 <body>
@@ -373,6 +390,14 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     <!-- Filter type -->
     <div class="card">
       <div class="card-title">Filter</div>
+
+      <div class="param-lbl">Input Pattern</div>
+      <select id="input-pattern-select" class="param-sel">
+        <option value="edge">Edge (vertical stripe)</option>
+        <option value="diagonal">Diagonal gradient</option>
+        <option value="checkerboard">Checkerboard</option>
+        <option value="circle">Circle blob</option>
+      </select>
 
       <div class="param-lbl">Filter Type</div>
       <div class="sel-group" id="filter-selector">
@@ -815,82 +840,594 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 </div><!-- end .wrap -->
 
 <script>
-/* Stage 1 — minimal interactivity only (tab switching, toggles, collapsible).
-   Full convolution simulation added in Stage 2. */
 (function(){
 'use strict';
 
-/* Tab switching */
-document.getElementById('tab-bar').addEventListener('click', function(e){
-  var btn = e.target.closest('button');
-  if(!btn || !btn.dataset.tab) return;
-  document.querySelectorAll('#tab-bar button').forEach(function(b){ b.classList.remove('active'); });
-  btn.classList.add('active');
-  document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('active'); });
-  document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
-});
+// ── Constants ──────────────────────────────────────────────────────
+var IN = 8;
+var SPEED_MS = [800, 350, 100];
 
-/* Key Concepts collapse */
-document.getElementById('concepts-toggle').addEventListener('click', function(){
-  var body  = document.getElementById('concepts-body');
-  var arrow = document.getElementById('concepts-arrow');
-  body.classList.toggle('collapsed');
-  arrow.textContent = body.classList.contains('collapsed') ? '▸' : '▾';
-});
-
-/* Filter selector — show/hide custom kernel editor */
-document.getElementById('filter-selector').addEventListener('click', function(e){
-  var btn = e.target.closest('.sel-btn');
-  if(!btn) return;
-  document.querySelectorAll('#filter-selector .sel-btn').forEach(function(b){ b.classList.remove('active'); });
-  btn.classList.add('active');
-  document.getElementById('custom-k-wrap').classList.toggle('show', btn.dataset.filter === 'custom');
-});
-
-/* Generic toggle-grp handler */
-document.querySelectorAll('.toggle-grp').forEach(function(grp){
-  grp.addEventListener('click', function(e){
-    var btn = e.target.closest('button');
-    if(!btn) return;
-    grp.querySelectorAll('button').forEach(function(b){ b.classList.remove('active'); });
-    btn.classList.add('active');
-  });
-});
-
-/* Generic sel-group handler (stride) */
-document.getElementById('stride-selector').addEventListener('click', function(e){
-  var btn = e.target.closest('.sel-btn');
-  if(!btn) return;
-  document.querySelectorAll('#stride-selector .sel-btn').forEach(function(b){ b.classList.remove('active'); });
-  btn.classList.add('active');
-});
-
-/* Speed label update */
-document.getElementById('sld-speed').addEventListener('input', function(){
-  document.getElementById('val-speed').textContent = ['Slow','Med','Fast'][+this.value];
-});
-
-/* Padding hint update */
-document.getElementById('padding-toggle').addEventListener('click', function(e){
-  var btn = e.target.closest('button');
-  if(!btn) return;
-  var hint = document.getElementById('pad-hint');
-  hint.textContent = btn.dataset.pad === 'same'
-    ? 'Same: output size = input size (zero-pad borders)'
-    : 'Valid: output = ⌊(in − k) / s⌋ + 1';
-});
-
-/* Pool type annotation update */
-document.getElementById('pool-type-toggle').addEventListener('click', function(e){
-  var btn = e.target.closest('button');
-  if(!btn) return;
-  var anno = document.getElementById('pool-anno');
-  if(btn.dataset.pool === 'max'){
-    anno.textContent = 'MaxPool 2×2 — takes the largest value from each 2×2 non-overlapping window. Preserves the strongest activation while halving spatial dimensions.';
-  } else {
-    anno.textContent = 'AvgPool 2×2 — takes the average of each 2×2 non-overlapping window. Produces a smoother, more spatially averaged representation.';
+// ── Input patterns ─────────────────────────────────────────────────
+var INPUT_PATTERNS = {
+  edge: function(){
+    return Array.from({length:IN}, function(_,r){
+      return Array.from({length:IN}, function(_,c){ return c < IN/2 ? 0.9 : 0.1; });
+    });
+  },
+  diagonal: function(){
+    return Array.from({length:IN}, function(_,r){
+      return Array.from({length:IN}, function(_,c){ return (r+c)/(2*(IN-1)); });
+    });
+  },
+  checkerboard: function(){
+    return Array.from({length:IN}, function(_,r){
+      return Array.from({length:IN}, function(_,c){ return (r+c)%2===0?1.0:0.0; });
+    });
+  },
+  circle: function(){
+    var cx=(IN-1)/2, cy=(IN-1)/2, radius=2.5;
+    return Array.from({length:IN}, function(_,r){
+      return Array.from({length:IN}, function(_,c){
+        return Math.sqrt((r-cy)*(r-cy)+(c-cx)*(c-cx))<=radius?1.0:0.0;
+      });
+    });
   }
+};
+
+// ── Kernel definitions ─────────────────────────────────────────────
+var B = 1/9;
+var KERNELS = {
+  3: {
+    edge:    [[-1,0,1],[-2,0,2],[-1,0,1]],
+    blur:    [[B,B,B],[B,B,B],[B,B,B]],
+    sharpen: [[0,-1,0],[-1,5,-1],[0,-1,0]],
+    custom:  [[0,0,0],[0,1,0],[0,0,0]]
+  },
+  5: {
+    edge: [
+      [-1,-2,0,2,1],[-2,-4,0,4,2],[-3,-6,0,6,3],[-2,-4,0,4,2],[-1,-2,0,2,1]
+    ],
+    blur: Array.from({length:5},function(){return Array.from({length:5},function(){return 1/25;})}),
+    sharpen: [
+      [0,0,-1,0,0],[0,-1,-2,-1,0],[-1,-2,17,-2,-1],[0,-1,-2,-1,0],[0,0,-1,0,0]
+    ],
+    custom: Array.from({length:5},function(_,r){
+      return Array.from({length:5},function(_,c){return r===2&&c===2?1:0;});
+    })
+  }
+};
+
+// ── State ──────────────────────────────────────────────────────────
+var K=3, stride=1, padMode='none', pad=0, filterType='edge', inputPattern='edge';
+var inputData=[], kernelData=[], outputData=[], outputMaxAbs=1;
+var positions=[], outSize=0, step=-1, playing=false, timer=null;
+var inputCells=[], kernelCells=[], outputCells=[];
+var lastRFIndices=[], lastOutIdx=-1;
+
+// ── Color helpers ──────────────────────────────────────────────────
+function grayBg(v){
+  var c=Math.round(255*(1-Math.max(0,Math.min(1,v))));
+  return 'rgb('+c+','+c+','+c+')';
+}
+function kColor(v,mx){
+  if(!mx) return '#f8f8f8';
+  var t=Math.min(Math.abs(v)/mx,1);
+  if(v>0) return d3.interpolateRgb('#ffffff','#2D5A1B')(t);
+  if(v<0) return d3.interpolateRgb('#ffffff','#B0321D')(t);
+  return '#ffffff';
+}
+function oColor(v,mx){
+  if(v===null||v===undefined||!mx) return '#f5f5f5';
+  var t=Math.min(Math.abs(v)/mx,1);
+  if(v>0) return d3.interpolateRgb('#f0f0f0','#2D5A1B')(t);
+  if(v<0) return d3.interpolateRgb('#f0f0f0','#B0321D')(t);
+  return '#f0f0f0';
+}
+function fmtV(v){
+  if(v===null||v===undefined) return '';
+  var a=Math.abs(v);
+  if(a>=100) return v.toFixed(0);
+  if(a>=10)  return v.toFixed(0);
+  if(a>=1)   return v.toFixed(1);
+  if(a===0)  return '0';
+  return v.toFixed(2).replace(/^(-?)0\./,'$1.');
+}
+
+// ── Math helpers ───────────────────────────────────────────────────
+function computeOutSize(){
+  pad = padMode==='same' ? Math.floor(K/2) : 0;
+  outSize = Math.max(1, Math.floor((IN+2*pad-K)/stride)+1);
+}
+function buildPositions(){
+  positions=[];
+  for(var pr=0;pr<outSize;pr++)
+    for(var pc=0;pc<outSize;pc++)
+      positions.push([pr,pc]);
+}
+function paddedVal(r,c){
+  var pr=r-pad, pc=c-pad;
+  if(pr<0||pr>=IN||pc<0||pc>=IN) return 0;
+  return inputData[pr][pc];
+}
+function dotProduct(pr,pc){
+  var sum=0;
+  for(var ki=0;ki<K;ki++)
+    for(var kj=0;kj<K;kj++)
+      sum+=paddedVal(pr*stride+ki, pc*stride+kj)*kernelData[ki][kj];
+  return sum;
+}
+function kernelAbsMax(){
+  return d3.max(kernelData.reduce(function(a,r){return a.concat(r);},[] ).map(Math.abs))||1;
+}
+function precomputeOutputMax(){
+  var mx=0;
+  for(var pr=0;pr<outSize;pr++)
+    for(var pc=0;pc<outSize;pc++)
+      mx=Math.max(mx,Math.abs(dotProduct(pr,pc)));
+  return Math.max(mx,0.001);
+}
+
+// ── Render: input grid ─────────────────────────────────────────────
+function renderInputGrid(){
+  var el=document.getElementById('input-grid');
+  el.innerHTML='';
+  el.style.gridTemplateColumns='repeat('+IN+',26px)';
+  inputCells=[];
+  for(var r=0;r<IN;r++){
+    for(var c=0;c<IN;c++){
+      var d=document.createElement('div');
+      d.className='px-cell';
+      d.style.background=grayBg(inputData[r][c]);
+      d.style.cursor='pointer';
+      d.dataset.r=r; d.dataset.c=c;
+      el.appendChild(d);
+      inputCells.push(d);
+    }
+  }
+  el.onclick=function(e){
+    var t=e.target.closest('.px-cell');
+    if(!t) return;
+    var ri=+t.dataset.r, ci=+t.dataset.c;
+    inputData[ri][ci]=inputData[ri][ci]>0.5?0.0:1.0;
+    t.style.background=grayBg(inputData[ri][ci]);
+    resetOutputOnly();
+  };
+  document.getElementById('input-badge').textContent=IN+'×'+IN;
+  document.getElementById('input-shape-lbl').textContent=IN+' × '+IN+' input';
+}
+
+// ── Render: kernel grid ────────────────────────────────────────────
+function renderKernelGrid(){
+  var el=document.getElementById('kernel-grid');
+  el.innerHTML='';
+  el.style.gridTemplateColumns='repeat('+K+',26px)';
+  kernelCells=[];
+  var mx=kernelAbsMax();
+  for(var ki=0;ki<K;ki++){
+    for(var kj=0;kj<K;kj++){
+      var v=kernelData[ki][kj];
+      var d=document.createElement('div');
+      d.className='px-cell';
+      d.style.background=kColor(v,mx);
+      d.style.fontSize='.58rem';
+      d.style.color=Math.abs(v)>mx*0.45?'white':'#333';
+      d.textContent=fmtV(v);
+      el.appendChild(d);
+      kernelCells.push(d);
+    }
+  }
+  document.getElementById('kernel-badge').textContent=K+'×'+K;
+  document.getElementById('kernel-shape-lbl').textContent=K+' × '+K+' kernel';
+}
+
+// ── Render: output grid ────────────────────────────────────────────
+function renderOutputGrid(){
+  var el=document.getElementById('output-grid');
+  el.innerHTML='';
+  el.style.gridTemplateColumns='repeat('+outSize+',26px)';
+  outputCells=[];
+  for(var pr=0;pr<outSize;pr++){
+    for(var pc=0;pc<outSize;pc++){
+      var v=outputData[pr]?outputData[pr][pc]:null;
+      var d=document.createElement('div');
+      d.className='px-cell';
+      if(v!==null){
+        d.style.background=oColor(v,outputMaxAbs);
+        d.style.fontSize='.57rem';
+        d.style.color='#333';
+        d.textContent=fmtV(v);
+      } else {
+        d.style.background='#f8f8f8';
+      }
+      el.appendChild(d);
+      outputCells.push(d);
+    }
+  }
+  document.getElementById('output-badge').textContent=outSize+'×'+outSize;
+  document.getElementById('output-shape-lbl').textContent=outSize+' × '+outSize+' feature map';
+  lastOutIdx=-1;
+}
+
+// ── Update single output cell ──────────────────────────────────────
+function updateOutputCell(pr,pc){
+  var idx=pr*outSize+pc;
+  var cell=outputCells[idx];
+  if(!cell) return;
+  var v=outputData[pr][pc];
+  cell.style.background=oColor(v,outputMaxAbs);
+  cell.style.fontSize='.57rem';
+  cell.style.color='#333';
+  cell.textContent=fmtV(v);
+}
+
+// ── Highlight receptive field on input ─────────────────────────────
+function clearRFHighlight(){
+  lastRFIndices.forEach(function(i){
+    if(inputCells[i]) inputCells[i].classList.remove('rf-hi');
+  });
+  lastRFIndices=[];
+}
+function highlightRF(pr,pc){
+  clearRFHighlight();
+  for(var ki=0;ki<K;ki++){
+    for(var kj=0;kj<K;kj++){
+      var ir=pr*stride+ki-pad, ic=pc*stride+kj-pad;
+      if(ir>=0&&ir<IN&&ic>=0&&ic<IN){
+        var idx=ir*IN+ic;
+        inputCells[idx].classList.add('rf-hi');
+        lastRFIndices.push(idx);
+      }
+    }
+  }
+}
+
+// ── Highlight current output cell ─────────────────────────────────
+function highlightOutCell(pr,pc){
+  if(lastOutIdx>=0&&outputCells[lastOutIdx]){
+    var lpr=Math.floor(lastOutIdx/outSize), lpc=lastOutIdx%outSize;
+    outputCells[lastOutIdx].classList.remove('out-cur');
+    updateOutputCell(lpr,lpc);
+  }
+  var idx=pr*outSize+pc;
+  lastOutIdx=idx;
+  if(outputCells[idx]){
+    outputCells[idx].classList.add('out-cur');
+    outputCells[idx].textContent=fmtV(outputData[pr][pc]);
+  }
+}
+
+// ── Right panel ────────────────────────────────────────────────────
+function updateRightPanel(pr,pc){
+  document.getElementById('rp-row').textContent=pr;
+  document.getElementById('rp-col').textContent=pc;
+  document.getElementById('rp-step').textContent=(step+1)+' / '+positions.length;
+  document.getElementById('stat-row').textContent=pr;
+  document.getElementById('stat-col').textContent=pc;
+  document.getElementById('stat-step').textContent=step+1;
+
+  // Receptive field display
+  var rfEl=document.getElementById('rf-grid');
+  rfEl.style.gridTemplateColumns='repeat('+K+',26px)';
+  rfEl.innerHTML='';
+  for(var ki=0;ki<K;ki++){
+    for(var kj=0;kj<K;kj++){
+      var ir=pr*stride+ki-pad, ic=pc*stride+kj-pad;
+      var v=(ir>=0&&ir<IN&&ic>=0&&ic<IN)?inputData[ir][ic]:0;
+      var cell=document.createElement('div');
+      cell.className='px-cell';
+      cell.style.background=grayBg(v);
+      cell.style.fontSize='.55rem';
+      cell.style.color=v>0.55?'rgba(255,255,255,.8)':'rgba(0,0,0,.5)';
+      cell.textContent=v.toFixed(1);
+      rfEl.appendChild(cell);
+    }
+  }
+
+  // Dot product panel
+  var dpEl=document.getElementById('dp-display');
+  dpEl.innerHTML='';
+  var terms=[];
+  for(var ki2=0;ki2<K;ki2++){
+    for(var kj2=0;kj2<K;kj2++){
+      var ir2=pr*stride+ki2-pad, ic2=pc*stride+kj2-pad;
+      var iv=(ir2>=0&&ir2<IN&&ic2>=0&&ic2<IN)?inputData[ir2][ic2]:0;
+      var kv=kernelData[ki2][kj2];
+      terms.push({i:iv,k:kv,p:iv*kv});
+    }
+  }
+  var showN=K<=3?terms.length:6;
+  terms.slice(0,showN).forEach(function(t){
+    var row=document.createElement('div');
+    row.className='dp-row';
+    row.innerHTML='<div class="dp-v in">'+t.i.toFixed(2)+'</div>'+
+      '<div class="dp-op">×</div>'+
+      '<div class="dp-v hi">'+fmtV(t.k)+'</div>'+
+      '<div class="dp-op">=</div>'+
+      '<div class="dp-v">'+t.p.toFixed(3)+'</div>';
+    dpEl.appendChild(row);
+  });
+  if(K>3){
+    var ell=document.createElement('div');
+    ell.style.cssText='font-size:.62rem;color:var(--text-muted);text-align:center;padding:.1rem 0';
+    ell.textContent='…'+(terms.length-showN)+' more terms';
+    dpEl.appendChild(ell);
+  }
+  var sumEl=document.getElementById('dp-total');
+  var sum=terms.reduce(function(a,t){return a+t.p;},0);
+  sumEl.style.display='';
+  sumEl.textContent='Σ = '+sum.toFixed(3);
+}
+
+function updateShapeCalc(){
+  var padStr=padMode==='same'?'Same ('+pad+')':'None (0)';
+  document.getElementById('sc-input').textContent=IN+'×'+IN;
+  document.getElementById('sc-kernel').textContent=K+'×'+K;
+  document.getElementById('sc-stride').textContent=stride;
+  document.getElementById('sc-pad').textContent=padStr;
+  document.getElementById('sc-output').textContent=outSize+'×'+outSize;
+  document.getElementById('sc-formula').textContent=
+    '⌊('+IN+'+'+2*pad+'−'+K+')/'+stride+'⌋+1 = '+outSize;
+}
+
+function resetRightPanel(){
+  document.getElementById('rp-row').textContent='—';
+  document.getElementById('rp-col').textContent='—';
+  document.getElementById('rp-step').textContent='0 / '+positions.length;
+  document.getElementById('stat-row').textContent='—';
+  document.getElementById('stat-col').textContent='—';
+  document.getElementById('stat-step').textContent='0';
+  var rfEl=document.getElementById('rf-grid');
+  rfEl.style.gridTemplateColumns='repeat('+K+',26px)';
+  rfEl.innerHTML='';
+  for(var i=0;i<K*K;i++){
+    var c=document.createElement('div');
+    c.className='px-cell hi-input';
+    c.textContent='·';
+    rfEl.appendChild(c);
+  }
+  document.getElementById('dp-display').innerHTML=
+    '<div style="font-size:.68rem;color:var(--text-muted);font-style:italic;text-align:center;padding:.4rem 0;line-height:1.6">Press Step or Play<br>to see computation</div>';
+  document.getElementById('dp-total').style.display='none';
+}
+
+// ── Annotation ─────────────────────────────────────────────────────
+function setAnno(msg,cls){
+  var el=document.getElementById('anno-box');
+  el.textContent=msg;
+  el.className='anno-box '+(cls||'neutral');
+}
+function annoFilter(){
+  if(filterType==='edge')
+    return 'The Sobel X filter responds strongly to vertical edges — bright values in the output mark where pixel intensity changes sharply left-to-right.';
+  if(filterType==='blur')
+    return 'The box blur averages each patch — edges smooth out and the output becomes a blurred version of the input.';
+  if(filterType==='sharpen')
+    return 'The sharpen kernel amplifies the center pixel relative to its neighbors — edges and fine detail become more pronounced.';
+  return 'Custom filter — the output shows how your kernel weights respond to each patch of the input.';
+}
+
+// ── Getters ────────────────────────────────────────────────────────
+function getK(){
+  var b=document.querySelector('#kernel-size-toggle button.active');
+  return b?+b.dataset.k:3;
+}
+function getStride(){
+  var b=document.querySelector('#stride-selector .sel-btn.active');
+  return b?+b.dataset.stride:1;
+}
+function getPad(){
+  var b=document.querySelector('#padding-toggle button.active');
+  return b?b.dataset.pad:'none';
+}
+function getFilter(){
+  var b=document.querySelector('#filter-selector .sel-btn.active');
+  return b?b.dataset.filter:'edge';
+}
+function getKernelData(){
+  var ft=filterType;
+  var pool=KERNELS[K]||KERNELS[3];
+  if(ft==='custom'){
+    var inputs=document.querySelectorAll('#custom-kernel-grid input');
+    // Custom editor is 3×3; embed in center for 5×5
+    var base=Array.from({length:3},function(_,i){
+      return Array.from({length:3},function(_,j){
+        var el=inputs[i*3+j];
+        return el?parseFloat(el.value)||0:0;
+      });
+    });
+    if(K===3) return base;
+    return Array.from({length:5},function(_,i){
+      return Array.from({length:5},function(_,j){
+        return (i>=1&&i<=3&&j>=1&&j<=3)?base[i-1][j-1]:0;
+      });
+    });
+  }
+  return (pool[ft]||pool.edge).map(function(r){return r.slice();});
+}
+
+// ── Core step ──────────────────────────────────────────────────────
+function doStep(){
+  if(step>=positions.length-1){
+    stopPlay();
+    clearRFHighlight();
+    setAnno('Convolution complete — the output feature map shows where this filter detected its pattern.','good');
+    return;
+  }
+  step++;
+  var pr=positions[step][0], pc=positions[step][1];
+  var val=dotProduct(pr,pc);
+  if(!outputData[pr]) outputData[pr]=new Array(outSize).fill(null);
+  outputData[pr][pc]=val;
+  updateOutputCell(pr,pc);
+  highlightRF(pr,pc);
+  highlightOutCell(pr,pc);
+  updateRightPanel(pr,pc);
+  if(step===positions.length-1){
+    stopPlay();
+    clearRFHighlight();
+    setAnno('Convolution complete — the output feature map shows where this filter detected its pattern.','good');
+  } else {
+    setAnno('Kernel at ('+pr+', '+pc+') — dot product with input patch = '+val.toFixed(3),'neutral');
+  }
+}
+
+function startPlay(){
+  if(playing) return;
+  playing=true;
+  document.getElementById('btn-play').textContent='⏸ Pause';
+  var ms=SPEED_MS[+document.getElementById('sld-speed').value];
+  timer=setInterval(function(){
+    if(step>=positions.length-1){stopPlay();return;}
+    doStep();
+  },ms);
+}
+function stopPlay(){
+  playing=false;
+  document.getElementById('btn-play').textContent='⏵ Play';
+  if(timer){clearInterval(timer);timer=null;}
+}
+
+// ── Reset helpers ──────────────────────────────────────────────────
+function resetOutputOnly(){
+  stopPlay();
+  step=-1; lastOutIdx=-1;
+  clearRFHighlight();
+  outputMaxAbs=precomputeOutputMax();
+  outputData=Array.from({length:outSize},function(){return new Array(outSize).fill(null);});
+  renderOutputGrid();
+  resetRightPanel();
+  setAnno('Input modified — press Play or Step to see the updated convolution.','neutral');
+}
+
+function doReset(){
+  stopPlay();
+  step=-1; lastOutIdx=-1;
+  clearRFHighlight();
+  K=getK(); stride=getStride(); padMode=getPad();
+  filterType=getFilter(); kernelData=getKernelData();
+  computeOutSize(); buildPositions();
+  outputMaxAbs=precomputeOutputMax();
+  outputData=Array.from({length:outSize},function(){return new Array(outSize).fill(null);});
+  renderKernelGrid();
+  renderOutputGrid();
+  updateShapeCalc();
+  resetRightPanel();
+  setAnno('Press Play or Step to watch the kernel slide across the input.','neutral');
+}
+
+function fullReset(){
+  K=getK(); stride=getStride(); padMode=getPad();
+  filterType=getFilter(); kernelData=getKernelData();
+  inputData=INPUT_PATTERNS[inputPattern]();
+  computeOutSize(); buildPositions();
+  outputMaxAbs=precomputeOutputMax();
+  outputData=Array.from({length:outSize},function(){return new Array(outSize).fill(null);});
+  renderInputGrid();
+  renderKernelGrid();
+  renderOutputGrid();
+  updateShapeCalc();
+  resetRightPanel();
+  setAnno('Press Play or Step to watch the kernel slide across the input.','neutral');
+}
+
+// ── Event wiring ───────────────────────────────────────────────────
+document.getElementById('tab-bar').addEventListener('click',function(e){
+  var btn=e.target.closest('button');
+  if(!btn||!btn.dataset.tab) return;
+  document.querySelectorAll('#tab-bar button').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('active');});
+  document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
 });
+
+document.getElementById('concepts-toggle').addEventListener('click',function(){
+  var body=document.getElementById('concepts-body');
+  var arrow=document.getElementById('concepts-arrow');
+  body.classList.toggle('collapsed');
+  arrow.textContent=body.classList.contains('collapsed')?'▸':'▾';
+});
+
+document.getElementById('input-pattern-select').addEventListener('change',function(){
+  inputPattern=this.value;
+  inputData=INPUT_PATTERNS[inputPattern]();
+  renderInputGrid();
+  resetOutputOnly();
+  setAnno('New input pattern loaded — press Play or Step to run the convolution.','neutral');
+});
+
+document.getElementById('filter-selector').addEventListener('click',function(e){
+  var btn=e.target.closest('.sel-btn');
+  if(!btn) return;
+  document.querySelectorAll('#filter-selector .sel-btn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  document.getElementById('custom-k-wrap').classList.toggle('show',btn.dataset.filter==='custom');
+  filterType=btn.dataset.filter;
+  kernelData=getKernelData();
+  doReset();
+  setAnno(annoFilter(),'neutral');
+});
+
+document.getElementById('kernel-size-toggle').addEventListener('click',function(e){
+  var btn=e.target.closest('button');
+  if(!btn) return;
+  document.querySelectorAll('#kernel-size-toggle button').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  doReset();
+});
+
+document.getElementById('stride-selector').addEventListener('click',function(e){
+  var btn=e.target.closest('.sel-btn');
+  if(!btn) return;
+  document.querySelectorAll('#stride-selector .sel-btn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  doReset();
+});
+
+document.getElementById('padding-toggle').addEventListener('click',function(e){
+  var btn=e.target.closest('button');
+  if(!btn) return;
+  document.querySelectorAll('#padding-toggle button').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  document.getElementById('pad-hint').textContent=btn.dataset.pad==='same'
+    ?'Same: output size = input size (zero-pad borders)'
+    :'Valid: output = ⌊(in − k) / s⌋ + 1';
+  doReset();
+});
+
+document.getElementById('btn-play').addEventListener('click',function(){
+  if(playing) stopPlay(); else startPlay();
+});
+document.getElementById('btn-step').addEventListener('click',function(){
+  stopPlay(); doStep();
+});
+document.getElementById('btn-reset').addEventListener('click',fullReset);
+
+document.getElementById('sld-speed').addEventListener('input',function(){
+  document.getElementById('val-speed').textContent=['Slow','Med','Fast'][+this.value];
+  if(playing){stopPlay();startPlay();}
+});
+
+// Pool type / size (tabs 2+3 annotations only — no simulation yet in Stage 2)
+document.getElementById('pool-type-toggle').addEventListener('click',function(e){
+  var btn=e.target.closest('button');
+  if(!btn) return;
+  document.querySelectorAll('#pool-type-toggle button').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  var anno=document.getElementById('pool-anno');
+  anno.textContent=btn.dataset.pool==='max'
+    ?'MaxPool 2×2 — takes the largest value from each 2×2 non-overlapping window. Preserves the strongest activation while halving spatial dimensions.'
+    :'AvgPool 2×2 — takes the average of each 2×2 non-overlapping window. Produces a smoother, more spatially averaged representation.';
+});
+document.getElementById('pool-size-toggle').addEventListener('click',function(e){
+  var btn=e.target.closest('button');
+  if(!btn) return;
+  document.querySelectorAll('#pool-size-toggle button').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+});
+
+// ── Boot ───────────────────────────────────────────────────────────
+inputPattern='edge';
+fullReset();
 
 })();
 </script>
