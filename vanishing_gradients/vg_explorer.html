@@ -218,7 +218,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   width:100%;overflow-x:auto;
 }
 #svg-gradient-flow{
-  width:100%;min-height:260px;display:block;border-radius:6px;
+  width:100%;min-height:240px;display:block;border-radius:6px;
   background:#FDFAF5;
 }
 
@@ -854,8 +854,8 @@ function renderNetwork(){
   if(!svgEl) return;
   var n=depth+2; // total nodes
   var NODE_R=22, GAP=Math.max(60,Math.min(88,520/Math.max(n-1,1)));
-  var W=(n-1)*GAP+2*NODE_R+44, H=210;
-  var CY=88, BAR_Y=CY+NODE_R+6, LABEL_Y=CY-NODE_R-7;
+  var W=(n-1)*GAP+2*NODE_R+44, H=240;
+  var CY=105, BAR_Y=CY+NODE_R+7, LABEL_Y=CY-NODE_R-9;
   var xs=d3.range(n).map(function(i){return NODE_R+22+i*GAP;});
 
   var svg=d3.select(svgEl);
@@ -1202,6 +1202,10 @@ function doReset(){
   }
   document.getElementById('stat-step').textContent='0';
   document.getElementById('stat-epoch').textContent='1';
+  // Keep Tabs 2 and 3 in sync (safe to call — functions are hoisted)
+  renderCompoundChart();
+  renderChainFormula();
+  renderAllSolutions();
 }
 
 // ── Event wiring ───────────────────────────────────────────────────
@@ -1389,10 +1393,28 @@ function renderActivationChart(){
 function renderCompoundChart(){
   var svgEl=document.getElementById('svg-compound');
   if(!svgEl) return;
+  // Guard: gradients must be populated
+  if(!gradients||!gradients.length){return;}
   var n=depth+2;
   var bcr=svgEl.getBoundingClientRect();
   var W=Math.max(180,bcr.width||280), H=220;
   var P={t:20,r:14,b:38,l:46}, iw=W-P.l-P.r, ih=H-P.t-P.b;
+
+  // If no gradients revealed yet, show a placeholder
+  if(currentReveal===-1){
+    var sv=d3.select(svgEl);
+    sv.selectAll('*').remove();
+    sv.attr('viewBox','0 0 '+W+' '+H).attr('height',H).attr('width','100%');
+    sv.append('rect').attr('width',W).attr('height',H).attr('fill','#FDFAF5');
+    sv.append('text').attr('x',W/2).attr('y',H/2-8).attr('text-anchor','middle')
+      .attr('dominant-baseline','middle').attr('fill','rgba(0,0,0,.2)')
+      .attr('font-family','Outfit,sans-serif').attr('font-size',11)
+      .text('Run backward pass on Tab 1');
+    sv.append('text').attr('x',W/2).attr('y',H/2+12).attr('text-anchor','middle')
+      .attr('fill','rgba(0,0,0,.12)').attr('font-family','Outfit,sans-serif').attr('font-size',9)
+      .text('bars appear layer by layer');
+    return;
+  }
 
   var data=d3.range(n).map(function(j){
     var rev=currentReveal>=0&&j>=currentReveal;
@@ -1480,12 +1502,13 @@ function renderChainFormula(){
 }
 
 // ── Tab 3: Mini-network helper ─────────────────────────────────────
-function drawMiniNet(svgId, grads5){
+function drawMiniNet(svgId, grads5, opts){
+  opts=opts||{};
   var svgEl=document.getElementById(svgId);
   if(!svgEl) return;
-  var W=svgEl.getBoundingClientRect().width||200, H=90;
+  var W=svgEl.getBoundingClientRect().width||200, H=opts.skipArcs?104:90;
   var n=5, R=10, GAP=(W-2*R-16)/(n-1);
-  var CY=38, xs=d3.range(n).map(function(i){return R+8+i*GAP;});
+  var CY=opts.skipArcs?52:38, xs=d3.range(n).map(function(i){return R+8+i*GAP;});
 
   var svg=d3.select(svgEl);
   svg.selectAll('*').remove();
@@ -1520,6 +1543,26 @@ function drawMiniNet(svgId, grads5){
     svg.append('text').attr('x',xs[j]).attr('y',CY+1).attr('text-anchor','middle')
       .attr('dominant-baseline','middle').attr('font-family','Outfit,sans-serif')
       .attr('font-size',8).attr('fill','#555').text(nlbls[j]);
+  }
+
+  // Optional skip-connection curved arcs (bypass every 2 nodes)
+  if(opts.skipArcs){
+    var arcApy=CY-R-20; // apex y of the arc (above nodes)
+    [[0,2],[2,4]].forEach(function(pair){
+      var ax1=xs[pair[0]], ax2=xs[pair[1]], mx=(ax1+ax2)/2;
+      svg.append('path')
+        .attr('d','M'+ax1+','+CY+' C'+ax1+','+(CY-48)+' '+ax2+','+(CY-48)+' '+ax2+','+CY)
+        .attr('fill','none').attr('stroke','#2e7d32').attr('stroke-width',2)
+        .attr('stroke-dasharray','4,2').attr('opacity',0.85)
+        .attr('marker-end','url(#'+svgId+'-healthy)');
+      svg.append('text').attr('x',mx).attr('y',CY-44)
+        .attr('text-anchor','middle').attr('font-size',7.5).attr('fill','#2e7d32')
+        .attr('font-family','IBM Plex Mono,monospace').text('1.0');
+    });
+    svg.append('text').attr('x',W/2).attr('y',H-4)
+      .attr('text-anchor','middle').attr('font-size',7.5).attr('fill','#2e7d32')
+      .attr('font-family','Outfit,sans-serif').attr('font-style','italic')
+      .text('dashed = skip gradient highway');
   }
 }
 
@@ -1558,7 +1601,7 @@ function renderAllSolutions(){
   var gClip=gClipRaw.map(function(v){return Math.min(v,clipThresh);});
 
   drawMiniNet('svg-sol-bn',   gBN);
-  drawMiniNet('svg-sol-skip', gSkip);
+  drawMiniNet('svg-sol-skip', gSkip, {skipArcs:true});
   drawMiniNet('svg-sol-init', gInit);
   drawMiniNet('svg-sol-clip', gClip);
 }
@@ -1604,6 +1647,8 @@ document.getElementById('tab-bar').addEventListener('click',function(e){
 
 // ── Boot ───────────────────────────────────────────────────────────
 doReset();
+// Tab 2 activation chart renders immediately (Tab 2 may be visited without changing settings)
+renderActivationChart();
 
 })();
 </script>
