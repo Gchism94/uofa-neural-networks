@@ -180,6 +180,7 @@ Add a row to the appropriate table under `## Contents`:
 - `optimizers/optimizer_explorer.html`
 - `batch_norm/bn_explorer.html`
 - `convolution/conv_explorer.html`
+- `vanishing_gradients/vg_explorer.html`
 
 ---
 

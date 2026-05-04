@@ -326,6 +326,29 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 .speed-dot.slow    {background:var(--grad-dead)}
 .speed-dot.fast    {background:var(--grad-explode)}
 
+/* ── Chain rule formula panel ────────────────────────────────────── */
+.formula-wrap{
+  margin-top:.65rem;border-top:1px solid var(--border-lt);padding-top:.6rem;
+}
+.formula-label{font-size:.67rem;font-weight:600;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--text-muted);margin-bottom:.35rem}
+.chain-formula{
+  font-family:'IBM Plex Mono',monospace;font-size:.72rem;line-height:1.9;
+  overflow-x:auto;white-space:nowrap;padding:.35rem .45rem;
+  background:var(--cream-mid);border-radius:5px;
+}
+.ct{display:inline;white-space:nowrap}
+.ct-bad{color:#B0321D;font-weight:700}
+.ct-ok {color:#2e7d32;font-weight:600}
+.ct-w  {color:#1A56A0;font-weight:600}
+.ct-dim{color:#888}
+.ct-result{display:block;margin-top:.25rem;font-size:.75rem}
+
+/* ── Solution cards — clickable ──────────────────────────────────── */
+.solution-card{cursor:pointer;transition:box-shadow .15s,border-color .15s}
+.solution-card:hover{box-shadow:0 3px 10px rgba(44,90,27,.18);border-color:var(--g-lt)}
+.solution-card.active{border-color:var(--g-mid);box-shadow:0 2px 8px rgba(44,90,27,.2)}
+
 /* Gradient ratio display */
 .ratio-box{
   text-align:center;padding:.55rem .5rem;border-radius:6px;
@@ -438,11 +461,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
         Key Concepts <span id="concepts-arrow">▾</span>
       </div>
       <div class="concepts-body" id="concepts-body">
-        <div class="concepts-item"><strong>Vanishing gradients:</strong> sigmoid and tanh derivatives are at most ~0.25 and 1.0, and are often much smaller. Multiplied together across many layers, even small derivatives compound to near-zero — early layers receive almost no gradient signal.</div>
-        <div class="concepts-item"><strong>Exploding gradients:</strong> if weight matrices have norms greater than 1, backpropagated gradients can compound multiplicatively and grow without bound, causing unstable updates and NaN loss.</div>
-        <div class="concepts-item"><strong>Chain rule:</strong> backpropagation multiplies gradients layer-by-layer: ∂L/∂W₁ = (∂L/∂aₙ) × (∂aₙ/∂aₙ₋₁) × … × (∂a₂/∂a₁). Each factor is a derivative of the activation — the product of many factors &lt;1 collapses to zero.</div>
-        <div class="concepts-item"><strong>Depth problem:</strong> in a 10-layer sigmoid network, the gradient reaching layer 1 is (0.25)¹⁰ ≈ 0.000001 — a million-fold reduction. Early layers barely update, effectively freezing them during training.</div>
-        <div class="concepts-item"><strong>Modern fixes:</strong> ReLU removes the saturation problem (derivative = 1 for positive values). Skip connections (ResNets) create gradient highways. Xavier/He initialization keeps activation variance stable. Gradient clipping caps runaway gradients.</div>
+        <div class="concepts-item"><strong>Why gradients vanish:</strong> sigmoid and tanh derivatives max out at 0.25 and 1.0 — multiplied together across N layers gives 0.25ᴺ or smaller. After 10 layers: 0.25¹⁰ ≈ 0.000001.</div>
+        <div class="concepts-item"><strong>Why gradients explode:</strong> if weight_scale &gt; 1 and derivatives &gt; 1, the product grows exponentially backward through layers — each layer amplifies rather than shrinks the signal.</div>
+        <div class="concepts-item"><strong>The chain rule is the culprit:</strong> backprop multiplies one derivative per layer — the gradient at layer 1 = product of N terms. If any term &lt; 1, the product shrinks geometrically. N terms of 0.25 gives 0.25ᴺ.</div>
+        <div class="concepts-item"><strong>ReLU mostly fixes vanishing:</strong> derivative is exactly 1 for positive inputs — doesn't shrink the gradient. But "dead ReLU" neurons (always negative inputs) have zero gradient and never recover.</div>
+        <div class="concepts-item"><strong>Modern solutions:</strong> Batch Norm, skip connections (ResNets), careful initialization (Xavier/He), and gradient clipping all address the problem from different angles — normalize, bypass, scale correctly, or cap the damage.</div>
       </div>
     </div>
 
@@ -538,29 +561,25 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     <!-- ─ Tab 2: Activation Functions ──────────────────────────────── -->
     <div class="tab-panel" id="panel-activations">
       <div class="card">
-        <div class="plot-label">Activation function and its derivative</div>
+        <div class="plot-label" id="act-tab-label">Sigmoid — activation function and derivative</div>
         <div class="act-panels">
 
           <!-- Left: activation curve + derivative -->
           <div>
-            <div style="font-size:.67rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;
-                        color:var(--text-muted);text-align:center;margin-bottom:.35rem">
-              σ(x) and σ′(x)
+            <div id="act-fn-header" style="font-size:.67rem;font-weight:600;letter-spacing:.07em;
+                        text-transform:uppercase;color:var(--text-muted);text-align:center;margin-bottom:.35rem">
+              σ(x) and σ′(x) — x ∈ [−4, 4]
             </div>
-            <svg id="svg-activation">
+            <svg id="svg-activation" style="width:100%;min-height:220px;display:block;border-radius:5px;background:#FDFAF5">
               <rect width="100%" height="220" fill="#FDFAF5"/>
-              <text x="50%" y="100" text-anchor="middle" dominant-baseline="middle"
+              <text x="50%" y="110" text-anchor="middle" dominant-baseline="middle"
                     fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="11">
-                Activation curve
-              </text>
-              <text x="50%" y="122" text-anchor="middle" dominant-baseline="middle"
-                    fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="9">
-                rendered by D3
+                Activation curve — rendered by D3
               </text>
             </svg>
             <div class="legend" style="margin-top:.35rem">
-              <span><span class="legend-line" style="background:var(--g-mid)"></span>σ(x)</span>
-              <span><span class="legend-line" style="background:var(--orange);border-top:2px dashed var(--orange)"></span>σ′(x)</span>
+              <span><span class="legend-line" style="background:var(--g-mid)"></span><span id="leg-act">σ(x)</span></span>
+              <span><span class="legend-line" style="background:var(--orange);border-top:2px dashed var(--orange)"></span><span id="leg-deriv">σ′(x)</span></span>
             </div>
           </div>
 
@@ -568,29 +587,34 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
           <div>
             <div style="font-size:.67rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;
                         color:var(--text-muted);text-align:center;margin-bottom:.35rem">
-              Gradient magnitude per layer (compounding)
+              Gradient magnitude per layer (log scale)
             </div>
-            <svg id="svg-compound">
+            <svg id="svg-compound" style="width:100%;min-height:220px;display:block;border-radius:5px;background:#FDFAF5">
               <rect width="100%" height="220" fill="#FDFAF5"/>
-              <text x="50%" y="100" text-anchor="middle" dominant-baseline="middle"
+              <text x="50%" y="110" text-anchor="middle" dominant-baseline="middle"
                     fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="11">
-                Per-layer gradient bar chart
-              </text>
-              <text x="50%" y="122" text-anchor="middle" dominant-baseline="middle"
-                    fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="9">
-                rendered by D3
+                Per-layer gradient bars — rendered by D3
               </text>
             </svg>
             <div class="legend" style="margin-top:.35rem">
-              <span><span class="legend-dot" style="background:var(--grad-healthy)"></span>Healthy gradient</span>
+              <span><span class="legend-dot" style="background:var(--grad-healthy)"></span>Healthy</span>
               <span><span class="legend-dot" style="background:var(--grad-dead)"></span>Vanished</span>
+              <span><span class="legend-dot" style="background:var(--grad-explode)"></span>Exploding</span>
             </div>
           </div>
 
         </div><!-- end act-panels -->
 
-        <!-- Max derivative annotation -->
-        <div class="anno-box neutral" id="act-anno" style="margin-top:.6rem;font-size:.75rem">
+        <!-- Chain rule formula -->
+        <div class="formula-wrap">
+          <div class="formula-label">Chain rule — backpropagated gradient product</div>
+          <div class="chain-formula" id="chain-formula">
+            <span class="ct ct-dim">Run the backward pass on Tab 1 to see the chain rule expansion.</span>
+          </div>
+        </div>
+
+        <!-- Activation annotation -->
+        <div class="anno-box neutral" id="act-anno" style="margin-top:.5rem;font-size:.75rem">
           Sigmoid max derivative ≈ 0.25 — each layer multiplies the gradient by at most 0.25. After 6 layers: 0.25⁶ ≈ 0.00024.
         </div>
       </div>
@@ -604,58 +628,34 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
         <div class="solutions-grid">
 
           <!-- Solution 1: Batch Normalization -->
-          <div class="solution-card">
+          <div class="solution-card" data-sol="bn">
             <div class="solution-title">Batch Normalization</div>
             <div class="solution-desc">Normalizes layer inputs to zero mean and unit variance — keeps activation magnitudes from drifting, stabilizing gradients throughout training.</div>
-            <svg class="solution-svg" id="svg-sol-bn">
-              <rect width="100%" height="100" fill="#FDFAF5"/>
-              <text x="50%" y="46" text-anchor="middle" dominant-baseline="middle"
-                    fill="rgba(0,0,0,.2)" font-family="Outfit,sans-serif" font-size="9">
-                gradient flow with BN
-              </text>
-            </svg>
+            <svg class="solution-svg" id="svg-sol-bn" style="min-height:90px"></svg>
             <span class="solution-tag tag-norm">Normalization</span>
           </div>
 
           <!-- Solution 2: Skip Connections -->
-          <div class="solution-card">
+          <div class="solution-card" data-sol="skip">
             <div class="solution-title">Skip Connections (ResNet)</div>
             <div class="solution-desc">Identity shortcuts let gradients bypass layers entirely — the gradient highway ensures every layer receives at least a clean copy of the upstream gradient.</div>
-            <svg class="solution-svg" id="svg-sol-skip">
-              <rect width="100%" height="100" fill="#FDFAF5"/>
-              <text x="50%" y="46" text-anchor="middle" dominant-baseline="middle"
-                    fill="rgba(0,0,0,.2)" font-family="Outfit,sans-serif" font-size="9">
-                gradient flow with skip connections
-              </text>
-            </svg>
+            <svg class="solution-svg" id="svg-sol-skip" style="min-height:90px"></svg>
             <span class="solution-tag tag-arch">Architecture</span>
           </div>
 
           <!-- Solution 3: Xavier / He Init -->
-          <div class="solution-card">
+          <div class="solution-card" data-sol="init">
             <div class="solution-title">Xavier / He Initialization</div>
             <div class="solution-desc">Scales initial weights by 1/√n (Xavier) or √(2/n) (He/ReLU) to keep activation variance stable across layers — prevents vanishing or exploding at the start.</div>
-            <svg class="solution-svg" id="svg-sol-init">
-              <rect width="100%" height="100" fill="#FDFAF5"/>
-              <text x="50%" y="46" text-anchor="middle" dominant-baseline="middle"
-                    fill="rgba(0,0,0,.2)" font-family="Outfit,sans-serif" font-size="9">
-                gradient flow with proper init
-              </text>
-            </svg>
+            <svg class="solution-svg" id="svg-sol-init" style="min-height:90px"></svg>
             <span class="solution-tag tag-init">Initialization</span>
           </div>
 
           <!-- Solution 4: Gradient Clipping -->
-          <div class="solution-card">
+          <div class="solution-card" data-sol="clip">
             <div class="solution-title">Gradient Clipping</div>
-            <div class="solution-desc">Caps gradient norm at a threshold (e.g. 1.0) before the optimizer step — prevents individual parameter updates from becoming catastrophically large.</div>
-            <svg class="solution-svg" id="svg-sol-clip">
-              <rect width="100%" height="100" fill="#FDFAF5"/>
-              <text x="50%" y="46" text-anchor="middle" dominant-baseline="middle"
-                    fill="rgba(0,0,0,.2)" font-family="Outfit,sans-serif" font-size="9">
-                gradient flow with clipping
-              </text>
-            </svg>
+            <div class="solution-desc">Caps gradient norm at a threshold (e.g. 0.5) before the optimizer step — prevents individual parameter updates from becoming catastrophically large.</div>
+            <svg class="solution-svg" id="svg-sol-clip" style="min-height:90px"></svg>
             <span class="solution-tag tag-clip">Clipping</span>
           </div>
 
@@ -1152,6 +1152,9 @@ function doStep(){
   updateRightPanel();
   updateHistoryChart();
   updateAnno();
+  // Keep Tab 2 compound chart and chain formula in sync
+  renderCompoundChart();
+  renderChainFormula();
 }
 
 // ── Playback ───────────────────────────────────────────────────────
@@ -1224,6 +1227,7 @@ document.getElementById('depth-selector').addEventListener('click',function(e){
   document.querySelectorAll('#depth-selector .sel-btn').forEach(function(b){b.classList.remove('active');});
   btn.classList.add('active');
   doReset();
+  updateTab2(); updateTab3();
 });
 
 document.getElementById('act-selector').addEventListener('click',function(e){
@@ -1240,12 +1244,15 @@ document.getElementById('act-selector').addEventListener('click',function(e){
   var annoEl=document.getElementById('act-anno');
   if(annoEl) annoEl.textContent=msgs[btn.dataset.act]||'';
   doReset();
+  updateTab2(); updateTab3();
 });
 
 document.getElementById('sld-wscale').addEventListener('input',function(){
   document.getElementById('val-wscale').textContent=(+this.value).toFixed(2);
 });
-document.getElementById('sld-wscale').addEventListener('change',doReset);
+document.getElementById('sld-wscale').addEventListener('change',function(){
+  doReset(); updateTab2(); updateTab3();
+});
 
 document.getElementById('sld-lr').addEventListener('input',function(){
   document.getElementById('val-lr').textContent=(+this.value).toFixed(3);
@@ -1263,6 +1270,337 @@ document.getElementById('btn-step').addEventListener('click',function(){
   stopPlay(); doStep();
 });
 document.getElementById('btn-reset').addEventListener('click',doReset);
+
+// ── Tab 2: Activation chart ────────────────────────────────────────
+var ACT_SYMS={sigmoid:'σ',tanh:'tanh',relu:'ReLU',lrelu:'lReLU'};
+var DERIV_SYMS={sigmoid:"σ′",tanh:"tanh′",relu:"ReLU′",lrelu:"lReLU′"};
+
+function renderActivationChart(){
+  var svgEl=document.getElementById('svg-activation');
+  if(!svgEl) return;
+  var bcr=svgEl.getBoundingClientRect();
+  var W=Math.max(180,bcr.width||280), H=220;
+  var P={t:20,r:14,b:28,l:36}, iw=W-P.l-P.r, ih=H-P.t-P.b;
+  var pts=200, xDom=[-4,4];
+  var xs=d3.range(pts).map(function(i){return xDom[0]+i*(xDom[1]-xDom[0])/(pts-1);});
+  var av=xs.map(actFn), dv=xs.map(actDeriv);
+  var allV=av.concat(dv);
+  var yMin=Math.min(d3.min(allV),-0.05)-0.05;
+  var yMax=Math.max(d3.max(allV),0.3)+0.05;
+
+  var svg=d3.select(svgEl);
+  svg.selectAll('*').remove();
+  svg.attr('viewBox','0 0 '+W+' '+H).attr('height',H).attr('width','100%');
+  svg.append('rect').attr('width',W).attr('height',H).attr('fill','#FDFAF5');
+  var g=svg.append('g').attr('transform','translate('+P.l+','+P.t+')');
+  var xSc=d3.scaleLinear().domain(xDom).range([0,iw]);
+  var ySc=d3.scaleLinear().domain([yMin,yMax]).range([ih,0]);
+
+  g.append('g').attr('transform','translate(0,'+ih+')')
+   .call(d3.axisBottom(xSc).ticks(5).tickSize(-ih).tickFormat(''))
+   .call(function(a){a.select('.domain').remove();a.selectAll('line').attr('stroke','#F0F0F0');});
+  g.append('g').call(d3.axisLeft(ySc).ticks(5).tickSize(-iw).tickFormat(''))
+   .call(function(a){a.select('.domain').remove();a.selectAll('line').attr('stroke','#F0F0F0');});
+
+  // Zero axes
+  g.append('line').attr('x1',0).attr('x2',iw).attr('y1',ySc(0)).attr('y2',ySc(0))
+   .attr('stroke','#DDD').attr('stroke-width',1);
+  g.append('line').attr('x1',xSc(0)).attr('x2',xSc(0)).attr('y1',0).attr('y2',ih)
+   .attr('stroke','#DDD').attr('stroke-width',1);
+
+  // Reference lines
+  if(actType==='sigmoid'){
+    g.append('line').attr('x1',0).attr('x2',iw).attr('y1',ySc(0.25)).attr('y2',ySc(0.25))
+     .attr('stroke','#AAA').attr('stroke-width',1).attr('stroke-dasharray','5,3');
+    g.append('text').attr('x',iw-2).attr('y',ySc(0.25)-4).attr('text-anchor','end')
+     .attr('font-size',8).attr('fill','#AAA').attr('font-family','IBM Plex Mono,monospace')
+     .text('max σ′ = 0.25');
+    // Saturated region shading
+    [[xDom[0],-2,'Saturated'],[2,xDom[1],'Saturated']].forEach(function(p){
+      g.append('rect').attr('x',xSc(p[0])).attr('y',0)
+       .attr('width',xSc(p[1])-xSc(p[0])).attr('height',ih)
+       .attr('fill','rgba(176,50,29,.05)');
+      g.append('text').attr('x',xSc((p[0]+p[1])/2)).attr('y',10)
+       .attr('text-anchor','middle').attr('font-size',7.5).attr('fill','#B0321D')
+       .attr('font-family','Outfit,sans-serif').attr('font-style','italic').text(p[2]);
+    });
+    g.append('text').attr('x',xSc(0)).attr('y',10).attr('text-anchor','middle')
+     .attr('font-size',7.5).attr('fill','#2e7d32').attr('font-family','Outfit,sans-serif')
+     .attr('font-style','italic').text('Active');
+  }
+  if(actType==='tanh'){
+    g.append('line').attr('x1',0).attr('x2',iw).attr('y1',ySc(1.0)).attr('y2',ySc(1.0))
+     .attr('stroke','#AAA').attr('stroke-width',1).attr('stroke-dasharray','5,3');
+    g.append('text').attr('x',iw-2).attr('y',ySc(1.0)-4).attr('text-anchor','end')
+     .attr('font-size',8).attr('fill','#AAA').attr('font-family','IBM Plex Mono,monospace')
+     .text('max tanh′ = 1');
+    [[-3,-1,'Saturated'],[ 1, 3,'Saturated']].forEach(function(p){
+      g.append('text').attr('x',xSc((p[0]+p[1])/2)).attr('y',10)
+       .attr('text-anchor','middle').attr('font-size',7.5).attr('fill','#B0321D')
+       .attr('font-family','Outfit,sans-serif').attr('font-style','italic').text(p[2]);
+    });
+    g.append('text').attr('x',xSc(0)).attr('y',10).attr('text-anchor','middle')
+     .attr('font-size',7.5).attr('fill','#2e7d32').attr('font-family','Outfit,sans-serif')
+     .attr('font-style','italic').text('Active');
+  }
+  if(actType==='relu'){
+    g.append('text').attr('x',xSc(-2)).attr('y',ih-6).attr('text-anchor','middle')
+     .attr('font-size',7.5).attr('fill','#B0321D').attr('font-family','Outfit,sans-serif')
+     .attr('font-style','italic').text('Dead (∂=0)');
+    g.append('text').attr('x',xSc(2)).attr('y',10).attr('text-anchor','middle')
+     .attr('font-size',7.5).attr('fill','#2e7d32').attr('font-family','Outfit,sans-serif')
+     .attr('font-style','italic').text('Active (∂=1)');
+  }
+  if(actType==='lrelu'){
+    g.append('text').attr('x',xSc(-2)).attr('y',ih-6).attr('text-anchor','middle')
+     .attr('font-size',7.5).attr('fill','#E8630A').attr('font-family','Outfit,sans-serif')
+     .attr('font-style','italic').text('Slow (∂=0.01)');
+    g.append('text').attr('x',xSc(2)).attr('y',10).attr('text-anchor','middle')
+     .attr('font-size',7.5).attr('fill','#2e7d32').attr('font-family','Outfit,sans-serif')
+     .attr('font-style','italic').text('Active (∂=1)');
+  }
+
+  g.append('g').attr('transform','translate(0,'+ih+')')
+   .call(d3.axisBottom(xSc).ticks(5))
+   .call(function(a){a.select('.domain').attr('stroke','#CCC');a.selectAll('text').attr('font-size',8).attr('fill','#888');});
+  g.append('g').call(d3.axisLeft(ySc).ticks(4))
+   .call(function(a){a.select('.domain').attr('stroke','#CCC');a.selectAll('text').attr('font-size',8).attr('fill','#888');});
+
+  var lFn=d3.line().x(function(_,i){return xSc(xs[i]);}).y(function(d){return ySc(d);}).curve(d3.curveCatmullRom);
+  g.append('path').datum(av).attr('fill','none').attr('stroke','#2e7d32').attr('stroke-width',2.5).attr('d',lFn);
+  g.append('path').datum(dv).attr('fill','none').attr('stroke','#E8630A').attr('stroke-width',1.8)
+   .attr('stroke-dasharray','5,3').attr('d',lFn);
+
+  g.append('text').attr('x',iw/2).attr('y',ih+22).attr('text-anchor','middle')
+   .attr('font-size',9).attr('fill','#999').attr('font-family','Outfit,sans-serif').text('x');
+
+  // Update legend labels
+  var sym=ACT_SYMS[actType]||'f';
+  var ds=DERIV_SYMS[actType]||"f′";
+  var la=document.getElementById('leg-act'); if(la) la.textContent=sym+'(x)';
+  var ld=document.getElementById('leg-deriv'); if(ld) ld.textContent=ds+'(x)';
+  var h=document.getElementById('act-fn-header');
+  if(h) h.textContent=sym+'(x) and '+ds+'(x)  —  x ∈ [−4, 4]';
+  var tl=document.getElementById('act-tab-label');
+  if(tl) tl.textContent={sigmoid:'Sigmoid',tanh:'Tanh',relu:'ReLU',lrelu:'Leaky ReLU'}[actType]+' — activation function and derivative';
+}
+
+// ── Tab 2: Compound gradient bar chart ────────────────────────────
+function renderCompoundChart(){
+  var svgEl=document.getElementById('svg-compound');
+  if(!svgEl) return;
+  var n=depth+2;
+  var bcr=svgEl.getBoundingClientRect();
+  var W=Math.max(180,bcr.width||280), H=220;
+  var P={t:20,r:14,b:38,l:46}, iw=W-P.l-P.r, ih=H-P.t-P.b;
+
+  var data=d3.range(n).map(function(j){
+    var rev=currentReveal>=0&&j>=currentReveal;
+    return{lbl:j===0?'In':j===n-1?'Out':'L'+j, g:rev?gradients[j]:null};
+  });
+
+  var svg=d3.select(svgEl);
+  svg.selectAll('*').remove();
+  svg.attr('viewBox','0 0 '+W+' '+H).attr('height',H).attr('width','100%');
+  svg.append('rect').attr('width',W).attr('height',H).attr('fill','#FDFAF5');
+  var g=svg.append('g').attr('transform','translate('+P.l+','+P.t+')');
+
+  var maxG=d3.max(gradients)||1;
+  var minG=d3.min(gradients.filter(function(v){return v>0;}))||1e-9;
+  var xSc=d3.scaleBand().domain(data.map(function(d){return d.lbl;})).range([0,iw]).padding(0.18);
+  var ySc=d3.scaleLog().domain([Math.max(minG*0.3,1e-9),maxG*3]).range([ih,0]).clamp(true);
+
+  g.append('g').attr('transform','translate(0,'+ih+')')
+   .call(d3.axisBottom(xSc))
+   .call(function(a){a.select('.domain').attr('stroke','#CCC');a.selectAll('text').attr('font-size',8).attr('fill','#888');});
+  g.append('g').call(d3.axisLeft(ySc).ticks(4,'.1e'))
+   .call(function(a){a.select('.domain').attr('stroke','#CCC');a.selectAll('text').attr('font-size',8).attr('fill','#888');});
+
+  // Healthy threshold
+  g.append('line').attr('x1',0).attr('x2',iw).attr('y1',ySc(0.001)).attr('y2',ySc(0.001))
+   .attr('stroke','#2e7d32').attr('stroke-width',1).attr('stroke-dasharray','4,3');
+  g.append('text').attr('x',iw-2).attr('y',ySc(0.001)-3).attr('text-anchor','end')
+   .attr('font-size',7.5).attr('fill','#2e7d32').attr('font-family','IBM Plex Mono,monospace')
+   .text('0.001 threshold');
+
+  // Bars
+  data.forEach(function(d){
+    if(d.g===null) return;
+    var gv=Math.max(d.g,1e-10);
+    var y=ySc(gv), h=Math.max(2,ih-y);
+    g.append('rect').attr('x',xSc(d.lbl)).attr('y',y)
+     .attr('width',xSc.bandwidth()).attr('height',h)
+     .attr('fill',gCol(d.g)).attr('rx',2).attr('opacity',.85);
+  });
+
+  g.append('text').attr('x',iw/2).attr('y',ih+30).attr('text-anchor','middle')
+   .attr('font-size',9).attr('fill','#999').attr('font-family','Outfit,sans-serif').text('Layer');
+  g.append('text').attr('transform','rotate(-90)').attr('x',-ih/2).attr('y',-36)
+   .attr('text-anchor','middle').attr('font-size',9).attr('fill','#999')
+   .attr('font-family','Outfit,sans-serif').text('Gradient (log scale)');
+}
+
+// ── Tab 2: Chain rule formula ──────────────────────────────────────
+function renderChainFormula(){
+  var el=document.getElementById('chain-formula');
+  if(!el) return;
+  var n=depth+2;
+  var sym=DERIV_SYMS[actType]||"f′";
+
+  if(currentReveal===-1){
+    el.innerHTML='<span class="ct ct-dim">Run the backward pass on Tab 1 to see the chain rule expansion.</span>';
+    return;
+  }
+
+  // Show each derivative term with color
+  var html='<span class="ct ct-dim">∂L/∂w₁ = </span>'+
+    '<span class="ct ct-ok">1.00</span>';
+
+  for(var l=n-2;l>=0;l--){
+    var z=wScale*activations[l];
+    var dv=actDeriv(z);
+    var dvStr=dv>=0.01?dv.toFixed(3):dv.toExponential(1);
+    var isSmall=dv<0.3; // highlight small derivatives
+    html+=' <span class="ct ct-dim">×</span>'+
+          ' <span class="ct '+(isSmall?'ct-bad':'ct-ok')+'">'+sym+'('+dvStr+')</span>'+
+          ' <span class="ct ct-w">·w</span>';
+  }
+
+  // Product line
+  var product=gradients[0];
+  var prodStr=product<0.0001?product.toExponential(2):product.toFixed(5);
+  var prodCls=gCls(product);
+  var prodColor=gCol(product);
+  html+='<span class="ct-result"><span class="ct ct-dim">= </span>'+
+        '<span style="color:'+prodColor+';font-weight:700">'+prodStr+'</span>'+
+        ' <span class="ct ct-dim">(gradient at input layer — '+
+        {dead:'vanishing ⚠',healthy:'healthy ✓',large:'large ⚠',explode:'exploding ⚠'}[prodCls]+')</span></span>';
+
+  el.innerHTML=html;
+}
+
+// ── Tab 3: Mini-network helper ─────────────────────────────────────
+function drawMiniNet(svgId, grads5){
+  var svgEl=document.getElementById(svgId);
+  if(!svgEl) return;
+  var W=svgEl.getBoundingClientRect().width||200, H=90;
+  var n=5, R=10, GAP=(W-2*R-16)/(n-1);
+  var CY=38, xs=d3.range(n).map(function(i){return R+8+i*GAP;});
+
+  var svg=d3.select(svgEl);
+  svg.selectAll('*').remove();
+  svg.attr('viewBox','0 0 '+W+' '+H).attr('height',H).attr('width','100%');
+  svg.append('rect').attr('width',W).attr('height',H).attr('fill','#FDFAF5');
+
+  var defs=svg.append('defs');
+  ['dead','healthy','large','explode','none'].forEach(function(c){
+    var col=c==='dead'?'#BBBBBB':c==='healthy'?'#2e7d32':c==='large'?'#E8630A':c==='explode'?'#B0321D':'#DDD';
+    defs.append('marker').attr('id',svgId+'-'+c)
+      .attr('markerWidth',6).attr('markerHeight',6).attr('refX',5).attr('refY',3).attr('orient','auto')
+      .append('path').attr('d','M0,0 L0,6 L6,3 z').attr('fill',col);
+  });
+
+  // Arrows
+  for(var i=0;i<n-1;i++){
+    var g=grads5[i], col=gCol(g), cls=gCls(g)||'none';
+    var sw=Math.max(1.5,Math.min(4,1.5+Math.log10(Math.max(g,1e-5)+1)*2));
+    svg.append('line').attr('x1',xs[i]+R+1).attr('y1',CY).attr('x2',xs[i+1]-R-1).attr('y2',CY)
+      .attr('stroke',col).attr('stroke-width',sw).attr('marker-end','url(#'+svgId+'-'+cls+')');
+    svg.append('text').attr('x',(xs[i]+xs[i+1])/2).attr('y',CY-R-3)
+      .attr('text-anchor','middle').attr('font-size',7).attr('fill',col)
+      .attr('font-family','IBM Plex Mono,monospace').text(gLbl(g));
+  }
+
+  // Nodes
+  var nlbls=['In','L1','L2','L3','Out'];
+  for(var j=0;j<n;j++){
+    svg.append('circle').attr('cx',xs[j]+1).attr('cy',CY+1).attr('r',R).attr('fill','rgba(0,0,0,.06)');
+    svg.append('circle').attr('cx',xs[j]).attr('cy',CY).attr('r',R)
+      .attr('fill','white').attr('stroke',gCol(grads5[Math.min(j,n-1)])).attr('stroke-width',1.5);
+    svg.append('text').attr('x',xs[j]).attr('y',CY+1).attr('text-anchor','middle')
+      .attr('dominant-baseline','middle').attr('font-family','Outfit,sans-serif')
+      .attr('font-size',8).attr('fill','#555').text(nlbls[j]);
+  }
+}
+
+// ── Tab 3: Render all solution mini-networks ───────────────────────
+function renderAllSolutions(){
+  var n5=5;
+
+  // Compute gradients for a 5-node network under each scenario
+  function gradFwd(ws,atype){
+    var rng=makeRng(99);
+    var acts=[0.5+rng()*1.0];
+    var saved_act=actType, saved_ws=wScale;
+    actType=atype; wScale=ws;
+    for(var l=1;l<n5;l++) acts.push(actFn(ws*acts[l-1]));
+    var grads=new Array(n5); grads[n5-1]=1.0;
+    for(var l2=n5-2;l2>=0;l2--) grads[l2]=grads[l2+1]*ws*actDeriv(ws*acts[l2]);
+    actType=saved_act; wScale=saved_ws;
+    return grads;
+  }
+
+  // BN: sigmoid with wScale=0.9, but BN normalizes activations → use larger derivatives
+  // Approximate: use tanh (less saturated) + wScale=0.85
+  var gBN=gradFwd(0.85,'tanh');
+
+  // Skip: regular gradients but each layer also receives skip signal
+  var gRaw=gradFwd(wScale,actType);
+  var skipFloor=0.05*gRaw[n5-1];
+  var gSkip=gRaw.map(function(v){return Math.max(v,skipFloor);});
+
+  // Xavier/He: relu + wScale=sqrt(2/(n5-1))≈0.71 (He for fan_in=4)
+  var gInit=gradFwd(Math.sqrt(2.0/(n5-1)),'relu');
+
+  // Clipping: exploding scenario clipped at 0.5
+  var gClipRaw=gradFwd(1.6,actType);
+  var clipThresh=0.5;
+  var gClip=gClipRaw.map(function(v){return Math.min(v,clipThresh);});
+
+  drawMiniNet('svg-sol-bn',   gBN);
+  drawMiniNet('svg-sol-skip', gSkip);
+  drawMiniNet('svg-sol-init', gInit);
+  drawMiniNet('svg-sol-clip', gClip);
+}
+
+// ── Tab 3: Solution card click ─────────────────────────────────────
+var SOL_DETAILS={
+  bn:'Batch Normalization keeps activations centered (mean≈0, var≈1) at each layer — derivatives stay in their active range rather than saturating. The gradient reaching the input is dramatically larger than without BN. No learnable parameters lost: γ and β restore expressive power.',
+  skip:'Skip connections add a direct path: ∂L/∂L_prev = ∂L/∂L_next × (∂F/∂x + 1). The "+1" term means gradient always has a direct lane — even if the layer gradient is near zero, the identity path carries a full signal. This is why 100+ layer ResNets train successfully.',
+  init:'He initialization sets W ~ N(0, √(2/n)) for ReLU — keeps the variance of activations and gradients constant across depth. Xavier uses √(1/n) for tanh/sigmoid. Without this, the gradient shrinks or grows by a constant factor at every layer from the very first forward pass.',
+  clip:'Gradient clipping rescales the gradient vector when its norm exceeds a threshold: g ← g × (threshold / ‖g‖). The red (exploding) gradients shown here are scaled back to orange/green. Training continues with bounded updates rather than diverging completely.'
+};
+
+document.getElementById('panel-solutions').addEventListener('click',function(e){
+  var card=e.target.closest('.solution-card');
+  if(!card) return;
+  document.querySelectorAll('.solution-card').forEach(function(c){c.classList.remove('active');});
+  card.classList.add('active');
+  var sol=card.dataset.sol;
+  var annoEl=document.getElementById('sol-anno');
+  if(annoEl&&SOL_DETAILS[sol]){
+    annoEl.textContent=SOL_DETAILS[sol];
+    annoEl.className='anno-box good';
+  }
+});
+
+// ── Update Tab 2 + Tab 3 when params change ────────────────────────
+function updateTab2(){
+  renderActivationChart();
+  renderCompoundChart();
+  renderChainFormula();
+}
+function updateTab3(){
+  renderAllSolutions();
+}
+
+// ── Hook tab switching to render lazily ────────────────────────────
+document.getElementById('tab-bar').addEventListener('click',function(e){
+  var btn=e.target.closest('button');
+  if(!btn||!btn.dataset.tab) return;
+  if(btn.dataset.tab==='activations') updateTab2();
+  if(btn.dataset.tab==='solutions')   updateTab3();
+});
 
 // ── Boot ───────────────────────────────────────────────────────────
 doReset();
