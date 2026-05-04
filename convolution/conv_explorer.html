@@ -424,7 +424,7 @@ select.param-sel:focus{border-color:var(--g-mid)}
             <div class="px-cell editable lg"><input type="number" value="0"  step="1" min="-9" max="9" tabindex="9"></div>
           </div>
         </div>
-        <div class="hint-txt" style="margin-top:.3rem">Values applied on next Reset</div>
+        <div class="hint-txt" style="margin-top:.3rem">Click a cell to cycle −2→−1→0→1→2, or type any value. Press Reset to apply.</div>
       </div>
 
       <div class="param-lbl" style="margin-top:.4rem">Kernel Size</div>
@@ -1333,6 +1333,23 @@ document.getElementById('filter-selector').addEventListener('click',function(e){
   setAnno(annoFilter(),'neutral');
 });
 
+// Custom kernel click-cycle: each click steps the cell through -2,-1,0,1,2
+document.getElementById('custom-kernel-grid').addEventListener('click',function(e){
+  var inp=e.target.closest('.px-cell.editable')&&e.target.tagName!=='INPUT'
+    ? e.target.querySelector('input') : null;
+  // Only cycle on a click that doesn't land directly in the <input> itself
+  if(e.target.tagName==='INPUT') return; // let normal typing work
+  var cell=e.target.closest('.px-cell.editable');
+  if(!cell) return;
+  var i=cell.querySelector('input');
+  if(!i) return;
+  var seq=[-2,-1,0,1,2];
+  var cur=parseFloat(i.value)||0;
+  var idx=seq.indexOf(cur);
+  i.value=seq[(idx+1)%seq.length];
+  i.dispatchEvent(new Event('change',{bubbles:true}));
+});
+
 document.getElementById('kernel-size-toggle').addEventListener('click',function(e){
   var btn=e.target.closest('button');
   if(!btn) return;
@@ -1360,21 +1377,7 @@ document.getElementById('padding-toggle').addEventListener('click',function(e){
   doReset();
 });
 
-document.getElementById('btn-play').addEventListener('click',function(){
-  if(playing) stopPlay(); else startPlay();
-});
-document.getElementById('btn-step').addEventListener('click',function(){
-  stopPlay(); doStep();
-});
-document.getElementById('btn-reset').addEventListener('click',fullReset);
-
-document.getElementById('sld-speed').addEventListener('input',function(){
-  document.getElementById('val-speed').textContent=['Slow','Med','Fast'][+this.value];
-  if(playing){stopPlay();startPlay();}
-});
-
-// ── Play/Step/Reset dispatch by tab ───────────────────────────────
-// Pool and Arch live in Stage 3 IIFE — reached via window._pool / window._arch
+// ── Play/Step/Reset/Speed — dispatch by current tab ───────────────
 document.getElementById('btn-play').addEventListener('click',function(){
   var tab=currentTab();
   if(tab==='filters'){if(playing)stopPlay();else startPlay();}
@@ -1390,6 +1393,13 @@ document.getElementById('btn-reset').addEventListener('click',function(){
   if(tab==='filters') fullReset();
   else if(tab==='pooling'&&window._pool) window._pool.reset();
   else if(tab==='architecture'&&window._arch) window._arch.render();
+});
+
+document.getElementById('sld-speed').addEventListener('input',function(){
+  document.getElementById('val-speed').textContent=['Slow','Med','Fast'][+this.value];
+  var tab=currentTab();
+  if(tab==='filters'&&playing){stopPlay();startPlay();}
+  else if(tab==='pooling'&&window._pool) window._pool.restart();
 });
 
 // ── Tab bar (panel switching only — pool/arch init handled by Stage 3) ──
@@ -1788,7 +1798,10 @@ function renderArch(){
     x+=bd.w;
 
     if(i<layers.length-1){
-      var ay=BASE_Y-14;
+      // Arrow y: mid-height of the shorter of the two connected blocks
+      var nextH=dims[i+1].h;
+      var shortH=Math.min(bd.h,nextH);
+      var ay=BASE_Y-shortH/2;
       svg.append('line').attr('x1',x+1).attr('y1',ay).attr('x2',x+GAP-7).attr('y2',ay)
        .attr('stroke','#C8BE9A').attr('stroke-width',1.5).attr('marker-end','url(#a-arr)');
       x+=GAP;
@@ -1810,9 +1823,10 @@ function renderArch(){
 
 // ── Export pool + arch to window so Stage 2 handlers can reach them ─
 window._pool = {
-  play:  function(){ if(poolPlaying) stopPoolPlay(); else startPoolPlay(); },
-  step:  function(){ stopPoolPlay(); doPoolStep(); },
-  reset: function(){ initPool(); }
+  play:    function(){ if(poolPlaying) stopPoolPlay(); else startPoolPlay(); },
+  step:    function(){ stopPoolPlay(); doPoolStep(); },
+  reset:   function(){ initPool(); },
+  restart: function(){ if(poolPlaying){ stopPoolPlay(); startPoolPlay(); } }
 };
 window._arch = { render: renderArch };
 
