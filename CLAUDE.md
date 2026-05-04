@@ -179,6 +179,7 @@ Add a row to the appropriate table under `## Contents`:
 - `early_stopping/es_explorer.html`
 - `optimizers/optimizer_explorer.html`
 - `batch_norm/bn_explorer.html`
+- `convolution/conv_explorer.html`
 
 ---
 

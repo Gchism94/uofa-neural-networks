@@ -468,6 +468,11 @@ select.param-sel:focus{border-color:var(--g-mid)}
         <button class="active" data-ps="2">2×2</button>
         <button                data-ps="3">3×3</button>
       </div>
+      <div class="param-lbl">Pool Stride</div>
+      <div class="sel-group" id="pool-stride-selector">
+        <button class="sel-btn active" data-ps="2">2</button>
+        <button class="sel-btn"        data-ps="1">1</button>
+      </div>
     </div>
 
     <!-- Simulation controls -->
@@ -499,11 +504,11 @@ select.param-sel:focus{border-color:var(--g-mid)}
         Key Concepts <span id="concepts-arrow">▾</span>
       </div>
       <div class="concepts-body" id="concepts-body">
-        <div class="concepts-item"><strong>Convolution:</strong> slide a kernel across the input, computing a dot product at each position. The output at (r, c) sums the element-wise products of the kernel and the overlapping input patch.</div>
-        <div class="concepts-item"><strong>Stride:</strong> how many pixels the kernel moves per step. Stride 1 gives the largest output; stride 2 halves it. Higher stride = smaller feature map = more compression.</div>
-        <div class="concepts-item"><strong>Padding:</strong> zeros added around the input border. "Same" padding keeps output size equal to input size. "None" (valid) shrinks it by (k−1) pixels per side.</div>
-        <div class="concepts-item"><strong>Pooling:</strong> down-samples a feature map by taking the max or average of each non-overlapping window — reduces spatial size, builds translation invariance, cuts computation.</div>
-        <div class="concepts-item"><strong>Feature detection:</strong> edge kernels respond to intensity gradients; blur kernels smooth; sharpen kernels amplify detail. Learned CNN kernels discover task-specific features automatically.</div>
+        <div class="concepts-item"><strong>What is convolution?</strong> A filter slides across the input computing dot products — detecting the same pattern everywhere in the image (translation equivariance). One filter produces one feature map.</div>
+        <div class="concepts-item"><strong>What does stride do?</strong> Stride controls how many pixels the filter jumps at each step — larger stride = smaller output = faster computation but coarser spatial resolution.</div>
+        <div class="concepts-item"><strong>What does padding do?</strong> Padding adds zeros around the input border. "Same" padding preserves spatial dimensions; "Valid" (no padding) shrinks the output by (k−1) pixels per side.</div>
+        <div class="concepts-item"><strong>What does pooling do?</strong> Pooling reduces spatial dimensions by summarizing regions — max pooling keeps the strongest activation, making the network more robust to small translations in the input.</div>
+        <div class="concepts-item"><strong>Why share weights?</strong> The same filter weights are used at every position — this drastically reduces parameters compared to a fully-connected layer and encodes the assumption that features can appear anywhere.</div>
       </div>
     </div>
 
@@ -666,88 +671,36 @@ select.param-sel:focus{border-color:var(--g-mid)}
     <!-- ─ Tab 3: CNN Architecture ────────────────────────────────── -->
     <div class="tab-panel" id="panel-architecture">
       <div class="card">
-        <div class="plot-label">Typical CNN Pipeline</div>
+        <div class="plot-label">LeNet-style CNN Pipeline — block width ∝ channels, height ∝ spatial size</div>
 
+        <!-- D3-rendered SVG architecture diagram -->
         <div class="arch-scroll">
-          <div class="arch-row" id="arch-row">
+          <svg id="arch-svg" style="width:100%;min-height:185px;display:block;border-radius:4px"></svg>
+        </div>
 
-            <div class="arch-item">
-              <div class="arch-box b-input">Input</div>
-              <div class="arch-lbl">Image</div>
-              <div class="arch-shape">8×8×1</div>
+        <!-- Shape formula + param count -->
+        <div style="margin-top:.6rem;border-top:1px solid var(--border-lt);padding-top:.55rem;display:flex;flex-wrap:wrap;gap:.65rem;align-items:flex-start">
+          <div style="flex:1 1 220px">
+            <div class="param-lbl">Output Shape Formula</div>
+            <div class="shape-formula" id="arch-formula">
+              out = ⌊(in + 2·pad − kernel) / stride⌋ + 1<br>
+              Changes when you adjust Kernel Size or Stride.
             </div>
-            <div class="arch-arr"></div>
-
-            <div class="arch-item">
-              <div class="arch-box b-conv">Conv1</div>
-              <div class="arch-lbl">3×3 / 8 ch</div>
-              <div class="arch-shape">6×6×8</div>
-            </div>
-            <div class="arch-arr"></div>
-
-            <div class="arch-item">
-              <div class="arch-box b-relu">ReLU</div>
-              <div class="arch-lbl">activation</div>
-              <div class="arch-shape">6×6×8</div>
-            </div>
-            <div class="arch-arr"></div>
-
-            <div class="arch-item">
-              <div class="arch-box b-pool">Pool1</div>
-              <div class="arch-lbl">MaxPool 2×2</div>
-              <div class="arch-shape">3×3×8</div>
-            </div>
-            <div class="arch-arr"></div>
-
-            <div class="arch-item">
-              <div class="arch-box b-conv">Conv2</div>
-              <div class="arch-lbl">3×3 / 16 ch</div>
-              <div class="arch-shape">1×1×16</div>
-            </div>
-            <div class="arch-arr"></div>
-
-            <div class="arch-item">
-              <div class="arch-box b-relu">ReLU</div>
-              <div class="arch-lbl">activation</div>
-              <div class="arch-shape">1×1×16</div>
-            </div>
-            <div class="arch-arr"></div>
-
-            <div class="arch-item">
-              <div class="arch-box b-flat">Flatten</div>
-              <div class="arch-lbl">reshape</div>
-              <div class="arch-shape">16</div>
-            </div>
-            <div class="arch-arr"></div>
-
-            <div class="arch-item">
-              <div class="arch-box b-fc">FC</div>
-              <div class="arch-lbl">Dense 10</div>
-              <div class="arch-shape">10</div>
-            </div>
-            <div class="arch-arr"></div>
-
-            <div class="arch-item">
-              <div class="arch-box b-out">Output</div>
-              <div class="arch-lbl">Softmax</div>
-              <div class="arch-shape">10 classes</div>
-            </div>
-
-          </div><!-- end arch-row -->
-        </div><!-- end arch-scroll -->
-
-        <!-- Shape formula -->
-        <div style="margin-top:.7rem;border-top:1px solid var(--border-lt);padding-top:.6rem">
-          <div class="param-lbl">Output Shape Formula</div>
-          <div class="shape-formula" id="arch-formula">
-            out_size = ⌊(in + 2·pad − kernel) / stride⌋ + 1<br>
-            Example (3×3 kernel, stride 1, no pad, 8×8 input):<br>
-            &nbsp;&nbsp;⌊(8 + 0 − 3) / 1⌋ + 1 = <strong>6</strong>
+          </div>
+          <div style="flex:0 0 auto;text-align:right">
+            <div class="param-lbl">Learnable Parameters</div>
+            <div id="arch-param-count" style="font-family:'IBM Plex Mono',monospace;font-size:.92rem;font-weight:700;color:var(--g-dk)">—</div>
+            <div style="font-size:.62rem;color:var(--text-muted);margin-top:.1rem">Conv1 + Conv2 + FC</div>
           </div>
         </div>
 
-        <!-- Layer legend -->
-        <div class="legend" style="justify-content:center;margin-top:.55rem">
+        <!-- Click annotation -->
+        <div class="anno-box neutral" id="arch-anno" style="margin-top:.5rem;font-size:.75rem">
+          Click any layer block to see its role, shape, and parameter count.
+        </div>
+
+        <!-- Legend -->
+        <div class="legend" style="justify-content:center;margin-top:.5rem">
           <span><span class="legend-dot" style="background:var(--in-pale);border:1.5px solid var(--orange-lt)"></span>Input</span>
           <span><span class="legend-dot" style="background:var(--k-pale);border:1.5px solid var(--k-c)"></span>Conv</span>
           <span><span class="legend-dot" style="background:var(--yellow-pale);border:1.5px solid var(--yellow-hi)"></span>ReLU</span>
@@ -843,9 +796,22 @@ select.param-sel:focus{border-color:var(--g-mid)}
 (function(){
 'use strict';
 
-// ── Constants ──────────────────────────────────────────────────────
+// ── Shared ─────────────────────────────────────────────────────────
 var IN = 8;
 var SPEED_MS = [800, 350, 100];
+
+function currentTab(){
+  var b=document.querySelector('#tab-bar button.active');
+  return b?b.dataset.tab:'filters';
+}
+function makeRng(seed){
+  return function(){
+    seed|=0; seed=seed+0x6D2B79F5|0;
+    var t=Math.imul(seed^seed>>>15,1|seed);
+    t=t+Math.imul(t^t>>>7,61|t)^t;
+    return((t^t>>>14)>>>0)/4294967296;
+  };
+}
 
 // ── Input patterns ─────────────────────────────────────────────────
 var INPUT_PATTERNS = {
@@ -1407,29 +1373,466 @@ document.getElementById('sld-speed').addEventListener('input',function(){
   if(playing){stopPlay();startPlay();}
 });
 
-// Pool type / size (tabs 2+3 annotations only — no simulation yet in Stage 2)
+// ── Play/Step/Reset dispatch by tab ───────────────────────────────
+// Pool and Arch live in Stage 3 IIFE — reached via window._pool / window._arch
+document.getElementById('btn-play').addEventListener('click',function(){
+  var tab=currentTab();
+  if(tab==='filters'){if(playing)stopPlay();else startPlay();}
+  else if(tab==='pooling'&&window._pool) window._pool.play();
+});
+document.getElementById('btn-step').addEventListener('click',function(){
+  var tab=currentTab();
+  if(tab==='filters'){stopPlay();doStep();}
+  else if(tab==='pooling'&&window._pool) window._pool.step();
+});
+document.getElementById('btn-reset').addEventListener('click',function(){
+  var tab=currentTab();
+  if(tab==='filters') fullReset();
+  else if(tab==='pooling'&&window._pool) window._pool.reset();
+  else if(tab==='architecture'&&window._arch) window._arch.render();
+});
+
+// ── Tab bar (panel switching only — pool/arch init handled by Stage 3) ──
+document.getElementById('tab-bar').addEventListener('click',function(e){
+  var btn=e.target.closest('button');
+  if(!btn||!btn.dataset.tab) return;
+  document.querySelectorAll('#tab-bar button').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('active');});
+  document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
+  // Stage 3 adds its own tab-bar listener for pool/arch init
+});
+
+// ── Pool controls (toggle DOM then delegate reset to Stage 3) ──────
 document.getElementById('pool-type-toggle').addEventListener('click',function(e){
   var btn=e.target.closest('button');
   if(!btn) return;
   document.querySelectorAll('#pool-type-toggle button').forEach(function(b){b.classList.remove('active');});
   btn.classList.add('active');
-  var anno=document.getElementById('pool-anno');
-  anno.textContent=btn.dataset.pool==='max'
-    ?'MaxPool 2×2 — takes the largest value from each 2×2 non-overlapping window. Preserves the strongest activation while halving spatial dimensions.'
-    :'AvgPool 2×2 — takes the average of each 2×2 non-overlapping window. Produces a smoother, more spatially averaged representation.';
+  if(window._pool) window._pool.reset();
 });
 document.getElementById('pool-size-toggle').addEventListener('click',function(e){
   var btn=e.target.closest('button');
   if(!btn) return;
   document.querySelectorAll('#pool-size-toggle button').forEach(function(b){b.classList.remove('active');});
   btn.classList.add('active');
+  if(window._pool) window._pool.reset();
+});
+document.getElementById('pool-stride-selector').addEventListener('click',function(e){
+  var btn=e.target.closest('.sel-btn');
+  if(!btn) return;
+  document.querySelectorAll('#pool-stride-selector .sel-btn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  if(window._pool) window._pool.reset();
 });
 
 // ── Boot ───────────────────────────────────────────────────────────
 inputPattern='edge';
 fullReset();
+// Pool and arch init lazily on first tab visit
 
 })();
+</script>
+
+<script>
+/* ── Stage 3: Pooling + Architecture ─────────────────────────────── */
+(function(){
+'use strict';
+
+function currentTab(){
+  var b=document.querySelector('#tab-bar button.active');
+  return b?b.dataset.tab:'filters';
+}
+function makeRng(seed){
+  return function(){
+    seed|=0; seed=seed+0x6D2B79F5|0;
+    var t=Math.imul(seed^seed>>>15,1|seed);
+    t=t+Math.imul(t^t>>>7,61|t)^t;
+    return((t^t>>>14)>>>0)/4294967296;
+  };
+}
+
+// Shared colormap (mirrors Stage 2)
+function oColor(v,mx){
+  if(v===null||v===undefined||!mx) return '#f5f5f5';
+  var t=Math.min(Math.abs(v)/mx,1);
+  if(v>0) return d3.interpolateRgb('#f0f0f0','#2D5A1B')(t);
+  if(v<0) return d3.interpolateRgb('#f0f0f0','#B0321D')(t);
+  return '#f0f0f0';
+}
+function fmtV(v){
+  if(v===null||v===undefined) return '';
+  var a=Math.abs(v);
+  if(a>=10) return v.toFixed(0);
+  if(a>=1)  return v.toFixed(1);
+  if(a===0) return '0';
+  return v.toFixed(2).replace(/^(-?)0\./,'$1.');
+}
+
+// ── Pooling state ──────────────────────────────────────────────────
+var POOL_IN = 6;
+var poolType='max', poolSize=2, poolStride=2;
+var poolData=[], poolOutputData=[];
+var poolPositions=[], poolOutSize=0;
+var poolStep=-1, poolPlaying=false, poolTimer=null;
+var poolInputCells=[], poolOutputCells=[];
+var poolMaxAbs=1, poolRFIdx=[], poolLastOut=-1;
+var poolInitialized=false;
+var SPEED_MS=[800,350,100];
+
+function generatePoolData(){
+  var rng=makeRng(7777);
+  return Array.from({length:POOL_IN},function(){
+    return Array.from({length:POOL_IN},function(){return (rng()-.5)*3;});
+  });
+}
+
+function getPoolType(){var b=document.querySelector('#pool-type-toggle button.active');return b?b.dataset.pool:'max';}
+function getPoolSize(){var b=document.querySelector('#pool-size-toggle button.active');return b?+b.dataset.ps:2;}
+function getPoolStride(){var b=document.querySelector('#pool-stride-selector .sel-btn.active');return b?+b.dataset.ps:2;}
+
+function computePoolOutSize(){
+  poolOutSize=Math.max(1,Math.floor((POOL_IN-poolSize)/poolStride)+1);
+}
+function buildPoolPositions(){
+  poolPositions=[];
+  for(var pr=0;pr<poolOutSize;pr++)
+    for(var pc=0;pc<poolOutSize;pc++)
+      poolPositions.push([pr,pc]);
+}
+
+function renderPoolInputGrid(){
+  var el=document.getElementById('pool-input-grid');
+  el.innerHTML='';
+  el.style.gridTemplateColumns='repeat('+POOL_IN+',26px)';
+  poolInputCells=[];
+  poolMaxAbs=d3.max(poolData.reduce(function(a,r){return a.concat(r);},[] ).map(Math.abs))||1;
+  for(var r=0;r<POOL_IN;r++){
+    for(var c=0;c<POOL_IN;c++){
+      var v=poolData[r][c];
+      var d=document.createElement('div');
+      d.className='px-cell';
+      d.style.background=oColor(v,poolMaxAbs);
+      d.style.fontSize='.57rem';
+      d.style.color='#333';
+      d.textContent=fmtV(v);
+      el.appendChild(d);
+      poolInputCells.push(d);
+    }
+  }
+  document.getElementById('pool-in-badge').textContent=POOL_IN+'×'+POOL_IN;
+  document.getElementById('pool-in-shape').textContent=POOL_IN+' × '+POOL_IN+' feature map';
+}
+
+function renderPoolOutputGrid(){
+  var el=document.getElementById('pool-output-grid');
+  el.innerHTML='';
+  el.style.gridTemplateColumns='repeat('+poolOutSize+',26px)';
+  poolOutputCells=[];
+  for(var pr=0;pr<poolOutSize;pr++){
+    for(var pc=0;pc<poolOutSize;pc++){
+      var v=poolOutputData[pr]?poolOutputData[pr][pc]:null;
+      var d=document.createElement('div');
+      d.className='px-cell';
+      if(v!==null){
+        d.style.background=oColor(v,poolMaxAbs);
+        d.style.fontSize='.57rem';
+        d.style.color='#333';
+        d.textContent=fmtV(v);
+      } else {
+        d.style.background='#f8f8f8';
+      }
+      el.appendChild(d);
+      poolOutputCells.push(d);
+    }
+  }
+  document.getElementById('pool-out-badge').textContent=poolOutSize+'×'+poolOutSize;
+  document.getElementById('pool-out-shape').textContent=poolOutSize+' × '+poolOutSize+' output';
+  poolLastOut=-1;
+}
+
+function clearPoolRF(){
+  poolRFIdx.forEach(function(i){if(poolInputCells[i])poolInputCells[i].classList.remove('rf-hi');});
+  poolRFIdx=[];
+}
+function highlightPoolRF(pr,pc){
+  clearPoolRF();
+  for(var ki=0;ki<poolSize;ki++){
+    for(var kj=0;kj<poolSize;kj++){
+      var ir=pr*poolStride+ki, ic=pc*poolStride+kj;
+      if(ir<POOL_IN&&ic<POOL_IN){
+        var idx=ir*POOL_IN+ic;
+        poolInputCells[idx].classList.add('rf-hi');
+        poolRFIdx.push(idx);
+      }
+    }
+  }
+}
+function highlightPoolOut(pr,pc){
+  if(poolLastOut>=0&&poolOutputCells[poolLastOut]){
+    var lpr=Math.floor(poolLastOut/poolOutSize),lpc=poolLastOut%poolOutSize;
+    poolOutputCells[poolLastOut].classList.remove('out-cur');
+    var lv=poolOutputData[lpr]?poolOutputData[lpr][lpc]:null;
+    if(lv!==null){poolOutputCells[poolLastOut].style.background=oColor(lv,poolMaxAbs);}
+  }
+  var idx=pr*poolOutSize+pc;
+  poolLastOut=idx;
+  if(poolOutputCells[idx]) poolOutputCells[idx].classList.add('out-cur');
+}
+
+function computePoolValue(pr,pc){
+  var vals=[];
+  for(var ki=0;ki<poolSize;ki++){
+    for(var kj=0;kj<poolSize;kj++){
+      var ir=pr*poolStride+ki, ic=pc*poolStride+kj;
+      if(ir<POOL_IN&&ic<POOL_IN) vals.push(poolData[ir][ic]);
+    }
+  }
+  if(!vals.length) return 0;
+  return poolType==='max'?d3.max(vals):vals.reduce(function(a,b){return a+b;},0)/vals.length;
+}
+
+function doPoolStep(){
+  if(poolStep>=poolPositions.length-1){
+    stopPoolPlay();
+    clearPoolRF();
+    var typeStr=poolType==='max'?'Max pooling kept the strongest activation':'Average pooling blended values';
+    setPoolAnno(typeStr+' in each '+poolSize+'×'+poolSize+' region — output is '+poolOutSize+'×'+poolOutSize+'.','good');
+    return;
+  }
+  poolStep++;
+  var pr=poolPositions[poolStep][0],pc=poolPositions[poolStep][1];
+  var val=computePoolValue(pr,pc);
+  if(!poolOutputData[pr]) poolOutputData[pr]=new Array(poolOutSize).fill(null);
+  poolOutputData[pr][pc]=val;
+  var idx=pr*poolOutSize+pc;
+  if(poolOutputCells[idx]){
+    poolOutputCells[idx].style.background=oColor(val,poolMaxAbs);
+    poolOutputCells[idx].style.fontSize='.57rem';
+    poolOutputCells[idx].style.color='#333';
+    poolOutputCells[idx].textContent=fmtV(val);
+  }
+  highlightPoolRF(pr,pc);
+  highlightPoolOut(pr,pc);
+  setPoolAnno(
+    (poolType==='max'?'Max':'Avg')+' pool at ('+pr+','+pc+') — '+
+    poolSize+'×'+poolSize+' window → '+fmtV(val)+'   [step '+(poolStep+1)+'/'+poolPositions.length+']',
+    'neutral');
+  if(poolStep===poolPositions.length-1){
+    stopPoolPlay();
+    clearPoolRF();
+    var doneStr=poolType==='max'?'Max pooling kept the strongest activation':'Average pooling blended values';
+    setPoolAnno(doneStr+' in each '+poolSize+'×'+poolSize+' region. Output is '+poolOutSize+'×'+poolOutSize+'.','good');
+  }
+}
+
+function startPoolPlay(){
+  if(poolPlaying) return;
+  poolPlaying=true;
+  document.getElementById('btn-play').textContent='⏸ Pause';
+  var ms=SPEED_MS[+document.getElementById('sld-speed').value];
+  poolTimer=setInterval(function(){
+    if(poolStep>=poolPositions.length-1){stopPoolPlay();return;}
+    doPoolStep();
+  },ms);
+}
+function stopPoolPlay(){
+  poolPlaying=false;
+  document.getElementById('btn-play').textContent='⏵ Play';
+  if(poolTimer){clearInterval(poolTimer);poolTimer=null;}
+}
+function setPoolAnno(msg,cls){
+  var el=document.getElementById('pool-anno');
+  if(el){el.textContent=msg;el.className='anno-box '+(cls||'neutral');}
+}
+
+function initPool(){
+  stopPoolPlay();
+  poolType=getPoolType(); poolSize=getPoolSize(); poolStride=getPoolStride();
+  computePoolOutSize(); buildPoolPositions();
+  poolStep=-1; poolLastOut=-1;
+  clearPoolRF();
+  poolData=generatePoolData();
+  poolOutputData=Array.from({length:poolOutSize},function(){return new Array(poolOutSize).fill(null);});
+  renderPoolInputGrid();
+  renderPoolOutputGrid();
+  setPoolAnno(
+    (poolType==='max'?'Max':'Avg')+'Pool '+poolSize+'×'+poolSize+
+    ' (stride '+poolStride+') — press Play or Step to slide the window across the '+POOL_IN+'×'+POOL_IN+' feature map.',
+    'neutral');
+}
+
+// ── Architecture rendering ─────────────────────────────────────────
+function getK(){var b=document.querySelector('#kernel-size-toggle button.active');return b?+b.dataset.k:3;}
+function getStride(){var b=document.querySelector('#stride-selector .sel-btn.active');return b?+b.dataset.stride:1;}
+function getPad(){var b=document.querySelector('#padding-toggle button.active');return b?b.dataset.pad:'none';}
+
+function computeArchShapes(){
+  var K=getK(), S=getStride(), padMode=getPad();
+  var p=padMode==='same'?Math.floor(K/2):0;
+  var s1=Math.max(1,Math.floor((8+2*p-K)/S)+1);
+  var p1=Math.max(1,Math.floor((s1-2)/2)+1);
+  var s2=Math.max(0,p1-2);
+  var flatN=Math.max(1,s2*s2*16);
+  return [
+    {id:'input',lbl:'Input',  shape:[8,8,1],    type:'input',
+     info:'Raw pixel input — 8×8 image, 1 channel. Each value is one pixel intensity in [0, 1].'},
+    {id:'conv1',lbl:'Conv1',  shape:[s1,s1,8],  type:'conv',
+     info:'Conv '+K+'×'+K+', 8 filters, stride '+S+(p>0?', pad '+p:'')+'. Detects simple patterns. Params: '+K+'×'+K+'×1×8 + 8 = '+(K*K*8+8)+'.'},
+    {id:'relu1',lbl:'ReLU',   shape:[s1,s1,8],  type:'relu',
+     info:'ReLU: max(0, x) — zeros out negative activations, introduces nonlinearity. Shape unchanged: '+s1+'×'+s1+'×8.'},
+    {id:'pool1',lbl:'Pool1',  shape:[p1,p1,8],  type:'pool',
+     info:'MaxPool 2×2, stride 2 — takes the max of each 2×2 region. No parameters. Halves spatial size: '+s1+'→'+p1+'. Builds translation invariance.'},
+    {id:'conv2',lbl:'Conv2',  shape:[s2,s2,16], type:'conv',
+     info:'Conv 3×3, 16 filters, stride 1, no pad. Detects complex combinations. Params: 3×3×8×16 + 16 = '+(3*3*8*16+16)+'.'},
+    {id:'relu2',lbl:'ReLU',   shape:[s2,s2,16], type:'relu',
+     info:'Second ReLU — zeros negative values in Conv2 output. Shape unchanged: '+s2+'×'+s2+'×16.'},
+    {id:'flat', lbl:'Flatten',shape:[flatN],     type:'flat',
+     info:'Flattens '+s2+'×'+s2+'×16 = '+flatN+' values into a 1D vector. No parameters. Required before the FC layer.'},
+    {id:'fc',   lbl:'FC',     shape:[10],        type:'fc',
+     info:'Fully-connected, 10 outputs. Every input value has a separate weight. Params: '+flatN+'×10 + 10 = '+(flatN*10+10)+'.'},
+    {id:'out',  lbl:'Output', shape:[10],        type:'output',
+     info:'Softmax — converts 10 raw scores into probabilities summing to 1. One probability per class.'}
+  ];
+}
+
+function totalParams(layers){
+  var K=getK();
+  var c1=K*K*1*8+8;
+  var c2=3*3*8*16+16;
+  var fc=layers[6].shape[0]*10+10;
+  return c1+c2+fc;
+}
+
+function renderArch(){
+  var layers=computeArchShapes();
+  var svgEl=document.getElementById('arch-svg');
+  if(!svgEl) return;
+
+  var GAP=26,SVG_H=188,BASE_Y=134,MAX_H=100,MIN_H=12,MAX_W=60,MIN_W=22,MAX_S=8,MAX_CH=16;
+
+  function bH(shape){
+    if(shape.length===1) return MIN_H;
+    return MIN_H+(Math.max(shape[0],0)/MAX_S)*(MAX_H-MIN_H);
+  }
+  function bW(shape){
+    if(shape.length===1) return MIN_W+Math.min(1,shape[0]/10)*(MAX_W-MIN_W)*.5;
+    return MIN_W+((shape[2]||1)/MAX_CH)*(MAX_W-MIN_W);
+  }
+  function shapeStr(shape){
+    return shape.length===3?shape[0]+'×'+shape[1]+'×'+shape[2]:''+shape[0];
+  }
+
+  var COL={input:'#FDE8D8',conv:'#D0E4F8',relu:'#FBF0C8',pool:'#E8D8F8',flat:'#F0EBE0',fc:'#C8E6A8',output:'#2D5A1B'};
+  var BDR={input:'#E8630A',conv:'#1A56A0',relu:'#D4A017',pool:'#7B3FC4',flat:'#C8BE9A',fc:'#4A8C2F',output:'#1C3A0E'};
+  var TXT={input:'#C0500A',conv:'#1A56A0',relu:'#8B6914',pool:'#7B3FC4',flat:'#666',fc:'#1C3A0E',output:'white'};
+
+  var dims=layers.map(function(l){return{h:bH(l.shape),w:bW(l.shape)};});
+  var totalW=dims.reduce(function(a,d,i){return a+d.w+(i<dims.length-1?GAP:0);},0)+24;
+
+  var svg=d3.select(svgEl);
+  svg.selectAll('*').remove();
+  svg.attr('viewBox','0 0 '+totalW+' '+SVG_H)
+     .attr('height',SVG_H).attr('width','100%')
+     .attr('preserveAspectRatio','xMinYMid meet');
+
+  var defs=svg.append('defs');
+  defs.append('marker').attr('id','a-arr').attr('markerWidth',7).attr('markerHeight',7)
+    .attr('refX',6).attr('refY',3).attr('orient','auto')
+    .append('path').attr('d','M0,0 L0,6 L6,3 z').attr('fill','#C8BE9A');
+
+  var x=12;
+  layers.forEach(function(layer,i){
+    var bd=dims[i];
+    var bx=x, by=BASE_Y-bd.h;
+
+    var g=svg.append('g').style('cursor','pointer');
+
+    // Drop-shadow rect
+    g.append('rect').attr('x',bx+2).attr('y',by+2)
+     .attr('width',bd.w).attr('height',bd.h).attr('rx',4)
+     .attr('fill','rgba(0,0,0,.07)');
+
+    // Main block
+    var blk=g.append('rect').attr('class','arch-blk').attr('data-id',layer.id)
+     .attr('x',bx).attr('y',by).attr('width',bd.w).attr('height',bd.h).attr('rx',4)
+     .attr('fill',COL[layer.type]).attr('stroke',BDR[layer.type]).attr('stroke-width',1.5);
+
+    // Label inside if tall enough, else above
+    if(bd.h>=24){
+      g.append('text').attr('x',bx+bd.w/2).attr('y',by+bd.h/2)
+       .attr('text-anchor','middle').attr('dominant-baseline','middle')
+       .attr('font-family','Outfit,sans-serif').attr('font-size',9).attr('font-weight','600')
+       .attr('fill',TXT[layer.type]).attr('pointer-events','none').text(layer.lbl);
+    } else {
+      g.append('text').attr('x',bx+bd.w/2).attr('y',by-5)
+       .attr('text-anchor','middle').attr('font-family','Outfit,sans-serif')
+       .attr('font-size',8).attr('font-weight','600')
+       .attr('fill',BDR[layer.type]).attr('pointer-events','none').text(layer.lbl);
+    }
+
+    // Shape label below baseline
+    g.append('text').attr('x',bx+bd.w/2).attr('y',BASE_Y+14)
+     .attr('text-anchor','middle').attr('font-family','IBM Plex Mono,monospace')
+     .attr('font-size',7).attr('fill','#AAA').attr('pointer-events','none')
+     .text(shapeStr(layer.shape));
+
+    // Click
+    g.on('click',function(){
+      svg.selectAll('.arch-blk').attr('opacity',0.38);
+      blk.attr('opacity',1);
+      var el=document.getElementById('arch-anno');
+      if(el){el.textContent=layer.info;el.className='anno-box neutral';}
+    });
+
+    x+=bd.w;
+
+    if(i<layers.length-1){
+      var ay=BASE_Y-14;
+      svg.append('line').attr('x1',x+1).attr('y1',ay).attr('x2',x+GAP-7).attr('y2',ay)
+       .attr('stroke','#C8BE9A').attr('stroke-width',1.5).attr('marker-end','url(#a-arr)');
+      x+=GAP;
+    }
+  });
+
+  // Param count
+  var pc=totalParams(layers);
+  var pcEl=document.getElementById('arch-param-count');
+  if(pcEl) pcEl.textContent=pc.toLocaleString();
+
+  // Formula
+  var K=getK(),S=getStride(),padMode=getPad(),p=padMode==='same'?Math.floor(K/2):0;
+  var fEl=document.getElementById('arch-formula');
+  if(fEl) fEl.innerHTML='out = ⌊(in + 2·pad − kernel) / stride⌋ + 1<br>'+
+    'Current: ⌊(8 + '+2*p+' − '+K+') / '+S+'⌋ + 1 = <strong>'+
+    Math.max(1,Math.floor((8+2*p-K)/S)+1)+'</strong>';
+}
+
+// ── Export pool + arch to window so Stage 2 handlers can reach them ─
+window._pool = {
+  play:  function(){ if(poolPlaying) stopPoolPlay(); else startPoolPlay(); },
+  step:  function(){ stopPoolPlay(); doPoolStep(); },
+  reset: function(){ initPool(); }
+};
+window._arch = { render: renderArch };
+
+// ── Init pool on first visit to pooling tab ─────────────────────────
+document.querySelectorAll('#tab-bar button').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    if(btn.dataset.tab==='pooling'&&!poolInitialized){initPool();poolInitialized=true;}
+    if(btn.dataset.tab==='architecture') renderArch();
+  });
+});
+
+// Re-render arch live when conv params change
+['kernel-size-toggle','stride-selector','padding-toggle'].forEach(function(id){
+  var el=document.getElementById(id);
+  if(el) el.addEventListener('click',function(){
+    if(currentTab()==='architecture') renderArch();
+  });
+});
+
+})(); // end Stage 3 IIFE
 </script>
 
 <footer id="course-nav-footer" style="margin-top:1.5rem;padding:0.75rem 0 0 1rem;border-top:1px solid #E0DAC0;font-size:0.8rem;color:#78786A;text-align:left;">
