@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<!-- Copyright © 2026 Greg T. Chism. University of Arizona, College of Information Science.
+     INFO 557: Neural Networks. MIT License. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vanishing &amp; Exploding Gradients — Interactive Explorer | INFO 557: Neural Networks</title>
+<meta name="description" content="Watch gradient magnitudes shrink to zero or explode as they propagate backward through deep networks — and see how modern fixes keep training stable.">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Vanishing &amp; Exploding Gradients — Interactive Explorer">
+<meta property="og:description" content="Watch gradient magnitudes shrink to zero or explode as they propagate backward through deep networks — and see how modern fixes keep training stable.">
+<meta property="og:image" content="https://gchism94.github.io/uofa-neural-networks/vanishing_gradients/vg_explorer-preview.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="600">
+<meta property="og:url" content="https://gchism94.github.io/uofa-neural-networks/vanishing_gradients/vg_explorer.html">
+<meta property="fb:app_id" content="2385695445236853">
+
+<!-- Twitter/X card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Vanishing &amp; Exploding Gradients — Interactive Explorer">
+<meta name="twitter:description" content="Watch gradient magnitudes shrink to zero or explode as they propagate backward through deep networks — and see how modern fixes keep training stable.">
+<meta name="twitter:image" content="https://gchism94.github.io/uofa-neural-networks/vanishing_gradients/vg_explorer-preview.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+
+<style>
+/* ── Design tokens ──────────────────────────────────────────────── */
+:root{
+  --cream:#FAF7F0;--cream-mid:#F0EBE0;--cream-dk:#E2D9C5;
+  --g-dk:#1C3A0E;--g-mid:#2D5A1B;--g-lt:#4A8C2F;--g-pale:#C8E6A8;
+  --orange:#E8630A;--orange-lt:#F08C50;--orange-dk:#C0500A;
+  --blue:#1A56A0;--blue-pale:#D0E4F8;
+  --red:#B0321D;--red-pale:#F8DDD8;
+  --purple:#7B3FC4;--purple-pale:#E8D8F8;
+  --yellow:#B08000;--yellow-pale:#FBF0C8;--yellow-hi:#D4A017;
+  --text:#1A1A1A;--text-muted:#888;--text-soft:#555;
+  --border:#C8BE9A;--border-lt:#DDD6BE;--shadow:rgba(44,90,27,.10);
+
+  /* Gradient magnitude palette */
+  --grad-dead:#CCCCCC;       /* near-zero / vanished */
+  --grad-healthy:#2D5A1B;    /* good signal */
+  --grad-large:#E8630A;      /* getting big */
+  --grad-explode:#B0321D;    /* exploding */
+  --grad-dead-pale:#F0F0F0;
+  --grad-healthy-pale:#C8E6A8;
+  --grad-large-pale:#FDE8D8;
+  --grad-explode-pale:#F8DDD8;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:'Outfit',sans-serif;background:var(--cream);color:var(--text);
+  padding:1.25rem 1rem 2rem;min-height:100vh;line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:.85rem}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+.hdr{display:flex;justify-content:space-between;align-items:flex-start;column-gap:1rem;row-gap:.35rem;flex-wrap:wrap}
+.hdr>div:first-child{flex:1 1 auto;min-width:0}
+.hdr h1{font-size:clamp(1.2rem,2.1vw,1.55rem);font-weight:700;color:var(--g-dk);letter-spacing:-.02em;line-height:1.2}
+.hdr p.subtitle{font-size:.86rem;color:var(--text-muted);margin-top:.18rem}
+.hdr-rule{border:none;border-top:2.5px solid var(--g-dk);margin-top:.55rem}
+
+/* ── Fixed copyright ─────────────────────────────────────────────── */
+.cr-top{
+  position:fixed;top:.75rem;right:1rem;z-index:1000;
+  font-size:.72rem;color:var(--text-muted);text-align:right;
+  background:rgba(250,247,240,.92);padding:.2rem 1.5rem .2rem .5rem;
+  border-radius:5px;backdrop-filter:blur(4px);
+  border:1px solid var(--border-lt);white-space:nowrap;min-width:max-content;
+}
+.cr-top a{color:var(--orange);text-decoration:none}
+.cr-top a:hover{text-decoration:underline}
+
+/* ── Tab bar ─────────────────────────────────────────────────────── */
+.tab-bar{
+  display:flex;gap:.35rem;background:var(--cream-mid);
+  border:1px solid var(--border);border-radius:8px;
+  padding:.3rem;width:fit-content;
+}
+.tab-bar button{
+  font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:500;
+  padding:.3rem .9rem;border-radius:6px;cursor:pointer;
+  border:none;background:transparent;color:var(--text-soft);transition:all .15s;
+}
+.tab-bar button:hover{background:white;color:var(--g-dk)}
+.tab-bar button.active{background:white;color:var(--g-dk);font-weight:600;
+  box-shadow:0 1px 4px var(--shadow);}
+
+/* ── Explorer grid ───────────────────────────────────────────────── */
+.explorer-grid{
+  display:grid;
+  grid-template-columns:260px 1fr 220px;
+  gap:.85rem;align-items:start;
+}
+@media(max-width:980px){
+  .explorer-grid{grid-template-columns:260px 1fr}
+  .right-col{display:none}
+}
+@media(max-width:680px){.explorer-grid{grid-template-columns:1fr}}
+.left-col{display:flex;flex-direction:column;gap:.75rem}
+.center-col{display:flex;flex-direction:column;gap:.75rem}
+.right-col{display:flex;flex-direction:column;gap:.75rem}
+
+/* ── Cards ───────────────────────────────────────────────────────── */
+.card{background:white;border:1px solid var(--border);border-radius:8px;
+  padding:.85rem 1rem;box-shadow:0 2px 8px var(--shadow)}
+.card-title{font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--g-dk);margin-bottom:.55rem}
+
+/* ── Selectors ───────────────────────────────────────────────────── */
+.sel-group{display:flex;gap:.3rem;flex-wrap:wrap;margin-bottom:.45rem}
+.sel-btn{
+  font-family:'Outfit',sans-serif;font-size:.75rem;font-weight:500;
+  padding:.25rem .6rem;border-radius:5px;cursor:pointer;
+  border:1.5px solid var(--border-lt);background:var(--cream);color:var(--text-soft);
+  transition:all .12s;
+}
+.sel-btn:hover{background:var(--cream-mid)}
+.sel-btn.active{background:var(--g-mid);border-color:var(--g-mid);color:white}
+
+/* ── Toggle groups ───────────────────────────────────────────────── */
+.toggle-grp{
+  display:flex;gap:0;border-radius:6px;overflow:hidden;
+  border:1.5px solid var(--border);margin-bottom:.45rem;
+}
+.toggle-grp button{
+  font-family:'Outfit',sans-serif;font-size:.78rem;font-weight:500;
+  padding:.28rem 0;flex:1;border:none;cursor:pointer;
+  background:var(--cream);color:var(--text-soft);transition:all .12s;
+}
+.toggle-grp button.active{background:var(--g-mid);color:white}
+.toggle-grp button:not(.active):hover{background:var(--cream-mid)}
+
+/* ── Sliders ─────────────────────────────────────────────────────── */
+.srow{display:flex;align-items:center;gap:.45rem;margin-bottom:.2rem}
+.slbl{font-family:'IBM Plex Mono',monospace;font-size:.8rem;font-weight:500;
+  color:var(--g-dk);min-width:28px}
+input[type=range]{flex:1;appearance:none;-webkit-appearance:none;height:4px;
+  background:var(--cream-dk);border-radius:2px;cursor:pointer;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
+  border-radius:50%;background:var(--g-mid);border:2.5px solid white;
+  box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:pointer}
+.sval{font-family:'IBM Plex Mono',monospace;font-size:.76rem;
+  color:var(--text-muted);min-width:44px;text-align:right}
+.hint-txt{font-size:.7rem;color:var(--text-muted);font-style:italic;margin-top:.15rem}
+.param-lbl{font-size:.72rem;color:var(--text-soft);margin-bottom:.25rem;font-weight:500}
+
+/* ── Buttons ─────────────────────────────────────────────────────── */
+.ctrl-btns{display:flex;gap:.45rem;flex-wrap:wrap}
+.pbtn{
+  font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:600;
+  padding:.35rem .9rem;border-radius:6px;cursor:pointer;
+  border:1.5px solid var(--border);background:var(--cream);color:var(--g-dk);
+  transition:all .12s;
+}
+.pbtn:hover{background:var(--g-pale);border-color:var(--g-lt)}
+.pbtn.primary{background:var(--g-mid);border-color:var(--g-mid);color:white}
+.pbtn.primary:hover{background:var(--g-dk);border-color:var(--g-dk)}
+
+/* ── Annotation box ──────────────────────────────────────────────── */
+.anno-box{
+  border-radius:6px;padding:.55rem .75rem;font-size:.78rem;line-height:1.55;
+  background:var(--blue-pale);color:var(--blue);border-left:3px solid var(--blue);
+  min-height:3.2rem;
+}
+.anno-box.warn{background:var(--red-pale);color:var(--red);border-color:var(--red)}
+.anno-box.good{background:var(--g-pale);color:var(--g-dk);border-color:var(--g-mid)}
+.anno-box.neutral{background:var(--cream-mid);color:var(--text-soft);border-color:var(--border)}
+.anno-box.explode{background:#FDE8D8;color:var(--orange-dk);border-color:var(--orange)}
+
+/* ── Key Concepts ────────────────────────────────────────────────── */
+.concepts-body{overflow:hidden;max-height:900px;transition:max-height .3s ease}
+.concepts-body.collapsed{max-height:0;margin-bottom:-.55rem}
+.concepts-item{font-size:.74rem;color:var(--text-soft);line-height:1.5;
+  margin-bottom:.45rem;padding-left:.9rem;position:relative}
+.concepts-item:last-child{margin-bottom:0}
+.concepts-item::before{content:'●';color:#2e7d32;position:absolute;left:0;top:0}
+.concepts-item strong{color:#2e7d32;font-weight:600}
+
+/* ── Status bar ──────────────────────────────────────────────────── */
+.status-bar{
+  display:flex;gap:.6rem;flex-wrap:wrap;font-family:'IBM Plex Mono',monospace;
+  font-size:.72rem;color:var(--text-muted);
+}
+.stat-pill{background:var(--cream-mid);border:1px solid var(--border-lt);
+  border-radius:12px;padding:.15rem .55rem;}
+.stat-pill span{color:var(--g-dk);font-weight:600}
+
+/* ── Plot label ──────────────────────────────────────────────────── */
+.plot-label{font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--text-muted);text-align:center;margin-bottom:.5rem}
+
+/* ── Legend ──────────────────────────────────────────────────────── */
+.legend{display:flex;gap:.75rem;flex-wrap:wrap;font-size:.72rem;
+  color:var(--text-soft);margin-top:.5rem;align-items:center}
+.legend-dot{width:10px;height:10px;border-radius:50%;display:inline-block;
+  vertical-align:middle;margin-right:.25rem;flex-shrink:0}
+.legend-line{width:22px;height:3px;display:inline-block;vertical-align:middle;
+  margin-right:.25rem;border-radius:2px;flex-shrink:0}
+
+/* ── Tab panels ──────────────────────────────────────────────────── */
+.tab-panel{display:none}
+.tab-panel.active{display:flex;flex-direction:column;gap:.75rem}
+
+/* ────────────────────────────────────────────────────────────────── */
+/* ── Tab 1: Gradient Flow network diagram ────────────────────────── */
+/* ────────────────────────────────────────────────────────────────── */
+
+/* Full-width SVG placeholder */
+.flow-svg-wrap{
+  width:100%;overflow-x:auto;
+}
+#svg-gradient-flow{
+  width:100%;min-height:260px;display:block;border-radius:6px;
+  background:#FDFAF5;
+}
+
+/* Gradient-magnitude color classes used on arrows/nodes */
+.grad-dead   {stroke:var(--grad-dead)   ;fill:var(--grad-dead)   }
+.grad-healthy{stroke:var(--grad-healthy);fill:var(--grad-healthy)}
+.grad-large  {stroke:var(--grad-large)  ;fill:var(--grad-large)  }
+.grad-explode{stroke:var(--grad-explode);fill:var(--grad-explode)}
+
+/* Per-layer magnitude badge under each network column */
+.layer-badge-row{
+  display:flex;justify-content:space-around;align-items:flex-start;
+  gap:.3rem;margin-top:.45rem;flex-wrap:wrap;
+}
+.layer-badge{
+  display:flex;flex-direction:column;align-items:center;gap:.15rem;
+  min-width:44px;
+}
+.layer-badge-label{font-size:.6rem;color:var(--text-muted);
+  font-family:'IBM Plex Mono',monospace;text-align:center}
+.layer-badge-val{
+  font-family:'IBM Plex Mono',monospace;font-size:.72rem;font-weight:600;
+  padding:.12rem .35rem;border-radius:5px;
+  background:var(--grad-dead-pale);color:var(--grad-dead);
+}
+.layer-badge-val.healthy{background:var(--grad-healthy-pale);color:var(--grad-healthy)}
+.layer-badge-val.large  {background:var(--grad-large-pale);  color:var(--grad-large)}
+.layer-badge-val.explode{background:var(--grad-explode-pale);color:var(--grad-explode)}
+
+/* ────────────────────────────────────────────────────────────────── */
+/* ── Tab 2: Activation Functions ─────────────────────────────────── */
+/* ────────────────────────────────────────────────────────────────── */
+.act-panels{
+  display:grid;grid-template-columns:1fr 1fr;gap:.75rem;
+}
+@media(max-width:640px){.act-panels{grid-template-columns:1fr}}
+
+#svg-activation{
+  width:100%;min-height:220px;display:block;border-radius:5px;background:#FDFAF5;
+}
+#svg-compound{
+  width:100%;min-height:220px;display:block;border-radius:5px;background:#FDFAF5;
+}
+
+/* ────────────────────────────────────────────────────────────────── */
+/* ── Tab 3: Solutions — 2×2 grid ─────────────────────────────────── */
+/* ────────────────────────────────────────────────────────────────── */
+.solutions-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:.65rem;
+}
+@media(max-width:640px){.solutions-grid{grid-template-columns:1fr}}
+
+.solution-card{
+  background:white;border:1.5px solid var(--border-lt);border-radius:8px;
+  padding:.7rem .8rem;box-shadow:0 1px 5px var(--shadow);
+}
+.solution-title{
+  font-size:.72rem;font-weight:700;color:var(--g-dk);margin-bottom:.3rem;
+}
+.solution-desc{
+  font-size:.68rem;color:var(--text-soft);line-height:1.45;margin-bottom:.4rem;
+}
+.solution-svg{
+  width:100%;min-height:100px;display:block;border-radius:4px;background:#FDFAF5;
+}
+.solution-tag{
+  display:inline-block;font-size:.59rem;font-weight:600;letter-spacing:.04em;
+  text-transform:uppercase;padding:.1rem .38rem;border-radius:4px;margin-top:.3rem;
+}
+.tag-init{background:var(--blue-pale);color:var(--blue)}
+.tag-arch{background:var(--g-pale);color:var(--g-dk)}
+.tag-norm{background:var(--purple-pale);color:var(--purple)}
+.tag-clip{background:var(--yellow-pale);color:var(--yellow)}
+
+/* ── Right panel ─────────────────────────────────────────────────── */
+.grad-stat-row{
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:.7rem;padding:.22rem 0;border-bottom:1px solid var(--border-lt);
+}
+.grad-stat-row:last-child{border-bottom:none}
+.gsr-lbl{color:var(--text-muted);font-family:'IBM Plex Mono',monospace}
+.gsr-val{font-weight:600;font-family:'IBM Plex Mono',monospace;color:var(--g-dk)}
+
+/* Per-layer gradient list */
+.layer-grad-list{display:flex;flex-direction:column;gap:.3rem}
+.lgr{
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--cream);border:1px solid var(--border-lt);border-radius:5px;
+  padding:.28rem .5rem;
+}
+.lgr-name{font-size:.68rem;font-weight:600;color:var(--g-dk)}
+.lgr-bar-wrap{flex:1;margin:0 .45rem;height:5px;background:var(--cream-dk);
+  border-radius:3px;overflow:hidden}
+.lgr-bar{height:100%;border-radius:3px;background:var(--grad-dead);
+  transition:width .3s,background .3s}
+.lgr-val{font-size:.65rem;font-family:'IBM Plex Mono',monospace;
+  color:var(--text-muted);min-width:38px;text-align:right}
+
+/* Speed indicator dots */
+.speed-dot{
+  display:inline-block;width:8px;height:8px;border-radius:50%;
+  margin-right:.25rem;vertical-align:middle;
+}
+.speed-dot.healthy{background:var(--grad-healthy)}
+.speed-dot.slow    {background:var(--grad-dead)}
+.speed-dot.fast    {background:var(--grad-explode)}
+
+/* Gradient ratio display */
+.ratio-box{
+  text-align:center;padding:.55rem .5rem;border-radius:6px;
+  border:1px solid var(--border-lt);background:var(--cream);margin-top:.3rem;
+}
+.ratio-val{
+  display:block;font-family:'IBM Plex Mono',monospace;font-size:1.1rem;
+  font-weight:700;line-height:1.2;
+}
+.ratio-lbl{font-size:.62rem;color:var(--text-muted);margin-top:.12rem}
+</style>
+</head>
+<body>
+
+<div class="cr-top">© 2026 Greg T. Chism · <a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a></div>
+
+<div class="wrap">
+
+<header>
+  <div class="hdr">
+    <div>
+      <h1>Vanishing &amp; Exploding Gradients — Interactive Explorer</h1>
+      <p class="subtitle">Watch gradient magnitudes shrink to zero or explode as they propagate backward through deep networks — and see how modern fixes keep training stable</p>
+    </div>
+  </div>
+  <hr class="hdr-rule">
+</header>
+
+<!-- Tab bar -->
+<div class="tab-bar" id="tab-bar">
+  <button class="active" data-tab="flow">Gradient Flow</button>
+  <button data-tab="activations">Activation Functions</button>
+  <button data-tab="solutions">Solutions</button>
+</div>
+
+<!-- Main explorer -->
+<div class="explorer-grid">
+
+  <!-- ══ LEFT: Controls ══════════════════════════════════════════════ -->
+  <div class="left-col">
+
+    <!-- Network configuration -->
+    <div class="card">
+      <div class="card-title">Network</div>
+
+      <div class="param-lbl">Depth (hidden layers)</div>
+      <div class="sel-group" id="depth-selector">
+        <button class="sel-btn" data-depth="4">4</button>
+        <button class="sel-btn active" data-depth="6">6</button>
+        <button class="sel-btn" data-depth="8">8</button>
+        <button class="sel-btn" data-depth="10">10</button>
+      </div>
+
+      <div class="param-lbl">Activation Function</div>
+      <div class="sel-group" id="act-selector">
+        <button class="sel-btn active" data-act="sigmoid">Sigmoid</button>
+        <button class="sel-btn" data-act="tanh">Tanh</button>
+        <button class="sel-btn" data-act="relu">ReLU</button>
+        <button class="sel-btn" data-act="lrelu">Leaky ReLU</button>
+      </div>
+    </div>
+
+    <!-- Training parameters -->
+    <div class="card">
+      <div class="card-title">Parameters</div>
+
+      <!-- Weight scale -->
+      <div class="srow">
+        <span class="slbl">W</span>
+        <input type="range" id="sld-wscale" min="0.5" max="2.0" step="0.05" value="1.0">
+        <span class="sval" id="val-wscale">1.00</span>
+      </div>
+      <div class="hint-txt">Weight scale — &lt;1 vanishes, &gt;1 explodes</div>
+
+      <!-- Learning rate -->
+      <div class="srow" style="margin-top:.35rem">
+        <span class="slbl">η</span>
+        <input type="range" id="sld-lr" min="0.001" max="0.1" step="0.001" value="0.01">
+        <span class="sval" id="val-lr">0.010</span>
+      </div>
+      <div class="hint-txt">Learning rate</div>
+    </div>
+
+    <!-- Simulation controls -->
+    <div class="card">
+      <div class="card-title">Simulation</div>
+      <div class="ctrl-btns" style="margin-bottom:.45rem">
+        <button id="btn-play"  class="pbtn primary" style="flex:1">⏵ Play</button>
+        <button id="btn-step"  class="pbtn">⏭ Step</button>
+      </div>
+      <div class="ctrl-btns">
+        <button id="btn-reset" class="pbtn" style="flex:1">↺ Reset</button>
+      </div>
+      <div class="srow" style="margin-top:.5rem">
+        <span class="slbl" style="font-size:.72rem;min-width:42px">Speed</span>
+        <input type="range" id="sld-speed" min="0" max="2" step="1" value="1">
+        <span class="sval" id="val-speed">Med</span>
+      </div>
+    </div>
+
+    <!-- Annotation -->
+    <div class="card">
+      <div class="card-title">What's happening?</div>
+      <div class="anno-box neutral" id="anno-box">Select depth and activation, then press Play to watch gradients travel backward through the network.</div>
+    </div>
+
+    <!-- Key Concepts -->
+    <div class="card">
+      <div class="card-title" style="cursor:pointer;user-select:none" id="concepts-toggle">
+        Key Concepts <span id="concepts-arrow">▾</span>
+      </div>
+      <div class="concepts-body" id="concepts-body">
+        <div class="concepts-item"><strong>Vanishing gradients:</strong> sigmoid and tanh derivatives are at most ~0.25 and 1.0, and are often much smaller. Multiplied together across many layers, even small derivatives compound to near-zero — early layers receive almost no gradient signal.</div>
+        <div class="concepts-item"><strong>Exploding gradients:</strong> if weight matrices have norms greater than 1, backpropagated gradients can compound multiplicatively and grow without bound, causing unstable updates and NaN loss.</div>
+        <div class="concepts-item"><strong>Chain rule:</strong> backpropagation multiplies gradients layer-by-layer: ∂L/∂W₁ = (∂L/∂aₙ) × (∂aₙ/∂aₙ₋₁) × … × (∂a₂/∂a₁). Each factor is a derivative of the activation — the product of many factors &lt;1 collapses to zero.</div>
+        <div class="concepts-item"><strong>Depth problem:</strong> in a 10-layer sigmoid network, the gradient reaching layer 1 is (0.25)¹⁰ ≈ 0.000001 — a million-fold reduction. Early layers barely update, effectively freezing them during training.</div>
+        <div class="concepts-item"><strong>Modern fixes:</strong> ReLU removes the saturation problem (derivative = 1 for positive values). Skip connections (ResNets) create gradient highways. Xavier/He initialization keeps activation variance stable. Gradient clipping caps runaway gradients.</div>
+      </div>
+    </div>
+
+    <!-- Status bar -->
+    <div class="status-bar">
+      <div class="stat-pill">Epoch <span id="stat-epoch">0</span></div>
+      <div class="stat-pill">Step <span id="stat-step">0</span></div>
+    </div>
+
+  </div><!-- end left-col -->
+
+  <!-- ══ CENTER: Tab panels ══════════════════════════════════════════ -->
+  <div class="center-col">
+
+    <!-- ─ Tab 1: Gradient Flow ──────────────────────────────────────── -->
+    <div class="tab-panel active" id="panel-flow">
+      <div class="card">
+        <div class="plot-label">Backpropagation — gradient magnitude per layer</div>
+
+        <!-- D3-rendered network flow diagram -->
+        <div class="flow-svg-wrap">
+          <svg id="svg-gradient-flow">
+            <!-- Placeholder: gradient flow network rendered by JS -->
+            <rect width="100%" height="260" fill="#FDFAF5"/>
+            <text x="50%" y="120" text-anchor="middle" dominant-baseline="middle"
+                  fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="13">
+              Network gradient flow diagram
+            </text>
+            <text x="50%" y="145" text-anchor="middle" dominant-baseline="middle"
+                  fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="10">
+              arrows colored by gradient magnitude
+            </text>
+          </svg>
+        </div>
+
+        <!-- Per-layer gradient magnitude badges -->
+        <div class="layer-badge-row" id="layer-badge-row">
+          <div class="layer-badge">
+            <div class="layer-badge-val" id="badge-out">1.000</div>
+            <div class="layer-badge-label">Output</div>
+          </div>
+          <div class="layer-badge">
+            <div class="layer-badge-val" id="badge-l5">—</div>
+            <div class="layer-badge-label">Layer 6</div>
+          </div>
+          <div class="layer-badge">
+            <div class="layer-badge-val" id="badge-l4">—</div>
+            <div class="layer-badge-label">Layer 5</div>
+          </div>
+          <div class="layer-badge">
+            <div class="layer-badge-val" id="badge-l3">—</div>
+            <div class="layer-badge-label">Layer 4</div>
+          </div>
+          <div class="layer-badge">
+            <div class="layer-badge-val" id="badge-l2">—</div>
+            <div class="layer-badge-label">Layer 3</div>
+          </div>
+          <div class="layer-badge">
+            <div class="layer-badge-val" id="badge-l1">—</div>
+            <div class="layer-badge-label">Layer 2</div>
+          </div>
+          <div class="layer-badge">
+            <div class="layer-badge-val" id="badge-in">—</div>
+            <div class="layer-badge-label">Input</div>
+          </div>
+        </div>
+
+        <div class="legend" style="justify-content:center;margin-top:.6rem">
+          <span><span class="legend-line" style="background:var(--grad-dead)"></span>Dead (≈0)</span>
+          <span><span class="legend-line" style="background:var(--grad-healthy)"></span>Healthy</span>
+          <span><span class="legend-line" style="background:var(--grad-large)"></span>Large</span>
+          <span><span class="legend-line" style="background:var(--grad-explode)"></span>Exploding</span>
+        </div>
+      </div>
+
+      <!-- Gradient magnitude history chart -->
+      <div class="card">
+        <div class="plot-label">Gradient magnitude over training steps — earliest vs. latest layers</div>
+        <svg id="svg-grad-history" style="width:100%;min-height:160px;display:block;border-radius:5px;background:#FDFAF5">
+          <rect width="100%" height="160" fill="#FDFAF5"/>
+          <text x="50%" y="80" text-anchor="middle" dominant-baseline="middle"
+                fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="11">
+            Gradient magnitude history
+          </text>
+        </svg>
+        <div class="legend" style="margin-top:.35rem">
+          <span><span class="legend-dot" style="background:var(--grad-healthy)"></span>Deepest layer (output)</span>
+          <span><span class="legend-dot" style="background:var(--red)"></span>Earliest layer (input)</span>
+        </div>
+      </div>
+    </div><!-- end panel-flow -->
+
+    <!-- ─ Tab 2: Activation Functions ──────────────────────────────── -->
+    <div class="tab-panel" id="panel-activations">
+      <div class="card">
+        <div class="plot-label">Activation function and its derivative</div>
+        <div class="act-panels">
+
+          <!-- Left: activation curve + derivative -->
+          <div>
+            <div style="font-size:.67rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;
+                        color:var(--text-muted);text-align:center;margin-bottom:.35rem">
+              σ(x) and σ′(x)
+            </div>
+            <svg id="svg-activation">
+              <rect width="100%" height="220" fill="#FDFAF5"/>
+              <text x="50%" y="100" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="11">
+                Activation curve
+              </text>
+              <text x="50%" y="122" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="9">
+                rendered by D3
+              </text>
+            </svg>
+            <div class="legend" style="margin-top:.35rem">
+              <span><span class="legend-line" style="background:var(--g-mid)"></span>σ(x)</span>
+              <span><span class="legend-line" style="background:var(--orange);border-top:2px dashed var(--orange)"></span>σ′(x)</span>
+            </div>
+          </div>
+
+          <!-- Right: per-layer gradient bar chart -->
+          <div>
+            <div style="font-size:.67rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;
+                        color:var(--text-muted);text-align:center;margin-bottom:.35rem">
+              Gradient magnitude per layer (compounding)
+            </div>
+            <svg id="svg-compound">
+              <rect width="100%" height="220" fill="#FDFAF5"/>
+              <text x="50%" y="100" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="11">
+                Per-layer gradient bar chart
+              </text>
+              <text x="50%" y="122" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="9">
+                rendered by D3
+              </text>
+            </svg>
+            <div class="legend" style="margin-top:.35rem">
+              <span><span class="legend-dot" style="background:var(--grad-healthy)"></span>Healthy gradient</span>
+              <span><span class="legend-dot" style="background:var(--grad-dead)"></span>Vanished</span>
+            </div>
+          </div>
+
+        </div><!-- end act-panels -->
+
+        <!-- Max derivative annotation -->
+        <div class="anno-box neutral" id="act-anno" style="margin-top:.6rem;font-size:.75rem">
+          Sigmoid max derivative ≈ 0.25 — each layer multiplies the gradient by at most 0.25. After 6 layers: 0.25⁶ ≈ 0.00024.
+        </div>
+      </div>
+    </div><!-- end panel-activations -->
+
+    <!-- ─ Tab 3: Solutions ──────────────────────────────────────────── -->
+    <div class="tab-panel" id="panel-solutions">
+      <div class="card">
+        <div class="plot-label">Same deep network — four different gradient stability fixes</div>
+
+        <div class="solutions-grid">
+
+          <!-- Solution 1: Batch Normalization -->
+          <div class="solution-card">
+            <div class="solution-title">Batch Normalization</div>
+            <div class="solution-desc">Normalizes layer inputs to zero mean and unit variance — keeps activation magnitudes from drifting, stabilizing gradients throughout training.</div>
+            <svg class="solution-svg" id="svg-sol-bn">
+              <rect width="100%" height="100" fill="#FDFAF5"/>
+              <text x="50%" y="46" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.2)" font-family="Outfit,sans-serif" font-size="9">
+                gradient flow with BN
+              </text>
+            </svg>
+            <span class="solution-tag tag-norm">Normalization</span>
+          </div>
+
+          <!-- Solution 2: Skip Connections -->
+          <div class="solution-card">
+            <div class="solution-title">Skip Connections (ResNet)</div>
+            <div class="solution-desc">Identity shortcuts let gradients bypass layers entirely — the gradient highway ensures every layer receives at least a clean copy of the upstream gradient.</div>
+            <svg class="solution-svg" id="svg-sol-skip">
+              <rect width="100%" height="100" fill="#FDFAF5"/>
+              <text x="50%" y="46" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.2)" font-family="Outfit,sans-serif" font-size="9">
+                gradient flow with skip connections
+              </text>
+            </svg>
+            <span class="solution-tag tag-arch">Architecture</span>
+          </div>
+
+          <!-- Solution 3: Xavier / He Init -->
+          <div class="solution-card">
+            <div class="solution-title">Xavier / He Initialization</div>
+            <div class="solution-desc">Scales initial weights by 1/√n (Xavier) or √(2/n) (He/ReLU) to keep activation variance stable across layers — prevents vanishing or exploding at the start.</div>
+            <svg class="solution-svg" id="svg-sol-init">
+              <rect width="100%" height="100" fill="#FDFAF5"/>
+              <text x="50%" y="46" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.2)" font-family="Outfit,sans-serif" font-size="9">
+                gradient flow with proper init
+              </text>
+            </svg>
+            <span class="solution-tag tag-init">Initialization</span>
+          </div>
+
+          <!-- Solution 4: Gradient Clipping -->
+          <div class="solution-card">
+            <div class="solution-title">Gradient Clipping</div>
+            <div class="solution-desc">Caps gradient norm at a threshold (e.g. 1.0) before the optimizer step — prevents individual parameter updates from becoming catastrophically large.</div>
+            <svg class="solution-svg" id="svg-sol-clip">
+              <rect width="100%" height="100" fill="#FDFAF5"/>
+              <text x="50%" y="46" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.2)" font-family="Outfit,sans-serif" font-size="9">
+                gradient flow with clipping
+              </text>
+            </svg>
+            <span class="solution-tag tag-clip">Clipping</span>
+          </div>
+
+        </div><!-- end solutions-grid -->
+
+        <div class="anno-box neutral" id="sol-anno" style="margin-top:.6rem;font-size:.75rem">
+          Click a solution panel to see how it modifies the gradient signal at each layer.
+        </div>
+      </div>
+    </div><!-- end panel-solutions -->
+
+  </div><!-- end center-col -->
+
+  <!-- ══ RIGHT: Live statistics ══════════════════════════════════════ -->
+  <div class="right-col">
+
+    <!-- Per-layer gradient magnitudes -->
+    <div class="card">
+      <div class="card-title">Layer Gradients</div>
+      <div class="layer-grad-list" id="layer-grad-list">
+        <!-- Rendered by JS: 4–10 rows depending on depth -->
+        <div class="lgr">
+          <span class="lgr-name">L6 →</span>
+          <div class="lgr-bar-wrap"><div class="lgr-bar healthy" style="width:100%"></div></div>
+          <span class="lgr-val" id="lgr-6">1.000</span>
+        </div>
+        <div class="lgr">
+          <span class="lgr-name">L5</span>
+          <div class="lgr-bar-wrap"><div class="lgr-bar" style="width:60%"></div></div>
+          <span class="lgr-val" id="lgr-5">—</span>
+        </div>
+        <div class="lgr">
+          <span class="lgr-name">L4</span>
+          <div class="lgr-bar-wrap"><div class="lgr-bar" style="width:35%"></div></div>
+          <span class="lgr-val" id="lgr-4">—</span>
+        </div>
+        <div class="lgr">
+          <span class="lgr-name">L3</span>
+          <div class="lgr-bar-wrap"><div class="lgr-bar" style="width:15%"></div></div>
+          <span class="lgr-val" id="lgr-3">—</span>
+        </div>
+        <div class="lgr">
+          <span class="lgr-name">L2</span>
+          <div class="lgr-bar-wrap"><div class="lgr-bar" style="width:5%"></div></div>
+          <span class="lgr-val" id="lgr-2">—</span>
+        </div>
+        <div class="lgr">
+          <span class="lgr-name">L1 →</span>
+          <div class="lgr-bar-wrap"><div class="lgr-bar" style="width:1%"></div></div>
+          <span class="lgr-val" id="lgr-1">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gradient ratio -->
+    <div class="card">
+      <div class="card-title">Gradient Ratio</div>
+      <div class="ratio-box">
+        <span class="ratio-val" id="ratio-val">—</span>
+        <div class="ratio-lbl">‖∇L/∇output‖ at input layer</div>
+      </div>
+      <div style="font-size:.66rem;color:var(--text-muted);margin-top:.45rem;line-height:1.5;font-style:italic">
+        Ratio &lt; 0.01 indicates vanishing. Ratio &gt; 100 indicates exploding.
+      </div>
+    </div>
+
+    <!-- Learning speed per layer -->
+    <div class="card">
+      <div class="card-title">Learning Speed</div>
+      <div id="speed-list">
+        <!-- Rendered by JS -->
+        <div class="grad-stat-row">
+          <span class="gsr-lbl">Layer 6</span>
+          <span class="gsr-val"><span class="speed-dot healthy"></span>Fast</span>
+        </div>
+        <div class="grad-stat-row">
+          <span class="gsr-lbl">Layer 5</span>
+          <span class="gsr-val"><span class="speed-dot healthy"></span>Fast</span>
+        </div>
+        <div class="grad-stat-row">
+          <span class="gsr-lbl">Layer 4</span>
+          <span class="gsr-val"><span class="speed-dot slow"></span>Slow</span>
+        </div>
+        <div class="grad-stat-row">
+          <span class="gsr-lbl">Layer 3</span>
+          <span class="gsr-val"><span class="speed-dot slow"></span>Slow</span>
+        </div>
+        <div class="grad-stat-row">
+          <span class="gsr-lbl">Layer 2</span>
+          <span class="gsr-val"><span class="speed-dot slow"></span>Frozen</span>
+        </div>
+        <div class="grad-stat-row">
+          <span class="gsr-lbl">Layer 1</span>
+          <span class="gsr-val"><span class="speed-dot slow"></span>Frozen</span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end right-col -->
+
+</div><!-- end .explorer-grid -->
+
+</div><!-- end .wrap -->
+
+<script>
+/* Stage 1 — structural interactivity only (tabs, toggles, collapsible).
+   Full gradient simulation added in Stage 2. */
+(function(){
+'use strict';
+
+/* Tab switching */
+document.getElementById('tab-bar').addEventListener('click',function(e){
+  var btn=e.target.closest('button');
+  if(!btn||!btn.dataset.tab) return;
+  document.querySelectorAll('#tab-bar button').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('active');});
+  document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
+});
+
+/* Key Concepts collapse */
+document.getElementById('concepts-toggle').addEventListener('click',function(){
+  var body=document.getElementById('concepts-body');
+  var arrow=document.getElementById('concepts-arrow');
+  body.classList.toggle('collapsed');
+  arrow.textContent=body.classList.contains('collapsed')?'▸':'▾';
+});
+
+/* Depth selector */
+document.getElementById('depth-selector').addEventListener('click',function(e){
+  var btn=e.target.closest('.sel-btn');
+  if(!btn) return;
+  document.querySelectorAll('#depth-selector .sel-btn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+});
+
+/* Activation selector */
+document.getElementById('act-selector').addEventListener('click',function(e){
+  var btn=e.target.closest('.sel-btn');
+  if(!btn) return;
+  document.querySelectorAll('#act-selector .sel-btn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  /* Update activation annotation */
+  var msgs={
+    sigmoid:'Sigmoid max derivative ≈ 0.25 — each layer multiplies the gradient by at most 0.25. After 6 layers: 0.25⁶ ≈ 0.00024.',
+    tanh:'Tanh max derivative = 1.0, but typical inputs give derivatives of ~0.4. After 6 layers: 0.4⁶ ≈ 0.004. Better than sigmoid, still problematic.',
+    relu:'ReLU derivative = 1 for positive inputs, 0 for negative. Positive-side gradients flow unchanged — no vanishing. Risk: dead neurons if all inputs negative.',
+    lrelu:'Leaky ReLU derivative = 1 for x>0, α (e.g. 0.01) for x≤0. Prevents dead neurons while keeping near-unit gradients.'
+  };
+  var el=document.getElementById('act-anno');
+  if(el) el.textContent=msgs[btn.dataset.act]||'';
+});
+
+/* Slider label updates */
+document.getElementById('sld-wscale').addEventListener('input',function(){
+  document.getElementById('val-wscale').textContent=(+this.value).toFixed(2);
+});
+document.getElementById('sld-lr').addEventListener('input',function(){
+  document.getElementById('val-lr').textContent=(+this.value).toFixed(3);
+});
+document.getElementById('sld-speed').addEventListener('input',function(){
+  document.getElementById('val-speed').textContent=['Slow','Med','Fast'][+this.value];
+});
+
+})();
+</script>
+
+<footer id="course-nav-footer" style="margin-top:1.5rem;padding:0.75rem 0 0 1rem;border-top:1px solid #E0DAC0;font-size:0.8rem;color:#78786A;text-align:left;">
+  <a href="../" style="color:#2e7d32;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">&larr; All course visualizations</a>
+</footer>
+<script>
+if (window.self !== window.top) { var f = document.getElementById('course-nav-footer'); if (f) { f.style.display = 'none'; } }
+</script>
+
+</body>
+</html>
