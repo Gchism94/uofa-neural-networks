@@ -761,12 +761,447 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 </div><!-- end .wrap -->
 
 <script>
-/* Stage 1 — structural interactivity only (tabs, toggles, collapsible).
-   Full gradient simulation added in Stage 2. */
 (function(){
 'use strict';
 
-/* Tab switching */
+// ── Constants ──────────────────────────────────────────────────────
+var SPEED_MS=[700,280,80];
+
+// ── State ──────────────────────────────────────────────────────────
+var depth=6, actType='sigmoid', wScale=1.0, lr=0.01;
+var activations=[], gradients=[];
+// currentReveal: -1=nothing shown; n-2=only rightmost arrow; 0=all revealed
+var currentReveal=-1;
+var playing=false, timer=null;
+var histSteps=[], histOut=[], histInp=[];
+
+// ── Seeded RNG (mulberry32) ─────────────────────────────────────────
+function makeRng(seed){
+  return function(){
+    seed|=0; seed=seed+0x6D2B79F5|0;
+    var t=Math.imul(seed^seed>>>15,1|seed);
+    t=t+Math.imul(t^t>>>7,61|t)^t;
+    return((t^t>>>14)>>>0)/4294967296;
+  };
+}
+
+// ── Activation functions & derivatives ────────────────────────────
+function sigmoid(x){return 1/(1+Math.exp(-x));}
+function actFn(x){
+  if(actType==='sigmoid') return sigmoid(x);
+  if(actType==='tanh')    return Math.tanh(x);
+  if(actType==='relu')    return Math.max(0,x);
+  return x>0?x:0.01*x; // leaky relu
+}
+function actDeriv(x){
+  if(actType==='sigmoid'){var s=sigmoid(x);return s*(1-s);}
+  if(actType==='tanh')   {var t=Math.tanh(x);return 1-t*t;}
+  if(actType==='relu')   return x>0?1:0;
+  return x>0?1:0.01; // leaky relu
+}
+
+// ── Pre-compute forward + backward passes ─────────────────────────
+function computePasses(){
+  var n=depth+2;
+  var rng=makeRng(42);
+  activations=new Array(n);
+  gradients=new Array(n);
+  activations[0]=0.5+rng()*1.0; // input in [0.5,1.5]
+  for(var l=1;l<n;l++){
+    var z=wScale*activations[l-1];
+    activations[l]=actFn(z);
+  }
+  gradients[n-1]=1.0; // output gradient seed
+  for(var l2=n-2;l2>=0;l2--){
+    var z2=wScale*activations[l2];
+    gradients[l2]=gradients[l2+1]*wScale*actDeriv(z2);
+  }
+}
+
+// ── Gradient magnitude → color / class / label ────────────────────
+function gCol(g){
+  if(g===null||g===undefined) return '#DDDDDD';
+  if(g<0.001)  return '#BBBBBB';
+  if(g<=0.1)   return '#2e7d32';
+  if(g<=1.0)   return '#E8630A';
+  return '#B0321D';
+}
+function gCls(g){
+  if(g===null||g===undefined) return '';
+  if(g<0.001)  return 'dead';
+  if(g<=0.1)   return 'healthy';
+  if(g<=1.0)   return 'large';
+  return 'explode';
+}
+function gLbl(g){
+  if(g===null||g===undefined||g===0) return '';
+  if(g>=1000)   return g.toExponential(1);
+  if(g>=100)    return g.toFixed(0);
+  if(g>=10)     return g.toFixed(1);
+  if(g>=1)      return g.toFixed(2);
+  if(g>=0.01)   return g.toFixed(3);
+  if(g>=0.0001) return g.toExponential(1);
+  return g.toExponential(1);
+}
+function arrowW(g){
+  if(g===null) return 1.5;
+  return Math.max(1.5,Math.min(6,1.5+Math.log10(Math.max(g,1e-5)+1)*2.5));
+}
+
+// ── D3 gradient flow network diagram ──────────────────────────────
+function renderNetwork(){
+  var svgEl=document.getElementById('svg-gradient-flow');
+  if(!svgEl) return;
+  var n=depth+2; // total nodes
+  var NODE_R=22, GAP=Math.max(60,Math.min(88,520/Math.max(n-1,1)));
+  var W=(n-1)*GAP+2*NODE_R+44, H=210;
+  var CY=88, BAR_Y=CY+NODE_R+6, LABEL_Y=CY-NODE_R-7;
+  var xs=d3.range(n).map(function(i){return NODE_R+22+i*GAP;});
+
+  var svg=d3.select(svgEl);
+  svg.selectAll('*').remove();
+  svg.attr('viewBox','0 0 '+W+' '+H).attr('height',H)
+     .attr('width','100%').attr('preserveAspectRatio','xMidYMid meet');
+  svg.append('rect').attr('width',W).attr('height',H).attr('fill','#FDFAF5');
+
+  // Arrow markers
+  var defs=svg.append('defs');
+  [['dead','#BBBBBB'],['healthy','#2e7d32'],['large','#E8630A'],
+   ['explode','#B0321D'],['none','#CCCCCC']].forEach(function(p){
+    defs.append('marker').attr('id','va-'+p[0])
+      .attr('markerWidth',7).attr('markerHeight',7)
+      .attr('refX',6).attr('refY',3).attr('orient','auto')
+      .append('path').attr('d','M0,0 L0,6 L7,3 z').attr('fill',p[1]);
+  });
+
+  // Draw arrows (left-to-right, n-1 arrows, index 0..n-2)
+  for(var i=0;i<n-1;i++){
+    var x1=xs[i]+NODE_R+1, x2=xs[i+1]-NODE_R-1, ay=CY;
+    var revealed=currentReveal>=0&&i>=currentReveal;
+    var g=revealed?gradients[i]:null;
+    var col=revealed?gCol(g):'#CCCCCC';
+    var cls=revealed?gCls(g):'none';
+    var sw=revealed?arrowW(g):1.5;
+
+    svg.append('line')
+      .attr('x1',x1).attr('y1',ay).attr('x2',x2).attr('y2',ay)
+      .attr('stroke',col).attr('stroke-width',sw)
+      .attr('marker-end','url(#va-'+cls+')');
+
+    if(revealed&&g!==null){
+      svg.append('text')
+        .attr('x',(x1+x2)/2).attr('y',LABEL_Y)
+        .attr('text-anchor','middle')
+        .attr('font-family','IBM Plex Mono,monospace').attr('font-size',8.5)
+        .attr('font-weight','600').attr('fill',col)
+        .text(gLbl(g));
+    }
+  }
+
+  // Draw nodes
+  var nodeNames=['In'].concat(d3.range(1,n-1).map(function(i){return 'L'+i;}))
+                     .concat(['Out']);
+  for(var j=0;j<n;j++){
+    var cx=xs[j];
+    var nodeRevealed=currentReveal>=0&&j>=currentReveal;
+    var gj=nodeRevealed?gradients[j]:null;
+    var nodeCol=gj!==null?gCol(gj):'#C8BE9A';
+    var nodeFill=gj!==null&&gCls(gj)==='dead'?'#F6F6F6':'white';
+
+    // Drop shadow
+    svg.append('circle').attr('cx',cx+2).attr('cy',CY+2).attr('r',NODE_R)
+      .attr('fill','rgba(0,0,0,.07)');
+
+    // Node circle
+    svg.append('circle').attr('cx',cx).attr('cy',CY).attr('r',NODE_R)
+      .attr('fill',nodeFill).attr('stroke',nodeCol).attr('stroke-width',2);
+
+    // Layer name
+    svg.append('text').attr('x',cx).attr('y',CY-6)
+      .attr('text-anchor','middle').attr('font-family','Outfit,sans-serif')
+      .attr('font-size',9).attr('font-weight','600').attr('fill',nodeCol)
+      .text(nodeNames[j]);
+
+    // Activation value
+    var av=activations[j]!==undefined?activations[j].toFixed(2):'?';
+    svg.append('text').attr('x',cx).attr('y',CY+7)
+      .attr('text-anchor','middle').attr('font-family','IBM Plex Mono,monospace')
+      .attr('font-size',7.5).attr('fill','#777').text(av);
+
+    // Learning-speed bar below node
+    svg.append('rect').attr('x',cx-NODE_R).attr('y',BAR_Y)
+      .attr('width',NODE_R*2).attr('height',5).attr('rx',2).attr('fill','#EBEBEB');
+    if(gj!==null){
+      var maxG=Math.max(gradients[n-1],1e-8);
+      var frac=Math.min(1,Math.max(0.02,gj/maxG));
+      svg.append('rect').attr('x',cx-NODE_R).attr('y',BAR_Y)
+        .attr('width',NODE_R*2*frac).attr('height',5).attr('rx',2)
+        .attr('fill',gCol(gj));
+    }
+  }
+
+  // Back-flow label when partial
+  if(currentReveal>0){
+    svg.append('text').attr('x',W/2).attr('y',H-6)
+      .attr('text-anchor','middle').attr('font-family','Outfit,sans-serif')
+      .attr('font-size',8.5).attr('fill','#AAAAAA')
+      .text('← gradient flowing backward (backpropagation)');
+  }
+}
+
+// ── Badge row below network ────────────────────────────────────────
+function updateBadgeRow(){
+  var row=document.getElementById('layer-badge-row');
+  if(!row) return;
+  row.innerHTML='';
+  var n=depth+2;
+  for(var j=n-1;j>=0;j--){
+    var revealed=currentReveal>=0&&j>=currentReveal;
+    var g=revealed?gradients[j]:null;
+    var cls=g!==null?gCls(g):'';
+    var badge=document.createElement('div');
+    badge.className='layer-badge';
+    var valEl=document.createElement('div');
+    valEl.className='layer-badge-val'+(cls?' '+cls:'');
+    valEl.textContent=g!==null?gLbl(g):'—';
+    var lblEl=document.createElement('div');
+    lblEl.className='layer-badge-label';
+    lblEl.textContent=j===n-1?'Output':j===0?'Input':'Layer '+j;
+    badge.appendChild(valEl);
+    badge.appendChild(lblEl);
+    row.appendChild(badge);
+  }
+}
+
+// ── Right panel ────────────────────────────────────────────────────
+function updateRightPanel(){
+  var n=depth+2;
+
+  // Per-layer gradient list
+  var list=document.getElementById('layer-grad-list');
+  if(list){
+    list.innerHTML='';
+    for(var j=n-1;j>=0;j--){
+      var revealed=currentReveal>=0&&j>=currentReveal;
+      var g=revealed?gradients[j]:null;
+      var lbl=j===n-1?'Out →':j===0?'→ In':'L'+j;
+      var row=document.createElement('div');
+      row.className='lgr';
+      var statusIcon=g===null?'':'  '+(gCls(g)==='dead'?'✗':gCls(g)==='explode'?'⚠':'✓');
+      row.innerHTML=
+        '<span class="lgr-name">'+lbl+'</span>'+
+        '<div class="lgr-bar-wrap"><div class="lgr-bar" style="width:'+
+          (g!==null?Math.min(100,Math.max(2,g/Math.max(gradients[n-1],1e-8)*100)):0)+
+          '%;background:'+gCol(g)+'"></div></div>'+
+        '<span class="lgr-val" style="color:'+gCol(g)+'">'+
+          (g!==null?gLbl(g):'—')+'</span>';
+      list.appendChild(row);
+    }
+  }
+
+  // Gradient ratio (input / output)
+  var ratioEl=document.getElementById('ratio-val');
+  if(ratioEl){
+    if(currentReveal===0){
+      var ratio=gradients[0]/Math.max(gradients[n-1],1e-10);
+      ratioEl.textContent=gLbl(ratio);
+      ratioEl.style.color=
+        ratio<0.01?'#B0321D':ratio>100?'#E8630A':'#2e7d32';
+    } else {
+      ratioEl.textContent='—';
+      ratioEl.style.color='#888';
+    }
+  }
+
+  // Learning-speed list
+  var speedList=document.getElementById('speed-list');
+  if(speedList){
+    speedList.innerHTML='';
+    for(var j2=n-1;j2>=0;j2--){
+      var revealed2=currentReveal>=0&&j2>=currentReveal;
+      var g2=revealed2?gradients[j2]:null;
+      var lbl2=j2===n-1?'Output':j2===0?'Input':'Layer '+j2;
+      var dotCls='', spd='—';
+      if(g2!==null){
+        var c=gCls(g2);
+        if(c==='dead'){dotCls='slow';spd='Frozen';}
+        else if(c==='healthy'){dotCls='healthy';spd='Fast';}
+        else if(c==='large'){dotCls='healthy';spd='Fast';}
+        else{dotCls='fast';spd='Unstable';}
+      }
+      var sr=document.createElement('div');
+      sr.className='grad-stat-row';
+      sr.innerHTML='<span class="gsr-lbl">'+lbl2+'</span>'+
+        '<span class="gsr-val"><span class="speed-dot '+dotCls+'"></span>'+spd+'</span>';
+      speedList.appendChild(sr);
+    }
+  }
+
+  // Status pills
+  var steps=currentReveal===-1?0:(depth+2-1-currentReveal);
+  document.getElementById('stat-step').textContent=steps;
+  document.getElementById('stat-epoch').textContent='1';
+}
+
+// ── Gradient history line chart ────────────────────────────────────
+function updateHistoryChart(){
+  if(currentReveal===-1) return;
+  var n=depth+2;
+  var step=n-1-currentReveal; // 1-based step count
+  histSteps.push(step);
+  histOut.push(gradients[n-1]);
+  histInp.push(currentReveal===0?gradients[0]:null);
+
+  if(histSteps.length<2) return;
+  var svgEl=document.getElementById('svg-grad-history');
+  if(!svgEl) return;
+
+  var W=svgEl.getBoundingClientRect().width||500, H=160;
+  var P={t:18,r:14,b:28,l:46}, iw=W-P.l-P.r, ih=H-P.t-P.b;
+  var svg=d3.select(svgEl);
+  svg.selectAll('*').remove();
+  svg.attr('viewBox','0 0 '+W+' '+H).attr('height',H).attr('width','100%');
+  svg.append('rect').attr('width',W).attr('height',H).attr('fill','#FDFAF5');
+  var g=svg.append('g').attr('transform','translate('+P.l+','+P.t+')');
+
+  var allVals=histOut.concat(histInp.filter(function(v){return v!==null;}));
+  var yMax=Math.max(d3.max(allVals)||1,0.001);
+  var yMin=Math.max(d3.min(allVals.filter(function(v){return v>0;}))||0.0001,1e-9);
+  var useLog=yMax/yMin>50;
+  var xSc=d3.scaleLinear().domain([1,Math.max(histSteps.length,2)]).range([0,iw]);
+  var ySc=useLog
+    ?d3.scaleLog().domain([yMin*0.5,yMax*2]).range([ih,0]).clamp(true)
+    :d3.scaleLinear().domain([0,yMax*1.15]).range([ih,0]);
+
+  g.append('g').attr('transform','translate(0,'+ih+')')
+   .call(d3.axisBottom(xSc).ticks(4).tickSize(-ih).tickFormat(''))
+   .call(function(a){a.select('.domain').remove();a.selectAll('line').attr('stroke','#EFEFEF');});
+  g.append('g').call(d3.axisLeft(ySc).ticks(4).tickSize(-iw).tickFormat(''))
+   .call(function(a){a.select('.domain').remove();a.selectAll('line').attr('stroke','#EFEFEF');});
+  g.append('g').attr('transform','translate(0,'+ih+')')
+   .call(d3.axisBottom(xSc).ticks(4))
+   .call(function(a){a.select('.domain').attr('stroke','#CCC');
+     a.selectAll('text').attr('font-size',8).attr('fill','#888');});
+  g.append('g').call(d3.axisLeft(ySc).ticks(4))
+   .call(function(a){a.select('.domain').attr('stroke','#CCC');
+     a.selectAll('text').attr('font-size',8).attr('fill','#888');});
+
+  var lineFn=d3.line()
+    .x(function(_,i){return xSc(histSteps[i]);})
+    .y(function(d){return ySc(Math.max(d,1e-10));})
+    .defined(function(d){return d!==null&&d>0;})
+    .curve(d3.curveMonotoneX);
+
+  g.append('path').datum(histOut).attr('fill','none')
+   .attr('stroke','#2e7d32').attr('stroke-width',2).attr('d',lineFn);
+  if(histInp.some(function(v){return v!==null;})){
+    g.append('path').datum(histInp).attr('fill','none')
+     .attr('stroke','#B0321D').attr('stroke-width',2).attr('d',lineFn);
+  }
+  g.append('text').attr('x',iw/2).attr('y',ih+22).attr('text-anchor','middle')
+   .attr('font-size',9).attr('fill','#999').attr('font-family','Outfit,sans-serif').text('Step');
+  g.append('text').attr('transform','rotate(-90)').attr('x',-ih/2).attr('y',-36)
+   .attr('text-anchor','middle').attr('font-size',9).attr('fill','#999')
+   .attr('font-family','Outfit,sans-serif')
+   .text(useLog?'Gradient (log)':'Gradient magnitude');
+}
+
+// ── Annotation ─────────────────────────────────────────────────────
+var ACT_NAMES={sigmoid:'Sigmoid',tanh:'Tanh',relu:'ReLU',lrelu:'Leaky ReLU'};
+function updateAnno(){
+  var el=document.getElementById('anno-box');
+  if(!el) return;
+  if(currentReveal===-1){
+    el.textContent='Press Play or Step to run the backward pass and watch gradients propagate through the network.';
+    el.className='anno-box neutral';
+    return;
+  }
+  var n=depth+2;
+  var hasVanish=false, hasExplode=false, allHealthy=true;
+  for(var j=currentReveal;j<n;j++){
+    var g=gradients[j];
+    if(g<0.001)  hasVanish=true;
+    if(g>1.0)    hasExplode=true;
+    if(g<0.001||g>1.0) allHealthy=false;
+  }
+  var aname=ACT_NAMES[actType]||actType;
+  if(hasExplode){
+    el.textContent='⚠ Exploding gradients — gradient magnitude grows exponentially backward through '+depth+' layers. Weights will update by huge amounts, destabilizing training. Reduce the weight scale below 1.0 to stop this.';
+    el.className='anno-box explode';
+  } else if(hasVanish&&currentReveal===0){
+    el.textContent='⚠ Vanishing gradients detected — early layers receive near-zero gradient signal and learn almost nothing. '+aname+' saturates and multiplies small derivatives (each < 1) across '+depth+' layers: the product collapses to ≈0.';
+    el.className='anno-box warn';
+  } else if(allHealthy&&currentReveal===0){
+    el.textContent='✓ Gradient flow is healthy — all layers receive sufficient signal for effective learning. '+aname+' with weight scale '+wScale.toFixed(2)+' keeps gradients in a healthy range throughout the network.';
+    el.className='anno-box good';
+  } else {
+    var rem=currentReveal;
+    el.textContent='Backward pass: gradient revealed at layers '+(n-1)+' → '+(currentReveal)+'. '+(rem>0?rem+' layer'+(rem>1?'s':'')+' still to reveal.':'Complete.');
+    el.className='anno-box neutral';
+  }
+}
+
+// ── Single backward step ───────────────────────────────────────────
+function doStep(){
+  var n=depth+2;
+  if(currentReveal===0){stopPlay();updateAnno();return;}
+  if(currentReveal===-1) currentReveal=n-2; // first step: rightmost arrow
+  else currentReveal=Math.max(0,currentReveal-1);
+  renderNetwork();
+  updateBadgeRow();
+  updateRightPanel();
+  updateHistoryChart();
+  updateAnno();
+}
+
+// ── Playback ───────────────────────────────────────────────────────
+function startPlay(){
+  if(playing) return;
+  playing=true;
+  document.getElementById('btn-play').textContent='⏸ Pause';
+  var ms=SPEED_MS[+document.getElementById('sld-speed').value];
+  timer=setInterval(function(){
+    if(currentReveal===0){stopPlay();return;}
+    doStep();
+  },ms);
+}
+function stopPlay(){
+  playing=false;
+  document.getElementById('btn-play').textContent='⏵ Play';
+  if(timer){clearInterval(timer);timer=null;}
+}
+
+// ── Reset ──────────────────────────────────────────────────────────
+function doReset(){
+  stopPlay();
+  depth=+(document.querySelector('#depth-selector .sel-btn.active')||{dataset:{depth:6}}).dataset.depth;
+  actType=(document.querySelector('#act-selector .sel-btn.active')||{dataset:{act:'sigmoid'}}).dataset.act;
+  wScale=+document.getElementById('sld-wscale').value;
+  lr=+document.getElementById('sld-lr').value;
+  currentReveal=-1;
+  histSteps=[]; histOut=[]; histInp=[];
+  computePasses();
+  renderNetwork();
+  updateBadgeRow();
+  updateRightPanel();
+  updateAnno();
+  // Clear history SVG
+  var hs=document.getElementById('svg-grad-history');
+  if(hs){
+    var sv=d3.select(hs);
+    sv.selectAll('*').remove();
+    sv.attr('height',160).attr('width','100%').attr('viewBox','0 0 500 160');
+    sv.append('rect').attr('width',500).attr('height',160).attr('fill','#FDFAF5');
+    sv.append('text').attr('x',250).attr('y',80).attr('text-anchor','middle')
+      .attr('dominant-baseline','middle').attr('fill','rgba(0,0,0,.18)')
+      .attr('font-family','Outfit,sans-serif').attr('font-size',11)
+      .text('Gradient history — press Play to begin');
+  }
+  document.getElementById('stat-step').textContent='0';
+  document.getElementById('stat-epoch').textContent='1';
+}
+
+// ── Event wiring ───────────────────────────────────────────────────
 document.getElementById('tab-bar').addEventListener('click',function(e){
   var btn=e.target.closest('button');
   if(!btn||!btn.dataset.tab) return;
@@ -776,7 +1211,6 @@ document.getElementById('tab-bar').addEventListener('click',function(e){
   document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
 });
 
-/* Key Concepts collapse */
 document.getElementById('concepts-toggle').addEventListener('click',function(){
   var body=document.getElementById('concepts-body');
   var arrow=document.getElementById('concepts-arrow');
@@ -784,41 +1218,54 @@ document.getElementById('concepts-toggle').addEventListener('click',function(){
   arrow.textContent=body.classList.contains('collapsed')?'▸':'▾';
 });
 
-/* Depth selector */
 document.getElementById('depth-selector').addEventListener('click',function(e){
   var btn=e.target.closest('.sel-btn');
   if(!btn) return;
   document.querySelectorAll('#depth-selector .sel-btn').forEach(function(b){b.classList.remove('active');});
   btn.classList.add('active');
+  doReset();
 });
 
-/* Activation selector */
 document.getElementById('act-selector').addEventListener('click',function(e){
   var btn=e.target.closest('.sel-btn');
   if(!btn) return;
   document.querySelectorAll('#act-selector .sel-btn').forEach(function(b){b.classList.remove('active');});
   btn.classList.add('active');
-  /* Update activation annotation */
   var msgs={
     sigmoid:'Sigmoid max derivative ≈ 0.25 — each layer multiplies the gradient by at most 0.25. After 6 layers: 0.25⁶ ≈ 0.00024.',
-    tanh:'Tanh max derivative = 1.0, but typical inputs give derivatives of ~0.4. After 6 layers: 0.4⁶ ≈ 0.004. Better than sigmoid, still problematic.',
-    relu:'ReLU derivative = 1 for positive inputs, 0 for negative. Positive-side gradients flow unchanged — no vanishing. Risk: dead neurons if all inputs negative.',
-    lrelu:'Leaky ReLU derivative = 1 for x>0, α (e.g. 0.01) for x≤0. Prevents dead neurons while keeping near-unit gradients.'
+    tanh:'Tanh max derivative = 1.0, but typical inputs give ~0.4. After 6 layers: 0.4⁶ ≈ 0.004. Better than sigmoid, still problematic.',
+    relu:'ReLU derivative = 1 for positive inputs, 0 for negative. Gradients flow unchanged — no vanishing for active neurons.',
+    lrelu:'Leaky ReLU derivative = 1 (x>0) or 0.01 (x≤0). Prevents dead neurons while keeping near-unit gradients.'
   };
-  var el=document.getElementById('act-anno');
-  if(el) el.textContent=msgs[btn.dataset.act]||'';
+  var annoEl=document.getElementById('act-anno');
+  if(annoEl) annoEl.textContent=msgs[btn.dataset.act]||'';
+  doReset();
 });
 
-/* Slider label updates */
 document.getElementById('sld-wscale').addEventListener('input',function(){
   document.getElementById('val-wscale').textContent=(+this.value).toFixed(2);
 });
+document.getElementById('sld-wscale').addEventListener('change',doReset);
+
 document.getElementById('sld-lr').addEventListener('input',function(){
   document.getElementById('val-lr').textContent=(+this.value).toFixed(3);
 });
+
 document.getElementById('sld-speed').addEventListener('input',function(){
   document.getElementById('val-speed').textContent=['Slow','Med','Fast'][+this.value];
+  if(playing){stopPlay();startPlay();}
 });
+
+document.getElementById('btn-play').addEventListener('click',function(){
+  if(playing) stopPlay(); else startPlay();
+});
+document.getElementById('btn-step').addEventListener('click',function(){
+  stopPlay(); doStep();
+});
+document.getElementById('btn-reset').addEventListener('click',doReset);
+
+// ── Boot ───────────────────────────────────────────────────────────
+doReset();
 
 })();
 </script>
