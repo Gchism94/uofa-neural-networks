@@ -1682,27 +1682,38 @@ function computeArchShapes(){
   var p=padMode==='same'?Math.floor(K/2):0;
   var s1=Math.max(1,Math.floor((8+2*p-K)/S)+1);
   var p1=Math.max(1,Math.floor((s1-2)/2)+1);
-  var s2=Math.max(0,p1-2);
-  var flatN=Math.max(1,s2*s2*16);
+  // p1-2 can go negative/zero when K=5 and the pooled map is smaller than Conv2's 3×3 kernel
+  var s2raw=p1-2;
+  var s2=Math.max(1,s2raw);            // clamp: always at least 1×1
+  var tooSmall=(s2raw<1);              // flag for annotation warning
+  var flatN=s2*s2*16;                  // >= 16 always
+
+  var conv2Info='Conv 3×3, 16 filters, stride 1, no pad. Detects complex combinations. Params: 3×3×8×16+16='+(3*3*8*16+16)+'.';
+  if(tooSmall){
+    conv2Info='⚠ Pool1 output ('+p1+'×'+p1+') is smaller than the 3×3 Conv2 kernel. '+
+              'In practice you would use padding or a smaller kernel here. '+
+              'Showing minimum 1×1×16 output.';
+  }
+
   return [
     {id:'input',lbl:'Input',  shape:[8,8,1],    type:'input',
      info:'Raw pixel input — 8×8 image, 1 channel. Each value is one pixel intensity in [0, 1].'},
     {id:'conv1',lbl:'Conv1',  shape:[s1,s1,8],  type:'conv',
-     info:'Conv '+K+'×'+K+', 8 filters, stride '+S+(p>0?', pad '+p:'')+'. Detects simple patterns. Params: '+K+'×'+K+'×1×8 + 8 = '+(K*K*8+8)+'.'},
+     info:'Conv '+K+'×'+K+', 8 filters, stride '+S+(p>0?', pad '+p:'')+
+          '. Detects simple patterns. Params: '+K+'×'+K+'×1×8+8='+(K*K*8+8)+'.'},
     {id:'relu1',lbl:'ReLU',   shape:[s1,s1,8],  type:'relu',
-     info:'ReLU: max(0, x) — zeros out negative activations, introduces nonlinearity. Shape unchanged: '+s1+'×'+s1+'×8.'},
+     info:'ReLU: max(0, x) — zeros negative activations, introduces nonlinearity. Shape: '+s1+'×'+s1+'×8.'},
     {id:'pool1',lbl:'Pool1',  shape:[p1,p1,8],  type:'pool',
-     info:'MaxPool 2×2, stride 2 — takes the max of each 2×2 region. No parameters. Halves spatial size: '+s1+'→'+p1+'. Builds translation invariance.'},
-    {id:'conv2',lbl:'Conv2',  shape:[s2,s2,16], type:'conv',
-     info:'Conv 3×3, 16 filters, stride 1, no pad. Detects complex combinations. Params: 3×3×8×16 + 16 = '+(3*3*8*16+16)+'.'},
+     info:'MaxPool 2×2, stride 2 — takes the max of each 2×2 region. Halves spatial size: '+s1+'→'+p1+'. No parameters.'},
+    {id:'conv2',lbl:'Conv2',  shape:[s2,s2,16], type:'conv',  info:conv2Info},
     {id:'relu2',lbl:'ReLU',   shape:[s2,s2,16], type:'relu',
-     info:'Second ReLU — zeros negative values in Conv2 output. Shape unchanged: '+s2+'×'+s2+'×16.'},
+     info:'Second ReLU — zeros negative values in Conv2 output. Shape: '+s2+'×'+s2+'×16.'},
     {id:'flat', lbl:'Flatten',shape:[flatN],     type:'flat',
-     info:'Flattens '+s2+'×'+s2+'×16 = '+flatN+' values into a 1D vector. No parameters. Required before the FC layer.'},
+     info:'Flattens '+s2+'×'+s2+'×16 = '+flatN+' values into a 1D vector. Required before the FC layer.'},
     {id:'fc',   lbl:'FC',     shape:[10],        type:'fc',
-     info:'Fully-connected, 10 outputs. Every input value has a separate weight. Params: '+flatN+'×10 + 10 = '+(flatN*10+10)+'.'},
+     info:'Fully-connected, 10 outputs. Params: '+flatN+'×10+10='+(flatN*10+10)+'.'},
     {id:'out',  lbl:'Output', shape:[10],        type:'output',
-     info:'Softmax — converts 10 raw scores into probabilities summing to 1. One probability per class.'}
+     info:'Softmax — converts 10 raw scores into probabilities summing to 1. One per class.'}
   ];
 }
 
@@ -1819,6 +1830,22 @@ function renderArch(){
   if(fEl) fEl.innerHTML='out = ⌊(in + 2·pad − kernel) / stride⌋ + 1<br>'+
     'Current: ⌊(8 + '+2*p+' − '+K+') / '+S+'⌋ + 1 = <strong>'+
     Math.max(1,Math.floor((8+2*p-K)/S)+1)+'</strong>';
+
+  // Arch annotation — warn when Pool1 output is too small for Conv2
+  var annoEl=document.getElementById('arch-anno');
+  if(annoEl){
+    var conv2Layer=layers[4];
+    var isTooSmall=conv2Layer.info.charAt(0)==='⚠';
+    if(isTooSmall){
+      annoEl.textContent='⚠ With '+K+'×'+K+' filters and stride '+S+
+        ', Pool1 output is too small for the 3×3 Conv2 kernel. '+
+        'Conv2 shows minimum 1×1×16. Try "Same" padding or switch to 3×3 kernel.';
+      annoEl.className='anno-box warn';
+    } else {
+      annoEl.textContent='Click any layer block to see its role, shape, and parameter count.';
+      annoEl.className='anno-box neutral';
+    }
+  }
 }
 
 // ── Export pool + arch to window so Stage 2 handlers can reach them ─
