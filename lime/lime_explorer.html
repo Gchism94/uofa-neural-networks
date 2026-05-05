@@ -264,9 +264,20 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 .lime-step-card{
   display:flex;gap:.75rem;align-items:flex-start;
   background:var(--cream);border:1.5px solid var(--border-lt);
-  border-radius:8px;padding:.7rem .8rem;
+  border-radius:8px;padding:.7rem .8rem;transition:border-color .15s,box-shadow .15s;
 }
 .lime-step-card:hover{border-color:var(--g-lt);box-shadow:0 1px 5px var(--shadow)}
+.lime-step-card.step-active{border-color:var(--g-mid);box-shadow:0 0 0 2px var(--g-pale),0 2px 8px var(--shadow);background:white}
+
+/* ── Prediction breakdown (Tab 2) ────────────────────────────────── */
+.pred-breakdown{background:var(--cream-mid);border:1px solid var(--border-lt);border-radius:6px;padding:.5rem .65rem;margin-top:.5rem}
+.pred-lbl{font-size:.64rem;color:var(--text-muted);margin-bottom:.2rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+.pred-eq{font-family:'IBM Plex Mono',monospace;font-size:.71rem;line-height:1.8;overflow-x:auto;white-space:nowrap}
+.pred-term{font-weight:700}
+
+/* ── Step Through button ─────────────────────────────────────────── */
+.step-btn{font-family:'Outfit',sans-serif;font-size:.78rem;font-weight:600;padding:.3rem .85rem;border-radius:6px;cursor:pointer;border:1.5px solid var(--g-mid);background:var(--g-pale);color:var(--g-dk);transition:all .12s}
+.step-btn:hover{background:var(--g-mid);color:white}
 .lime-step-num{
   flex-shrink:0;width:26px;height:26px;border-radius:50%;
   background:var(--g-mid);color:white;font-family:'Outfit',sans-serif;
@@ -456,11 +467,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
         Key Concepts <span id="concepts-arrow">▾</span>
       </div>
       <div class="concepts-body" id="concepts-body">
-        <div class="concepts-item"><strong>What LIME is:</strong> LIME (Local Interpretable Model-Agnostic Explanations) explains any black-box classifier by fitting a simple linear model around a specific point of interest — the local behavior of a complex model is often much simpler than its global behavior.</div>
-        <div class="concepts-item"><strong>Local linearity:</strong> even if a neural network draws a highly curved decision boundary globally, the boundary near one specific point can be well-approximated by a straight line. LIME exploits this by explaining the local behavior only.</div>
-        <div class="concepts-item"><strong>Neighborhood radius:</strong> controls how far from the selected point LIME samples neighbors. Smaller radius → explanation is very local and may not generalize. Larger radius → smoother but less precise explanation.</div>
-        <div class="concepts-item"><strong>Model-agnostic:</strong> LIME only requires the ability to query the model for predictions — it never looks inside the model. The same algorithm explains neural networks, random forests, SVMs, or any other classifier.</div>
-        <div class="concepts-item"><strong>Feature weights:</strong> positive weight for feature xᵢ means increasing xᵢ pushes the prediction toward class 1; negative weight means increasing xᵢ pushes toward class 0. Larger magnitude = stronger influence.</div>
+        <div class="concepts-item"><strong>What is LIME?</strong> LIME fits a simple interpretable model (linear) locally around a prediction — it explains what the complex model is doing near that specific point, not globally.</div>
+        <div class="concepts-item"><strong>Local linearity:</strong> complex models are often locally linear — zoom in far enough and any smooth boundary looks like a line. LIME exploits this by fitting a line only in the small neighborhood of interest.</div>
+        <div class="concepts-item"><strong>Neighborhood radius:</strong> too small = too few neighbors, noisy explanation. Too large = the linear approximation poorly captures the nonlinear boundary. Tune for your problem.</div>
+        <div class="concepts-item"><strong>Model-agnostic:</strong> LIME only needs predict(x) — it works on any black-box model: neural nets, random forests, SVMs, even remote APIs. It never looks inside the model.</div>
+        <div class="concepts-item"><strong>Interpreting weights:</strong> positive weight = feature pushes toward class 1. Negative weight = feature pushes toward class 0. Magnitude = strength of influence at this specific point.</div>
       </div>
     </div>
 
@@ -548,8 +559,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 
         </div><!-- end fi-panels -->
 
+        <!-- Prediction decomposition -->
+        <div id="pred-breakdown"></div>
+
         <!-- Feature importance annotation -->
-        <div class="anno-box neutral" id="fi-anno" style="margin-top:.6rem;font-size:.75rem">
+        <div class="anno-box neutral" id="fi-anno" style="margin-top:.5rem;font-size:.75rem">
           Select a point on the Decision Boundary tab, then switch here to see the LIME feature importance explanation.
         </div>
       </div>
@@ -558,7 +572,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     <!-- ─ Tab 3: How LIME Works ───────────────────────────────────────── -->
     <div class="tab-panel" id="panel-howlime">
       <div class="card">
-        <div class="plot-label">How LIME Works — 5-step algorithm</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
+          <div class="plot-label" style="margin-bottom:0">How LIME Works — 5-step algorithm</div>
+          <button id="btn-step-through" class="step-btn">▶ Step Through</button>
+        </div>
 
         <div class="lime-steps">
 
@@ -1101,6 +1118,7 @@ function onSVGClick(x,y){
   var N=+document.getElementById('sld-samples').value;
   limeResult=runLIME(x,y,r,N);
   updateOverlay(); updatePanel(); updateAnno();
+  updateTab2(); updateTab3();
 }
 
 // ── Full reset ─────────────────────────────────────────────────────
@@ -1111,7 +1129,9 @@ function doReset(){
   dsName=dBtn?dBtn.dataset.ds:'moons';
   selectedPt=null; limeResult=null;
   trainData=generateData(dsName);
+  exampleLR=runLIME(0.5,0.2,0.35,100); // fixed example for step illustrations
   renderBoundary(); updatePanel(); updateAnno();
+  updateTab2(); updateTab3();
   var mdL={nn:'Neural Net',rf:'Random Forest',svm:'SVM'};
   var dsL={moons:'Moons',circles:'Circles',blobs:'Blobs'};
   var lEl=document.getElementById('boundary-label');
@@ -1169,7 +1189,305 @@ document.getElementById('btn-explain').addEventListener('click',function(){
 document.getElementById('btn-clear').addEventListener('click',function(){
   selectedPt=null; limeResult=null;
   updateOverlay(); updatePanel(); updateAnno();
+  updateTab2(); updateTab3();
 });
+
+// ─────────────────────────────────────────────────────────────────
+// ── STAGE 3: Feature Importance + How LIME Works ──────────────────
+// ─────────────────────────────────────────────────────────────────
+
+var exampleLR=null, stepTimer=null, activeStep=0;
+
+// ── Tab 2: Mini decision boundary ─────────────────────────────────
+function renderFIMiniMap(){
+  var svgEl=document.getElementById('svg-fi-boundary');
+  if(!svgEl) return;
+  var bcr=svgEl.getBoundingClientRect();
+  var W=Math.max(140,bcr.width||220), H=W;
+  var lx=d3.scaleLinear().domain([-DR,DR]).range([0,W]);
+  var ly=d3.scaleLinear().domain([-DR,DR]).range([H,0]);
+  var GN2=13, s2=W/GN2;
+  var svg=d3.select(svgEl);
+  svg.selectAll('*').remove();
+  svg.attr('viewBox','0 0 '+W+' '+H).attr('height',H).attr('width','100%')
+     .attr('preserveAspectRatio','xMidYMid meet');
+  svg.append('rect').attr('width',W).attr('height',H).attr('fill','#FDFAF5');
+  var bg=svg.append('g');
+  for(var row=0;row<GN2;row++){
+    for(var col=0;col<GN2;col++){
+      var px=lx.invert(col*s2+s2*.5),py=ly.invert(row*s2+s2*.5);
+      bg.append('rect').attr('x',col*s2).attr('y',row*s2)
+        .attr('width',s2+1).attr('height',s2+1).attr('fill',bgColor(predict(px,py)));
+    }
+  }
+  trainData.forEach(function(d){
+    svg.append('circle').attr('cx',lx(d.x)).attr('cy',ly(d.y)).attr('r',3)
+      .attr('fill',d.label===0?'#1A56A0':'#E8630A')
+      .attr('stroke','#fff').attr('stroke-width',.8).attr('opacity',.85);
+  });
+  if(!limeResult){
+    svg.append('text').attr('x',W/2).attr('y',H*.48).attr('text-anchor','middle')
+      .attr('dominant-baseline','middle').attr('fill','rgba(0,0,0,.22)')
+      .attr('font-family','Outfit,sans-serif').attr('font-size',Math.round(W*.044))
+      .text('Click Tab 1 to select a point');
+    return;
+  }
+  var lr=limeResult,r=+document.getElementById('sld-radius').value;
+  var rPx=lx(lr.x0+r)-lx(lr.x0);
+  svg.append('circle').attr('cx',lx(lr.x0)).attr('cy',ly(lr.y0)).attr('r',rPx)
+    .attr('fill','none').attr('stroke','#2D5A1B').attr('stroke-width',1.5)
+    .attr('stroke-dasharray','4,2').attr('opacity',.85);
+  lr.samples.forEach(function(s){
+    svg.append('circle').attr('cx',lx(s.x)).attr('cy',ly(s.y)).attr('r',1.8)
+      .attr('fill',s.p>0.5?'#E8630A':'#1A56A0').attr('opacity',.45);
+  });
+  var ln=boundaryLine(lr.w0,lr.w1,lr.w2);
+  if(ln){
+    svg.append('line').attr('x1',lx(ln[0].x)).attr('y1',ly(ln[0].y))
+      .attr('x2',lx(ln[1].x)).attr('y2',ly(ln[1].y))
+      .attr('stroke','white').attr('stroke-width',2).attr('stroke-dasharray','6,3').attr('opacity',.9);
+  }
+  svg.append('path').attr('d',starPath(lx(lr.x0),ly(lr.y0),8,3,5))
+    .attr('fill','#FFD700').attr('stroke','#333').attr('stroke-width',.8);
+}
+
+// ── Tab 2: Feature weight bar chart ───────────────────────────────
+function renderFIBars(){
+  var svgEl=document.getElementById('svg-fi-bars');
+  if(!svgEl) return;
+  var bcr=svgEl.getBoundingClientRect();
+  var W=Math.max(180,bcr.width||280),H=200;
+  var svg=d3.select(svgEl);
+  svg.selectAll('*').remove();
+  svg.attr('viewBox','0 0 '+W+' '+H).attr('height',H).attr('width','100%');
+  svg.append('rect').attr('width',W).attr('height',H).attr('fill','#FDFAF5');
+  if(!limeResult){
+    svg.append('text').attr('x',W/2).attr('y',H*.44).attr('text-anchor','middle')
+      .attr('dominant-baseline','middle').attr('fill','rgba(0,0,0,.2)')
+      .attr('font-family','Outfit,sans-serif').attr('font-size',11)
+      .text('Click a point on the Decision Boundary tab');
+    svg.append('text').attr('x',W/2).attr('y',H*.58).attr('text-anchor','middle')
+      .attr('fill','rgba(0,0,0,.13)').attr('font-family','Outfit,sans-serif').attr('font-size',9)
+      .text('to generate feature weights');
+    return;
+  }
+  var lr=limeResult;
+  var P={t:32,r:70,b:22,l:96},iw=W-P.l-P.r,ih=H-P.t-P.b;
+  var g=svg.append('g').attr('transform','translate('+P.l+','+P.t+')');
+  var rows=[{lbl:'Intercept w₀',val:lr.w0},{lbl:'x₁ weight',val:lr.w1},{lbl:'x₂ weight',val:lr.w2}];
+  var maxA=Math.max(d3.max(rows.map(function(r){return Math.abs(r.val);})),0.001);
+  var barH=Math.floor((ih-8)/rows.length), cx=iw*.44;
+  g.append('text').attr('x',cx*.25).attr('y',-16).attr('text-anchor','middle')
+   .attr('font-size',8).attr('fill','#1A56A0').attr('font-family','Outfit,sans-serif')
+   .attr('font-weight','600').text('← Class 0');
+  g.append('text').attr('x',cx+(iw-cx)*.7).attr('y',-16).attr('text-anchor','middle')
+   .attr('font-size',8).attr('fill','#E8630A').attr('font-family','Outfit,sans-serif')
+   .attr('font-weight','600').text('Class 1 →');
+  g.append('line').attr('x1',cx).attr('y1',-6).attr('x2',cx).attr('y2',ih+2)
+   .attr('stroke','#C8BE9A').attr('stroke-width',1).attr('stroke-dasharray','3,2');
+  g.append('text').attr('x',cx).attr('y',-9).attr('text-anchor','middle')
+   .attr('font-size',7.5).attr('fill','#AAA').attr('font-family','IBM Plex Mono,monospace').text('0');
+  rows.forEach(function(row,i){
+    var y0=i*(barH+4)+2;
+    var bLen=Math.max(2,Math.abs(row.val)/maxA*cx*.9);
+    var bCol=row.val>=0?'#2D5A1B':'#B0321D';
+    g.append('text').attr('x',cx-8).attr('y',y0+barH/2)
+     .attr('text-anchor','end').attr('dominant-baseline','middle')
+     .attr('font-family','IBM Plex Mono,monospace').attr('font-size',10.5)
+     .attr('fill','#555').text(row.lbl);
+    g.append('rect').attr('x',0).attr('y',y0).attr('width',iw).attr('height',barH)
+     .attr('rx',3).attr('fill','#F0EDE5');
+    var bx=row.val>=0?cx:cx-bLen;
+    g.append('rect').attr('x',bx).attr('y',y0+1).attr('width',bLen).attr('height',barH-2)
+     .attr('rx',3).attr('fill',bCol).attr('opacity',.88);
+    var valX=row.val>=0?cx+bLen+4:cx-bLen-4;
+    g.append('text').attr('x',valX).attr('y',y0+barH/2)
+     .attr('text-anchor',row.val>=0?'start':'end').attr('dominant-baseline','middle')
+     .attr('font-family','IBM Plex Mono,monospace').attr('font-size',10)
+     .attr('font-weight','600').attr('fill',bCol)
+     .text((row.val>=0?'+':'')+row.val.toFixed(3));
+  });
+  g.append('text').attr('x',iw/2).attr('y',ih+16).attr('text-anchor','middle')
+   .attr('font-size',8.5).attr('fill','#999').attr('font-family','Outfit,sans-serif')
+   .text('LIME Feature Weights — how each feature pushes the prediction');
+}
+
+// ── Tab 2: Prediction decomposition ───────────────────────────────
+function renderPredBreakdown(){
+  var el=document.getElementById('pred-breakdown');
+  if(!el) return;
+  if(!limeResult){el.innerHTML=''; return;}
+  var lr=limeResult,w1x=lr.w1*lr.x0,w2y=lr.w2*lr.y0,total=lr.w0+w1x+w2y;
+  function c(v){return v>=0?'#2D5A1B':'#B0321D';}
+  function f(v,plus){return (plus&&v>=0?'+':'')+v.toFixed(3);}
+  el.innerHTML=
+    '<div class="pred-breakdown">'+
+      '<div class="pred-lbl">Prediction decomposition</div>'+
+      '<div class="pred-eq">'+
+        'p ≈ <span class="pred-term" style="color:'+c(lr.w0)+'">'+f(lr.w0)+'</span>'+
+        ' + <span class="pred-term" style="color:'+c(lr.w1)+'">'+f(lr.w1)+'</span>·('+lr.x0.toFixed(2)+')'+
+        ' + <span class="pred-term" style="color:'+c(lr.w2)+'">'+f(lr.w2)+'</span>·('+lr.y0.toFixed(2)+')'+
+      '</div>'+
+      '<div class="pred-eq" style="margin-top:.08rem">'+
+        '  = <span class="pred-term" style="color:'+c(lr.w0)+'">'+f(lr.w0)+'</span>'+
+        ' + <span class="pred-term" style="color:'+c(w1x)+'">'+f(w1x,true)+'</span>'+
+        ' + <span class="pred-term" style="color:'+c(w2y)+'">'+f(w2y,true)+'</span>'+
+      '</div>'+
+      '<div class="pred-eq" style="margin-top:.08rem;font-weight:600">'+
+        '  = <span style="color:'+(total>0.5?'#E8630A':'#1A56A0')+'">'+total.toFixed(3)+'</span>'+
+        ' → <span class="class-badge '+(lr.predClass===0?'c0':'c1')+'" style="font-size:.67rem">Class '+lr.predClass+'</span>'+
+        ' <span style="color:#888;font-weight:400">('+Math.round(lr.conf*100)+'% confidence)</span>'+
+      '</div>'+
+    '</div>';
+}
+
+// ── Tab 2 full update ──────────────────────────────────────────────
+function updateTab2(){
+  renderFIMiniMap(); renderFIBars(); renderPredBreakdown();
+  var el=document.getElementById('fi-anno');
+  if(!el) return;
+  if(!limeResult){
+    el.textContent='Click a point on the Decision Boundary tab to generate feature weights.';
+    el.className='anno-box neutral';
+  } else {
+    var lr=limeResult;
+    var dom=Math.abs(lr.w1)>=Math.abs(lr.w2)?'x₁':'x₂';
+    el.textContent=dom+' has the strongest influence (w₁='+lr.w1.toFixed(3)+', w₂='+lr.w2.toFixed(3)+'). '+
+      'Local R²='+lr.r2.toFixed(2)+(lr.r2<0.5?' — try reducing radius for a better fit.':'.');
+    el.className='anno-box '+(lr.r2>0.65?'good':'neutral');
+  }
+}
+
+// ── Tab 3: Step illustrations ──────────────────────────────────────
+function drawStepIllus(svgId,stepN){
+  var svgEl=document.getElementById(svgId);
+  if(!svgEl) return;
+  var bcr=svgEl.getBoundingClientRect();
+  var W=Math.max(120,bcr.width||300),H=72;
+  var xr=[-2.5,2.5],yr=[-1.8,1.8];
+  var lx=d3.scaleLinear().domain(xr).range([8,W-8]);
+  var ly=d3.scaleLinear().domain(yr).range([H-8,8]);
+  var svg=d3.select(svgEl);
+  svg.selectAll('*').remove();
+  svg.attr('viewBox','0 0 '+W+' '+H).attr('height',H).attr('width','100%');
+  svg.append('rect').attr('width',W).attr('height',H).attr('fill','#FDFAF5');
+  var lr=limeResult||exampleLR;
+  var x0=lr?lr.x0:0.4,y0=lr?lr.y0:0.15;
+  var r=lr?+document.getElementById('sld-radius').value:0.35;
+  var rPx=lx(x0+r)-lx(x0);
+  if(stepN<=4){
+    svg.append('rect').attr('x',0).attr('y',0).attr('width',W*.5).attr('height',H)
+      .attr('fill','#d8e9f5').attr('opacity',.4);
+    svg.append('rect').attr('x',W*.5).attr('y',0).attr('width',W*.5).attr('height',H)
+      .attr('fill','#fde8d8').attr('opacity',.4);
+    trainData.slice(0,30).forEach(function(d){
+      svg.append('circle').attr('cx',lx(d.x)).attr('cy',ly(d.y)).attr('r',1.8)
+        .attr('fill',d.label===0?'#1A56A0':'#E8630A')
+        .attr('stroke','#fff').attr('stroke-width',.4).attr('opacity',.7);
+    });
+  }
+  if(stepN===1){
+    svg.append('path').attr('d',starPath(lx(x0),ly(y0),7,3,5))
+      .attr('fill','#FFD700').attr('stroke','#333').attr('stroke-width',1);
+  }
+  if(stepN>=2&&stepN<=4){
+    svg.append('circle').attr('cx',lx(x0)).attr('cy',ly(y0)).attr('r',rPx)
+      .attr('fill','rgba(45,90,27,.07)').attr('stroke','#2D5A1B')
+      .attr('stroke-width',1.4).attr('stroke-dasharray','4,2');
+    var samps=lr&&lr.samples?lr.samples.slice(0,50):[];
+    var maxW2=samps.length?d3.max(samps.map(function(s){return s.w;}))||1:1;
+    if(samps.length){
+      samps.forEach(function(s){
+        var sz=stepN===3?Math.max(1.5,(s.w/maxW2)*3.8):2;
+        var op=stepN===3?0.28+(s.w/maxW2)*.65:0.5;
+        svg.append('circle').attr('cx',lx(s.x)).attr('cy',ly(s.y)).attr('r',sz)
+          .attr('fill',s.p>0.5?'#E8630A':'#1A56A0').attr('opacity',op);
+      });
+    } else {
+      for(var i=0;i<18;i++){
+        var ang=i*Math.PI/9,dist=r*.7;
+        svg.append('circle').attr('cx',lx(x0+Math.cos(ang)*dist)).attr('cy',ly(y0+Math.sin(ang)*dist))
+          .attr('r',stepN===3?1.5+i*.04:2).attr('fill','#7B3FC4')
+          .attr('opacity',stepN===3?0.3+i*.025:0.48);
+      }
+    }
+    svg.append('path').attr('d',starPath(lx(x0),ly(y0),7,3,5))
+      .attr('fill','#FFD700').attr('stroke','#333').attr('stroke-width',1);
+  }
+  if(stepN===4){
+    var ln=lr?boundaryLine(lr.w0,lr.w1,lr.w2):null;
+    if(ln){
+      svg.append('line').attr('x1',lx(ln[0].x)).attr('y1',ly(ln[0].y))
+        .attr('x2',lx(ln[1].x)).attr('y2',ly(ln[1].y))
+        .attr('stroke','white').attr('stroke-width',2).attr('stroke-dasharray','6,3').attr('opacity',.9);
+    } else {
+      svg.append('line').attr('x1',W*.12).attr('y1',H*.32).attr('x2',W*.88).attr('y2',H*.68)
+        .attr('stroke','white').attr('stroke-width',2).attr('stroke-dasharray','6,3');
+    }
+  }
+  if(stepN===5){
+    var w1v=lr?lr.w1:0.32,w2v=lr?lr.w2:-0.22;
+    var mx=Math.max(Math.abs(w1v),Math.abs(w2v),0.01);
+    var rowH=22,cxB=W*.42,mLen=(W-cxB-16)*.9;
+    svg.append('line').attr('x1',cxB).attr('y1',4).attr('x2',cxB).attr('y2',H-4)
+      .attr('stroke','#C8C0A0').attr('stroke-width',1).attr('stroke-dasharray','3,2');
+    ['x₁','x₂'].forEach(function(lbl,i){
+      var v=i===0?w1v:w2v,bc=v>=0?'#2D5A1B':'#B0321D';
+      var y0b=14+i*(rowH+4),bLen=Math.max(2,Math.abs(v)/mx*mLen*.88);
+      svg.append('rect').attr('x',0).attr('y',y0b).attr('width',W).attr('height',rowH)
+        .attr('rx',2).attr('fill','#F0EDE5');
+      svg.append('rect').attr('x',v>=0?cxB:cxB-bLen).attr('y',y0b+1)
+        .attr('width',bLen).attr('height',rowH-2).attr('rx',2).attr('fill',bc).attr('opacity',.85);
+      svg.append('text').attr('x',cxB-5).attr('y',y0b+rowH/2)
+        .attr('text-anchor','end').attr('dominant-baseline','middle')
+        .attr('font-family','IBM Plex Mono,monospace').attr('font-size',11).attr('fill','#555').text(lbl);
+      svg.append('text').attr('x',v>=0?cxB+bLen+3:cxB-bLen-3).attr('y',y0b+rowH/2)
+        .attr('text-anchor',v>=0?'start':'end').attr('dominant-baseline','middle')
+        .attr('font-family','IBM Plex Mono,monospace').attr('font-size',9.5)
+        .attr('font-weight','600').attr('fill',bc).text((v>=0?'+':'')+v.toFixed(3));
+    });
+  }
+}
+
+function renderAllStepIllus(){
+  for(var i=1;i<=5;i++) drawStepIllus('svg-step'+i,i);
+}
+
+// ── Step Through animation ─────────────────────────────────────────
+function stopStepThrough(){
+  if(stepTimer){clearInterval(stepTimer);stepTimer=null;}
+  activeStep=0;
+  document.querySelectorAll('.lime-step-card').forEach(function(c){c.classList.remove('step-active');});
+  var btn=document.getElementById('btn-step-through');
+  if(btn) btn.textContent='▶ Step Through';
+}
+function startStepThrough(){
+  stopStepThrough();
+  var btn=document.getElementById('btn-step-through');
+  var token={}; stepTimer=token;
+  var count=0;
+  var iv=setInterval(function(){
+    if(stepTimer!==token){clearInterval(iv);return;}
+    count++;
+    activeStep=count;
+    document.querySelectorAll('.lime-step-card').forEach(function(c,i){
+      c.classList.toggle('step-active',i+1===count);
+    });
+    if(btn) btn.textContent='Step '+count+' / 5';
+    if(count>=5){
+      clearInterval(iv);
+      setTimeout(function(){if(stepTimer===token) stopStepThrough();},1200);
+    }
+  },950);
+}
+document.getElementById('btn-step-through').addEventListener('click',function(){
+  if(stepTimer) stopStepThrough(); else startStepThrough();
+});
+
+// ── Tab 3 full update ──────────────────────────────────────────────
+function updateTab3(){
+  renderAllStepIllus();
+}
 
 // ── Boot ───────────────────────────────────────────────────────────
 doReset();

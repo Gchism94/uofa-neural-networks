@@ -181,6 +181,7 @@ Add a row to the appropriate table under `## Contents`:
 - `batch_norm/bn_explorer.html`
 - `convolution/conv_explorer.html`
 - `vanishing_gradients/vg_explorer.html`
+- `lime/lime_explorer.html`
 
 ---
 
