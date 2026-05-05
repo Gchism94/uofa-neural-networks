@@ -968,6 +968,10 @@ function renderBoundary(){
      .attr('width','100%').attr('preserveAspectRatio','xMidYMid meet');
   svg.append('rect').attr('width',SS).attr('height',SS).attr('fill','#FDFAF5');
 
+  // Clip path — keeps neighborhood circle inside the plot area
+  svg.append('defs').append('clipPath').attr('id','lime-plot-clip')
+    .append('rect').attr('width',SS).attr('height',SS);
+
   // Coloured background grid
   var step=SS/GN;
   var bg=svg.append('g');
@@ -1007,7 +1011,10 @@ function renderBoundary(){
 function updateOverlay(){
   var svg=d3.select('#svg-decision');
   svg.select('.lime-ov').remove();
-  var ov=svg.append('g').attr('class','lime-ov');
+  // pointer-events:none so this group never blocks clicks on the transparent overlay rect
+  var ov=svg.append('g').attr('class','lime-ov')
+    .attr('pointer-events','none')
+    .attr('clip-path','url(#lime-plot-clip)');
   if(!limeResult) return;
   var lr=limeResult;
   var r=+document.getElementById('sld-radius').value;
@@ -1146,6 +1153,8 @@ document.getElementById('tab-bar').addEventListener('click',function(e){
   btn.classList.add('active');
   document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('active');});
   document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
+  if(btn.dataset.tab==='importance') updateTab2();
+  if(btn.dataset.tab==='howlime') updateTab3();
 });
 
 document.getElementById('concepts-toggle').addEventListener('click',function(){
@@ -1464,10 +1473,9 @@ function stopStepThrough(){
 function startStepThrough(){
   stopStepThrough();
   var btn=document.getElementById('btn-step-through');
-  var token={}; stepTimer=token;
+  if(btn) btn.textContent='■ Stop';
   var count=0;
-  var iv=setInterval(function(){
-    if(stepTimer!==token){clearInterval(iv);return;}
+  stepTimer=setInterval(function(){
     count++;
     activeStep=count;
     document.querySelectorAll('.lime-step-card').forEach(function(c,i){
@@ -1475,8 +1483,9 @@ function startStepThrough(){
     });
     if(btn) btn.textContent='Step '+count+' / 5';
     if(count>=5){
-      clearInterval(iv);
-      setTimeout(function(){if(stepTimer===token) stopStepThrough();},1200);
+      var saved=stepTimer; stepTimer=null;
+      clearInterval(saved);
+      setTimeout(function(){stopStepThrough();},1200);
     }
   },950);
 }
