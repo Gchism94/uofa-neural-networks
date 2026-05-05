@@ -543,7 +543,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 
       <!-- Gradient magnitude history chart -->
       <div class="card">
-        <div class="plot-label">Gradient magnitude over training steps — earliest vs. latest layers</div>
+        <div class="plot-label">Gradient magnitude over 10 training steps — the gap shows how much less early layers learn</div>
         <svg id="svg-grad-history" style="width:100%;min-height:160px;display:block;border-radius:5px;background:#FDFAF5">
           <rect width="100%" height="160" fill="#FDFAF5"/>
           <text x="50%" y="80" text-anchor="middle" dominant-baseline="middle"
@@ -552,8 +552,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
           </text>
         </svg>
         <div class="legend" style="margin-top:.35rem">
-          <span><span class="legend-dot" style="background:var(--grad-healthy)"></span>Deepest layer (output)</span>
-          <span><span class="legend-dot" style="background:var(--red)"></span>Earliest layer (input)</span>
+          <span><span class="legend-dot" style="background:var(--grad-healthy)"></span>Output layer (≈1.0, seed)</span>
+          <span><span class="legend-dot" style="background:var(--red)"></span>Input layer (varies — shows learning speed)</span>
         </div>
       </div>
     </div><!-- end panel-flow -->
@@ -773,7 +773,7 @@ var activations=[], gradients=[];
 // currentReveal: -1=nothing shown; n-2=only rightmost arrow; 0=all revealed
 var currentReveal=-1;
 var playing=false, timer=null;
-var histSteps=[], histOut=[], histInp=[];
+var trainHistory=null; // {out:[10 values≈1], inp:[10 values, varies]}
 
 // ── Seeded RNG (mulberry32) ─────────────────────────────────────────
 function makeRng(seed){
@@ -815,6 +815,26 @@ function computePasses(){
   for(var l2=n-2;l2>=0;l2--){
     var z2=wScale*activations[l2];
     gradients[l2]=gradients[l2+1]*wScale*actDeriv(z2);
+  }
+}
+
+// ── Pre-compute 10 "training steps" for the history chart ──────────
+function computeTrainHistory(){
+  var n=depth+2;
+  var rngDrift=makeRng(999);
+  var ws=wScale;
+  trainHistory={out:[],inp:[]};
+  for(var t=0;t<10;t++){
+    // Weight scale drifts each step: >1 → grows (exploding), <1 → shrinks (vanishing)
+    var drift=ws>1.05?0.04:ws<0.92?-0.03:0.015*(rngDrift()-0.5);
+    ws=Math.max(0.15,Math.min(4.5, ws*(1+drift)));
+    var rng_t=makeRng(42+t*7);
+    var acts=[0.5+rng_t()*1.0];
+    for(var l=1;l<n;l++) acts.push(actFn(ws*acts[l-1]));
+    var grads=new Array(n); grads[n-1]=1.0;
+    for(var l2=n-2;l2>=0;l2--) grads[l2]=grads[l2+1]*ws*actDeriv(ws*acts[l2]);
+    trainHistory.out.push(1.0);           // output always 1.0
+    trainHistory.inp.push(grads[0]);       // input drifts
   }
 }
 
@@ -1045,61 +1065,93 @@ function updateRightPanel(){
 
 // ── Gradient history line chart ────────────────────────────────────
 function updateHistoryChart(){
-  if(currentReveal===-1) return;
-  var n=depth+2;
-  var step=n-1-currentReveal; // 1-based step count
-  histSteps.push(step);
-  histOut.push(gradients[n-1]);
-  histInp.push(currentReveal===0?gradients[0]:null);
-
-  if(histSteps.length<2) return;
+  // Uses pre-computed trainHistory (10 training steps) — rendered at reset time
+  renderHistoryChart();
+}
+function renderHistoryChart(){
+  if(!trainHistory||!trainHistory.out.length) return;
   var svgEl=document.getElementById('svg-grad-history');
   if(!svgEl) return;
 
   var W=svgEl.getBoundingClientRect().width||500, H=160;
-  var P={t:18,r:14,b:28,l:46}, iw=W-P.l-P.r, ih=H-P.t-P.b;
+  var P={t:22,r:32,b:28,l:46}, iw=W-P.l-P.r, ih=H-P.t-P.b;
+  var N=trainHistory.out.length; // 10
+  var steps=d3.range(1,N+1);
+
   var svg=d3.select(svgEl);
   svg.selectAll('*').remove();
   svg.attr('viewBox','0 0 '+W+' '+H).attr('height',H).attr('width','100%');
   svg.append('rect').attr('width',W).attr('height',H).attr('fill','#FDFAF5');
   var g=svg.append('g').attr('transform','translate('+P.l+','+P.t+')');
 
-  var allVals=histOut.concat(histInp.filter(function(v){return v!==null;}));
-  var yMax=Math.max(d3.max(allVals)||1,0.001);
-  var yMin=Math.max(d3.min(allVals.filter(function(v){return v>0;}))||0.0001,1e-9);
-  var useLog=yMax/yMin>50;
-  var xSc=d3.scaleLinear().domain([1,Math.max(histSteps.length,2)]).range([0,iw]);
+  var allVals=trainHistory.out.concat(trainHistory.inp).filter(function(v){return v>0;});
+  var yMax=Math.max(d3.max(allVals)||1, 0.01);
+  var yMin=Math.max(d3.min(allVals)||0.0001, 1e-9);
+  var useLog=yMax/yMin>30;
+  var xSc=d3.scaleLinear().domain([1,N]).range([0,iw]);
   var ySc=useLog
-    ?d3.scaleLog().domain([yMin*0.5,yMax*2]).range([ih,0]).clamp(true)
-    :d3.scaleLinear().domain([0,yMax*1.15]).range([ih,0]);
+    ?d3.scaleLog().domain([Math.max(yMin*0.4,1e-9),yMax*2.5]).range([ih,0]).clamp(true)
+    :d3.scaleLinear().domain([0,yMax*1.25]).range([ih,0]);
 
   g.append('g').attr('transform','translate(0,'+ih+')')
-   .call(d3.axisBottom(xSc).ticks(4).tickSize(-ih).tickFormat(''))
-   .call(function(a){a.select('.domain').remove();a.selectAll('line').attr('stroke','#EFEFEF');});
+   .call(d3.axisBottom(xSc).ticks(5).tickSize(-ih).tickFormat(''))
+   .call(function(a){a.select('.domain').remove();a.selectAll('line').attr('stroke','#F0F0F0');});
   g.append('g').call(d3.axisLeft(ySc).ticks(4).tickSize(-iw).tickFormat(''))
-   .call(function(a){a.select('.domain').remove();a.selectAll('line').attr('stroke','#EFEFEF');});
+   .call(function(a){a.select('.domain').remove();a.selectAll('line').attr('stroke','#F0F0F0');});
   g.append('g').attr('transform','translate(0,'+ih+')')
-   .call(d3.axisBottom(xSc).ticks(4))
+   .call(d3.axisBottom(xSc).ticks(5))
    .call(function(a){a.select('.domain').attr('stroke','#CCC');
      a.selectAll('text').attr('font-size',8).attr('fill','#888');});
   g.append('g').call(d3.axisLeft(ySc).ticks(4))
    .call(function(a){a.select('.domain').attr('stroke','#CCC');
      a.selectAll('text').attr('font-size',8).attr('fill','#888');});
 
-  var lineFn=d3.line()
-    .x(function(_,i){return xSc(histSteps[i]);})
-    .y(function(d){return ySc(Math.max(d,1e-10));})
-    .defined(function(d){return d!==null&&d>0;})
+  var lineFnOut=d3.line().x(function(_,i){return xSc(steps[i]);})
+    .y(function(d){return ySc(Math.max(d,1e-10));}).curve(d3.curveMonotoneX);
+  var lineFnInp=d3.line().x(function(_,i){return xSc(steps[i]);})
+    .y(function(d){return ySc(Math.max(d,1e-10));}).defined(function(d){return d>0;})
     .curve(d3.curveMonotoneX);
 
-  g.append('path').datum(histOut).attr('fill','none')
-   .attr('stroke','#2e7d32').attr('stroke-width',2).attr('d',lineFn);
-  if(histInp.some(function(v){return v!==null;})){
-    g.append('path').datum(histInp).attr('fill','none')
-     .attr('stroke','#B0321D').attr('stroke-width',2).attr('d',lineFn);
+  // Shaded gap area between the two lines
+  var inpColor=gCol(trainHistory.inp[N-1]);
+  var areaFn=d3.area().x(function(_,i){return xSc(steps[i]);})
+    .y0(function(d){return ySc(Math.max(d,1e-10));})
+    .y1(function(_,i){return ySc(Math.max(trainHistory.inp[i],1e-10));})
+    .defined(function(d,i){return trainHistory.inp[i]>0;})
+    .curve(d3.curveMonotoneX);
+  g.append('path').datum(trainHistory.out)
+   .attr('fill',inpColor).attr('opacity',0.09).attr('d',areaFn);
+
+  // Output line (green, always ≈1.0)
+  g.append('path').datum(trainHistory.out).attr('fill','none')
+   .attr('stroke','#2e7d32').attr('stroke-width',2).attr('d',lineFnOut);
+  g.append('text').attr('x',xSc(N)+3).attr('y',ySc(1.0)+3)
+   .attr('font-size',7.5).attr('fill','#2e7d32').attr('font-family','Outfit,sans-serif')
+   .text('Output');
+
+  // Input line (colored by health)
+  g.append('path').datum(trainHistory.inp).attr('fill','none')
+   .attr('stroke',inpColor).attr('stroke-width',2).attr('d',lineFnInp);
+  g.append('text').attr('x',xSc(N)+3).attr('y',ySc(Math.max(trainHistory.inp[N-1],1e-10))+3)
+   .attr('font-size',7.5).attr('fill',inpColor).attr('font-family','Outfit,sans-serif')
+   .text('Input');
+
+  // Gap annotation at last step
+  var yOut=ySc(1.0), yInp=ySc(Math.max(trainHistory.inp[N-1],1e-9));
+  var gapMid=(yOut+yInp)/2;
+  if(Math.abs(yInp-yOut)>12){
+    var bx=xSc(N)-22;
+    g.append('line').attr('x1',bx).attr('y1',yOut).attr('x2',bx).attr('y2',yInp)
+     .attr('stroke','#AAA').attr('stroke-width',1).attr('stroke-dasharray','2,2');
+    g.append('text').attr('x',bx-3).attr('y',gapMid).attr('text-anchor','end')
+     .attr('dominant-baseline','middle').attr('font-size',7).attr('fill','#999')
+     .attr('font-family','Outfit,sans-serif').attr('font-style','italic')
+     .text('learning gap');
   }
+
   g.append('text').attr('x',iw/2).attr('y',ih+22).attr('text-anchor','middle')
-   .attr('font-size',9).attr('fill','#999').attr('font-family','Outfit,sans-serif').text('Step');
+   .attr('font-size',9).attr('fill','#999').attr('font-family','Outfit,sans-serif')
+   .text('Training step');
   g.append('text').attr('transform','rotate(-90)').attr('x',-ih/2).attr('y',-36)
    .attr('text-anchor','middle').attr('font-size',9).attr('fill','#999')
    .attr('font-family','Outfit,sans-serif')
@@ -1150,7 +1202,6 @@ function doStep(){
   renderNetwork();
   updateBadgeRow();
   updateRightPanel();
-  updateHistoryChart();
   updateAnno();
   // Keep Tab 2 compound chart and chain formula in sync
   renderCompoundChart();
@@ -1182,24 +1233,13 @@ function doReset(){
   wScale=+document.getElementById('sld-wscale').value;
   lr=+document.getElementById('sld-lr').value;
   currentReveal=-1;
-  histSteps=[]; histOut=[]; histInp=[];
   computePasses();
+  computeTrainHistory();
   renderNetwork();
   updateBadgeRow();
   updateRightPanel();
   updateAnno();
-  // Clear history SVG
-  var hs=document.getElementById('svg-grad-history');
-  if(hs){
-    var sv=d3.select(hs);
-    sv.selectAll('*').remove();
-    sv.attr('height',160).attr('width','100%').attr('viewBox','0 0 500 160');
-    sv.append('rect').attr('width',500).attr('height',160).attr('fill','#FDFAF5');
-    sv.append('text').attr('x',250).attr('y',80).attr('text-anchor','middle')
-      .attr('dominant-baseline','middle').attr('fill','rgba(0,0,0,.18)')
-      .attr('font-family','Outfit,sans-serif').attr('font-size',11)
-      .text('Gradient history — press Play to begin');
-  }
+  renderHistoryChart();
   document.getElementById('stat-step').textContent='0';
   document.getElementById('stat-epoch').textContent='1';
   // Keep Tabs 2 and 3 in sync (safe to call — functions are hoisted)
@@ -1547,20 +1587,29 @@ function drawMiniNet(svgId, grads5, opts){
 
   // Optional skip-connection curved arcs (bypass every 2 nodes)
   if(opts.skipArcs){
-    var arcApy=CY-R-20; // apex y of the arc (above nodes)
+    // Dedicated smaller arrowhead for skip arcs
+    defs.append('marker').attr('id',svgId+'-skip-arr')
+      .attr('markerWidth',5).attr('markerHeight',5)
+      .attr('refX',4.5).attr('refY',2.5).attr('orient','auto')
+      .append('path').attr('d','M0,0 L0,5 L5,2.5 z').attr('fill','#2e7d32');
+
     [[0,2],[2,4]].forEach(function(pair){
-      var ax1=xs[pair[0]], ax2=xs[pair[1]], mx=(ax1+ax2)/2;
+      // Endpoints at top edge of each node (CY-R), not at center
+      var sx=xs[pair[0]], ex=xs[pair[1]], mx=(sx+ex)/2;
+      var sy=CY-R, ey=CY-R;
+      // Control points lift the arc above the nodes
+      var cp=CY-R-46;
       svg.append('path')
-        .attr('d','M'+ax1+','+CY+' C'+ax1+','+(CY-48)+' '+ax2+','+(CY-48)+' '+ax2+','+CY)
-        .attr('fill','none').attr('stroke','#2e7d32').attr('stroke-width',2)
-        .attr('stroke-dasharray','4,2').attr('opacity',0.85)
-        .attr('marker-end','url(#'+svgId+'-healthy)');
-      svg.append('text').attr('x',mx).attr('y',CY-44)
-        .attr('text-anchor','middle').attr('font-size',7.5).attr('fill','#2e7d32')
+        .attr('d','M'+sx+','+sy+' C'+sx+','+cp+' '+ex+','+cp+' '+ex+','+ey)
+        .attr('fill','none').attr('stroke','#2e7d32').attr('stroke-width',1.5)
+        .attr('stroke-dasharray','4,2').attr('opacity',0.9)
+        .attr('marker-end','url(#'+svgId+'-skip-arr)');
+      svg.append('text').attr('x',mx).attr('y',cp-2)
+        .attr('text-anchor','middle').attr('font-size',7).attr('fill','#2e7d32')
         .attr('font-family','IBM Plex Mono,monospace').text('1.0');
     });
     svg.append('text').attr('x',W/2).attr('y',H-4)
-      .attr('text-anchor','middle').attr('font-size',7.5).attr('fill','#2e7d32')
+      .attr('text-anchor','middle').attr('font-size',7).attr('fill','#2e7d32')
       .attr('font-family','Outfit,sans-serif').attr('font-style','italic')
       .text('dashed = skip gradient highway');
   }
