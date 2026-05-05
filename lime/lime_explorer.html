@@ -767,11 +767,358 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 </div><!-- end .wrap -->
 
 <script>
-/* Stage 1 — structural interactivity only. Full LIME simulation added in Stage 2. */
 (function(){
 'use strict';
 
-/* Tab switching */
+// ── Constants ──────────────────────────────────────────────────────
+var SS=500, GN=22, DR=3.0;
+var xSc=d3.scaleLinear().domain([-DR,DR]).range([0,SS]);
+var ySc=d3.scaleLinear().domain([-DR,DR]).range([SS,0]);
+
+// ── State ──────────────────────────────────────────────────────────
+var dsName='moons', mdName='nn';
+var trainData=[], selectedPt=null, limeResult=null;
+
+// ── PRNG (mulberry32) ──────────────────────────────────────────────
+function makeRng(seed){
+  return function(){
+    seed|=0; seed=seed+0x6D2B79F5|0;
+    var t=Math.imul(seed^seed>>>15,1|seed);
+    t=t+Math.imul(t^t>>>7,61|t)^t;
+    return((t^t>>>14)>>>0)/4294967296;
+  };
+}
+function bm(rng){
+  var u1=Math.max(1e-10,rng()),u2=rng();
+  return Math.sqrt(-2*Math.log(u1))*Math.cos(2*Math.PI*u2);
+}
+
+// ── Dataset generation ─────────────────────────────────────────────
+function genMoons(rng){
+  var d=[],N=80;
+  for(var i=0;i<N;i++){
+    var a=rng()*Math.PI;
+    d.push({x:Math.cos(a)*1.6+(rng()-.5)*.3,y:Math.sin(a)*0.9+(rng()-.5)*.3,label:0});
+  }
+  for(var i=0;i<N;i++){
+    var a=rng()*Math.PI;
+    d.push({x:0.4-Math.cos(a)*1.6+(rng()-.5)*.3,y:-0.5-Math.sin(a)*0.9+(rng()-.5)*.3,label:1});
+  }
+  return d;
+}
+function genCircles(rng){
+  var d=[],N=80;
+  for(var i=0;i<N;i++){
+    var a=rng()*2*Math.PI,r=1.75+(rng()-.5)*.25;
+    d.push({x:Math.cos(a)*r,y:Math.sin(a)*r,label:0});
+  }
+  for(var i=0;i<N;i++){
+    var a=rng()*2*Math.PI,r=0.72+(rng()-.5)*.2;
+    d.push({x:Math.cos(a)*r,y:Math.sin(a)*r,label:1});
+  }
+  return d;
+}
+function genBlobs(rng){
+  var d=[];
+  [{cx:-1.2,cy:0.9,cls:0,n:53},{cx:1.2,cy:0.5,cls:1,n:47},{cx:-.2,cy:-1.5,cls:0,n:50}]
+  .forEach(function(c){
+    for(var i=0;i<c.n;i++) d.push({x:bm(rng)*.5+c.cx,y:bm(rng)*.5+c.cy,label:c.cls});
+  });
+  return d;
+}
+function generateData(ds){
+  var rng=makeRng(42);
+  if(ds==='circles') return genCircles(rng);
+  if(ds==='blobs')   return genBlobs(rng);
+  return genMoons(rng);
+}
+
+// ── Model predictions ──────────────────────────────────────────────
+function sig(z){return 1/(1+Math.exp(-z));}
+
+function predictNN(x,y){
+  var b=0.45*Math.sin(x*1.15)-0.12+0.07*x;
+  return sig((b-y)*3.2);
+}
+function predictRF(x,y){
+  var r=Math.sqrt(x*x+y*y),a=Math.atan2(y,x);
+  var th=1.22+0.22*Math.sin(4.5*a)+0.14*Math.cos(7*a)+0.08*Math.sin(11*a);
+  return sig((th-r)*4.5);
+}
+function predictSVM(x,y){
+  return sig(2.2*(x-0.25)-0.35*y+0.2*x*y-0.1*x*x);
+}
+function predict(x,y){
+  if(mdName==='rf')  return predictRF(x,y);
+  if(mdName==='svm') return predictSVM(x,y);
+  return predictNN(x,y);
+}
+
+// ── Background colour ──────────────────────────────────────────────
+function bgColor(p){
+  if(p<=0.5) return d3.interpolateRgb('#8aaed6','#F8F5F0')(p*2);
+  return d3.interpolateRgb('#F8F5F0','#f0a96b')((p-.5)*2);
+}
+
+// ── 3×3 WLS solver ─────────────────────────────────────────────────
+function inv3(m){
+  var a=m[0],b=m[1],c=m[2],d=m[3],e=m[4],f=m[5],g=m[6],h=m[7],k=m[8];
+  var det=a*(e*k-f*h)-b*(d*k-f*g)+c*(d*h-e*g);
+  if(Math.abs(det)<1e-12) return null;
+  var di=1/det;
+  return[(e*k-f*h)*di,(c*h-b*k)*di,(b*f-c*e)*di,
+         (f*g-d*k)*di,(a*k-c*g)*di,(c*d-a*f)*di,
+         (d*h-e*g)*di,(b*g-a*h)*di,(a*e-b*d)*di];
+}
+function mv3(m,v){
+  return[m[0]*v[0]+m[1]*v[1]+m[2]*v[2],
+         m[3]*v[0]+m[4]*v[1]+m[5]*v[2],
+         m[6]*v[0]+m[7]*v[1]+m[8]*v[2]];
+}
+
+// ── LIME algorithm ─────────────────────────────────────────────────
+function runLIME(x0,y0,r,N){
+  var rng=makeRng(42+Math.round((x0*37+y0*53)*100)&0x7fffffff);
+  var sigma=r*0.5, samples=[], tries=0;
+  while(samples.length<N&&tries<N*8){
+    tries++;
+    var dx=(rng()-.5)*2*r,dy=(rng()-.5)*2*r;
+    if(dx*dx+dy*dy>r*r) continue;
+    var sx=x0+dx,sy=y0+dy;
+    var d2=dx*dx+dy*dy,w=Math.exp(-d2/(sigma*sigma));
+    samples.push({x:sx,y:sy,p:predict(sx,sy),w:w});
+  }
+  if(samples.length<6) return null;
+
+  var S=0,Sx=0,Sy=0,Sxx=0,Sxy=0,Syy=0,Sp=0,Sxp=0,Syp=0;
+  samples.forEach(function(s){
+    var w=s.w,x=s.x,y=s.y,p=s.p;
+    S+=w;Sx+=w*x;Sy+=w*y;
+    Sxx+=w*x*x;Sxy+=w*x*y;Syy+=w*y*y;
+    Sp+=w*p;Sxp+=w*x*p;Syp+=w*y*p;
+  });
+  var invA=inv3([S,Sx,Sy,Sx,Sxx,Sxy,Sy,Sxy,Syy]);
+  if(!invA) return null;
+  var beta=mv3(invA,[Sp,Sxp,Syp]);
+  var w0=beta[0],w1=beta[1],w2=beta[2];
+
+  var meanP=Sp/S,ssRes=0,ssTot=0;
+  samples.forEach(function(s){
+    var ph=w0+w1*s.x+w2*s.y;
+    ssRes+=s.w*(s.p-ph)*(s.p-ph);
+    ssTot+=s.w*(s.p-meanP)*(s.p-meanP);
+  });
+  var r2=ssTot>1e-10?Math.max(0,Math.min(1,1-ssRes/ssTot)):0;
+  var p0=predict(x0,y0);
+  return{w0,w1,w2,r2,p0,predClass:p0>0.5?1:0,conf:p0>0.5?p0:1-p0,samples,x0,y0};
+}
+
+// ── Local boundary line ────────────────────────────────────────────
+function boundaryLine(w0,w1,w2){
+  var R=DR,pts=[];
+  function add(x,y){if(x>=-R-.01&&x<=R+.01&&y>=-R-.01&&y<=R+.01)pts.push({x:Math.max(-R,Math.min(R,x)),y:Math.max(-R,Math.min(R,y))});}
+  if(Math.abs(w2)>1e-5){
+    add(-R,(0.5-w0-w1*(-R))/w2); add(R,(0.5-w0-w1*R)/w2);
+  }
+  if(Math.abs(w1)>1e-5){
+    add((0.5-w0-w2*(-R))/w1,-R); add((0.5-w0-w2*R)/w1,R);
+  }
+  var u=[pts[0]];
+  for(var i=1;i<pts.length;i++){
+    var ok=true;
+    for(var j=0;j<u.length;j++) if(Math.abs(pts[i].x-u[j].x)<.05&&Math.abs(pts[i].y-u[j].y)<.05){ok=false;break;}
+    if(ok) u.push(pts[i]);
+  }
+  return u.length>=2?[u[0],u[u.length-1]]:null;
+}
+
+// ── Star path ──────────────────────────────────────────────────────
+function starPath(cx,cy,ro,ri,n){
+  var p='';
+  for(var i=0;i<n*2;i++){
+    var a=(i*Math.PI/n)-Math.PI/2,r=i%2===0?ro:ri;
+    p+=(i===0?'M':'L')+(cx+Math.cos(a)*r).toFixed(1)+','+(cy+Math.sin(a)*r).toFixed(1);
+  }
+  return p+'Z';
+}
+
+// ── Render decision boundary ───────────────────────────────────────
+function renderBoundary(){
+  var svgEl=document.getElementById('svg-decision');
+  var svg=d3.select(svgEl);
+  svg.selectAll('*').remove();
+  svg.attr('viewBox','0 0 '+SS+' '+SS).attr('height',SS)
+     .attr('width','100%').attr('preserveAspectRatio','xMidYMid meet');
+  svg.append('rect').attr('width',SS).attr('height',SS).attr('fill','#FDFAF5');
+
+  // Coloured background grid
+  var step=SS/GN;
+  var bg=svg.append('g');
+  for(var row=0;row<GN;row++){
+    for(var col=0;col<GN;col++){
+      var px=xSc.invert(col*step+step*.5),py=ySc.invert(row*step+step*.5);
+      bg.append('rect').attr('x',col*step).attr('y',row*step)
+        .attr('width',step+1).attr('height',step+1).attr('fill',bgColor(predict(px,py)));
+    }
+  }
+
+  // Training points
+  var pts=svg.append('g');
+  trainData.forEach(function(d){
+    pts.append('circle').attr('cx',xSc(d.x)).attr('cy',ySc(d.y)).attr('r',4.5)
+      .attr('fill',d.label===0?'#1A56A0':'#E8630A')
+      .attr('stroke','#fff').attr('stroke-width',1.2).attr('opacity',.88);
+  });
+
+  // LIME overlay layer
+  svg.append('g').attr('class','lime-ov');
+
+  // Clickable transparent overlay
+  svg.append('rect').attr('width',SS).attr('height',SS)
+    .attr('fill','transparent').attr('cursor','crosshair')
+    .on('click',function(event){
+      var sp=svgEl.createSVGPoint();
+      sp.x=event.clientX; sp.y=event.clientY;
+      var q=sp.matrixTransform(svgEl.getScreenCTM().inverse());
+      var dx=xSc.invert(q.x),dy=ySc.invert(q.y);
+      if(dx<-DR||dx>DR||dy<-DR||dy>DR) return;
+      onSVGClick(dx,dy);
+    });
+}
+
+// ── LIME SVG overlay ───────────────────────────────────────────────
+function updateOverlay(){
+  var svg=d3.select('#svg-decision');
+  svg.select('.lime-ov').remove();
+  var ov=svg.append('g').attr('class','lime-ov');
+  if(!limeResult) return;
+  var lr=limeResult;
+  var r=+document.getElementById('sld-radius').value;
+  var rPx=xSc(lr.x0+r)-xSc(lr.x0); // radius in SVG pixels
+
+  // Neighborhood circle
+  ov.append('circle').attr('cx',xSc(lr.x0)).attr('cy',ySc(lr.y0)).attr('r',rPx)
+    .attr('fill','none').attr('stroke','#2D5A1B').attr('stroke-width',2)
+    .attr('stroke-dasharray','6,3').attr('opacity',.85);
+
+  // Sampled neighbour points
+  lr.samples.forEach(function(s){
+    ov.append('circle').attr('cx',xSc(s.x)).attr('cy',ySc(s.y)).attr('r',2.5)
+      .attr('fill',s.p>0.5?'#E8630A':'#1A56A0')
+      .attr('stroke','#fff').attr('stroke-width',.5).attr('opacity',.55);
+  });
+
+  // Local linear boundary (dashed white)
+  var ln=boundaryLine(lr.w0,lr.w1,lr.w2);
+  if(ln){
+    ov.append('line')
+      .attr('x1',xSc(ln[0].x)).attr('y1',ySc(ln[0].y))
+      .attr('x2',xSc(ln[1].x)).attr('y2',ySc(ln[1].y))
+      .attr('stroke','white').attr('stroke-width',2.5)
+      .attr('stroke-dasharray','8,4').attr('opacity',.92);
+  }
+
+  // Star at selected point
+  ov.append('path').attr('d',starPath(xSc(lr.x0),ySc(lr.y0),10,4,5))
+    .attr('fill','#FFD700').attr('stroke','#333').attr('stroke-width',1);
+}
+
+// ── Right panel ────────────────────────────────────────────────────
+function setWeight(fillId,valId,w,maxW){
+  var el=document.getElementById(fillId);
+  var vEl=document.getElementById(valId);
+  var pct=maxW>0?Math.min(48,Math.abs(w)/maxW*48):0;
+  el.style.cssText='position:absolute;top:0;height:100%;border-radius:3px;'+
+    (w>=0?'left:50%;right:auto;':'right:50%;left:auto;')+
+    'width:'+pct+'%;background:'+(w>=0?'#2D5A1B':'#B0321D');
+  vEl.textContent=(w>=0?'+':'')+w.toFixed(3);
+  vEl.style.color=w>=0?'#2D5A1B':'#B0321D';
+}
+
+function updatePanel(){
+  if(!limeResult){
+    ['rp-x1','rp-x2','rp-conf','w1-val','w2-val'].forEach(function(id){document.getElementById(id).textContent='—';});
+    document.getElementById('class-badge').textContent='—';
+    document.getElementById('class-badge').className='class-badge';
+    document.getElementById('conf-fill').style.width='0%';
+    document.getElementById('r2-val').textContent='—';
+    document.getElementById('r2-val').style.color='var(--text-muted)';
+    document.getElementById('coord-val').textContent='— click to select —';
+    document.getElementById('btn-explain').disabled=true;
+    setWeight('w1-fill','w1-val',0,1);
+    setWeight('w2-fill','w2-val',0,1);
+    return;
+  }
+  var lr=limeResult;
+  document.getElementById('rp-x1').textContent=lr.x0.toFixed(3);
+  document.getElementById('rp-x2').textContent=lr.y0.toFixed(3);
+  document.getElementById('coord-val').textContent='('+lr.x0.toFixed(2)+', '+lr.y0.toFixed(2)+')';
+  document.getElementById('btn-explain').disabled=false;
+
+  var badge=document.getElementById('class-badge');
+  badge.textContent='Class '+lr.predClass;
+  badge.className='class-badge '+(lr.predClass===0?'c0':'c1');
+
+  var confPct=Math.round(lr.conf*100);
+  document.getElementById('rp-conf').textContent=confPct+'%';
+  var cf=document.getElementById('conf-fill');
+  cf.style.width=confPct+'%';
+  cf.style.background=lr.predClass===0?'#1A56A0':'#E8630A';
+
+  var maxW=Math.max(Math.abs(lr.w1),Math.abs(lr.w2),0.001);
+  setWeight('w1-fill','w1-val',lr.w1,maxW);
+  setWeight('w2-fill','w2-val',lr.w2,maxW);
+
+  var r2El=document.getElementById('r2-val');
+  r2El.textContent=lr.r2.toFixed(3);
+  r2El.style.color=lr.r2>0.8?'#2D5A1B':lr.r2>0.5?'#B08000':'#B0321D';
+}
+
+// ── Annotation ─────────────────────────────────────────────────────
+function updateAnno(){
+  var el=document.getElementById('anno-box');
+  if(!limeResult){
+    el.textContent='Click anywhere in the decision space to generate a LIME explanation for that point.';
+    el.className='anno-box neutral'; return;
+  }
+  var lr=limeResult,confPct=Math.round(lr.conf*100),r2=lr.r2;
+  if(r2<0.4){
+    el.textContent='Local R² = '+r2.toFixed(2)+' — the linear approximation fits poorly here. The black-box model is highly nonlinear in this neighborhood. Try reducing the radius for a tighter local fit.';
+    el.className='anno-box warn';
+  } else if(lr.conf<0.65){
+    el.textContent='This point is near the decision boundary — confidence is only '+confPct+'%. LIME\'s local approximation is most informative near boundaries where the model\'s decision is sensitive to feature values.';
+    el.className='anno-box neutral';
+  } else {
+    el.textContent='Point predicted as Class '+lr.predClass+' with '+confPct+'% confidence. The local linear boundary (dashed white) approximates the black-box model within the green neighborhood. R² = '+r2.toFixed(2)+'.';
+    el.className='anno-box good';
+  }
+}
+
+// ── Click handler ──────────────────────────────────────────────────
+function onSVGClick(x,y){
+  selectedPt={x:x,y:y};
+  var r=+document.getElementById('sld-radius').value;
+  var N=+document.getElementById('sld-samples').value;
+  limeResult=runLIME(x,y,r,N);
+  updateOverlay(); updatePanel(); updateAnno();
+}
+
+// ── Full reset ─────────────────────────────────────────────────────
+function doReset(){
+  var mBtn=document.querySelector('#model-selector .sel-btn.active');
+  var dBtn=document.querySelector('#dataset-selector .sel-btn.active');
+  mdName=mBtn?mBtn.dataset.model:'nn';
+  dsName=dBtn?dBtn.dataset.ds:'moons';
+  selectedPt=null; limeResult=null;
+  trainData=generateData(dsName);
+  renderBoundary(); updatePanel(); updateAnno();
+  var mdL={nn:'Neural Net',rf:'Random Forest',svm:'SVM'};
+  var dsL={moons:'Moons',circles:'Circles',blobs:'Blobs'};
+  var lEl=document.getElementById('boundary-label');
+  if(lEl) lEl.textContent='Decision Boundary — '+mdL[mdName]+' on '+dsL[dsName]+' dataset';
+}
+
+// ── Event wiring ───────────────────────────────────────────────────
 document.getElementById('tab-bar').addEventListener('click',function(e){
   var btn=e.target.closest('button');
   if(!btn||!btn.dataset.tab) return;
@@ -781,58 +1128,51 @@ document.getElementById('tab-bar').addEventListener('click',function(e){
   document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
 });
 
-/* Key Concepts collapse */
 document.getElementById('concepts-toggle').addEventListener('click',function(){
-  var body=document.getElementById('concepts-body');
-  var arrow=document.getElementById('concepts-arrow');
+  var body=document.getElementById('concepts-body'),arrow=document.getElementById('concepts-arrow');
   body.classList.toggle('collapsed');
   arrow.textContent=body.classList.contains('collapsed')?'▸':'▾';
 });
 
-/* Model selector */
 document.getElementById('model-selector').addEventListener('click',function(e){
-  var btn=e.target.closest('.sel-btn');
-  if(!btn) return;
+  var btn=e.target.closest('.sel-btn'); if(!btn) return;
   document.querySelectorAll('#model-selector .sel-btn').forEach(function(b){b.classList.remove('active');});
-  btn.classList.add('active');
+  btn.classList.add('active'); doReset();
 });
 
-/* Dataset selector */
 document.getElementById('dataset-selector').addEventListener('click',function(e){
-  var btn=e.target.closest('.sel-btn');
-  if(!btn) return;
+  var btn=e.target.closest('.sel-btn'); if(!btn) return;
   document.querySelectorAll('#dataset-selector .sel-btn').forEach(function(b){b.classList.remove('active');});
-  btn.classList.add('active');
+  btn.classList.add('active'); doReset();
 });
 
-/* Slider label updates */
 document.getElementById('sld-radius').addEventListener('input',function(){
   var v=(+this.value).toFixed(2);
   document.getElementById('val-radius').textContent=v;
   document.getElementById('nbr-radius').textContent=v;
 });
+document.getElementById('sld-radius').addEventListener('change',function(){
+  if(selectedPt) onSVGClick(selectedPt.x,selectedPt.y);
+});
+
 document.getElementById('sld-samples').addEventListener('input',function(){
   document.getElementById('val-samples').textContent=this.value;
   document.getElementById('nbr-samples').textContent=this.value;
 });
-
-/* Clear button */
-document.getElementById('btn-clear').addEventListener('click',function(){
-  document.getElementById('coord-val').textContent='— click to select —';
-  document.getElementById('btn-explain').disabled=true;
-  document.getElementById('rp-x1').textContent='—';
-  document.getElementById('rp-x2').textContent='—';
-  document.getElementById('class-badge').textContent='—';
-  document.getElementById('class-badge').className='class-badge';
-  document.getElementById('rp-conf').textContent='—';
-  document.getElementById('conf-fill').style.width='0%';
-  document.getElementById('w1-val').textContent='—';
-  document.getElementById('w2-val').textContent='—';
-  document.getElementById('r2-val').textContent='—';
-  document.getElementById('r2-val').style.color='var(--text-muted)';
-  document.getElementById('anno-box').textContent='Click any point on the decision boundary to run LIME and see why the model makes that prediction at that location.';
-  document.getElementById('anno-box').className='anno-box neutral';
+document.getElementById('sld-samples').addEventListener('change',function(){
+  if(selectedPt) onSVGClick(selectedPt.x,selectedPt.y);
 });
+
+document.getElementById('btn-explain').addEventListener('click',function(){
+  if(selectedPt) onSVGClick(selectedPt.x,selectedPt.y);
+});
+document.getElementById('btn-clear').addEventListener('click',function(){
+  selectedPt=null; limeResult=null;
+  updateOverlay(); updatePanel(); updateAnno();
+});
+
+// ── Boot ───────────────────────────────────────────────────────────
+doReset();
 
 })();
 </script>
