@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<!-- Copyright © 2026 Greg T. Chism. University of Arizona, College of Information Science.
+     INFO 557: Neural Networks. MIT License. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LIME — Local Interpretable Model-Agnostic Explanations | INFO 557: Neural Networks</title>
+<meta name="description" content="Click any point in the decision space to generate a local linear explanation — see how complex model decisions can be approximated locally with LIME.">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="LIME — Local Interpretable Model-Agnostic Explanations">
+<meta property="og:description" content="Click any point in the decision space to generate a local linear explanation — see how complex model decisions can be approximated locally with LIME.">
+<meta property="og:image" content="https://gchism94.github.io/uofa-neural-networks/lime/lime_explorer-preview.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="600">
+<meta property="og:url" content="https://gchism94.github.io/uofa-neural-networks/lime/lime_explorer.html">
+<meta property="fb:app_id" content="2385695445236853">
+
+<!-- Twitter/X card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="LIME — Local Interpretable Model-Agnostic Explanations">
+<meta name="twitter:description" content="Click any point in the decision space to generate a local linear explanation — see how complex model decisions can be approximated locally with LIME.">
+<meta name="twitter:image" content="https://gchism94.github.io/uofa-neural-networks/lime/lime_explorer-preview.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+
+<style>
+/* ── Design tokens ──────────────────────────────────────────────── */
+:root{
+  --cream:#FAF7F0;--cream-mid:#F0EBE0;--cream-dk:#E2D9C5;
+  --g-dk:#1C3A0E;--g-mid:#2D5A1B;--g-lt:#4A8C2F;--g-pale:#C8E6A8;
+  --orange:#E8630A;--orange-lt:#F08C50;--orange-dk:#C0500A;
+  --blue:#1A56A0;--blue-pale:#D0E4F8;
+  --red:#B0321D;--red-pale:#F8DDD8;
+  --purple:#7B3FC4;--purple-pale:#E8D8F8;
+  --yellow:#B08000;--yellow-pale:#FBF0C8;--yellow-hi:#D4A017;
+  --text:#1A1A1A;--text-muted:#888;--text-soft:#555;
+  --border:#C8BE9A;--border-lt:#DDD6BE;--shadow:rgba(44,90,27,.10);
+
+  /* LIME-specific palette */
+  --class0:#1A56A0;   --class0-pale:#D0E4F8;   /* blue  = class 0 */
+  --class1:#E8630A;   --class1-pale:#FDE8D8;   /* orange = class 1 */
+  --nbr:#7B3FC4;      --nbr-pale:#E8D8F8;      /* purple = neighborhood */
+  --local:#2D5A1B;    --local-pale:#C8E6A8;    /* green = local model */
+  --pos-w:#2D5A1B;    --neg-w:#B0321D;         /* feature weight colors */
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:'Outfit',sans-serif;background:var(--cream);color:var(--text);
+  padding:1.25rem 1rem 2rem;min-height:100vh;line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:.85rem}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+.hdr{display:flex;justify-content:space-between;align-items:flex-start;column-gap:1rem;row-gap:.35rem;flex-wrap:wrap}
+.hdr>div:first-child{flex:1 1 auto;min-width:0}
+.hdr h1{font-size:clamp(1.2rem,2.1vw,1.55rem);font-weight:700;color:var(--g-dk);letter-spacing:-.02em;line-height:1.2}
+.hdr p.subtitle{font-size:.86rem;color:var(--text-muted);margin-top:.18rem}
+.hdr-rule{border:none;border-top:2.5px solid var(--g-dk);margin-top:.55rem}
+
+/* ── Fixed copyright ─────────────────────────────────────────────── */
+.cr-top{
+  position:fixed;top:.75rem;right:1rem;z-index:1000;
+  font-size:.72rem;color:var(--text-muted);text-align:right;
+  background:rgba(250,247,240,.92);padding:.2rem 1.5rem .2rem .5rem;
+  border-radius:5px;backdrop-filter:blur(4px);
+  border:1px solid var(--border-lt);white-space:nowrap;min-width:max-content;
+}
+.cr-top a{color:var(--orange);text-decoration:none}
+.cr-top a:hover{text-decoration:underline}
+
+/* ── Tab bar ─────────────────────────────────────────────────────── */
+.tab-bar{
+  display:flex;gap:.35rem;background:var(--cream-mid);
+  border:1px solid var(--border);border-radius:8px;
+  padding:.3rem;width:fit-content;
+}
+.tab-bar button{
+  font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:500;
+  padding:.3rem .9rem;border-radius:6px;cursor:pointer;
+  border:none;background:transparent;color:var(--text-soft);transition:all .15s;
+}
+.tab-bar button:hover{background:white;color:var(--g-dk)}
+.tab-bar button.active{background:white;color:var(--g-dk);font-weight:600;
+  box-shadow:0 1px 4px var(--shadow);}
+
+/* ── Explorer grid ───────────────────────────────────────────────── */
+.explorer-grid{
+  display:grid;
+  grid-template-columns:250px 1fr 210px;
+  gap:.85rem;align-items:start;
+}
+@media(max-width:980px){
+  .explorer-grid{grid-template-columns:250px 1fr}
+  .right-col{display:none}
+}
+@media(max-width:680px){.explorer-grid{grid-template-columns:1fr}}
+.left-col{display:flex;flex-direction:column;gap:.75rem}
+.center-col{display:flex;flex-direction:column;gap:.75rem}
+.right-col{display:flex;flex-direction:column;gap:.75rem}
+
+/* ── Cards ───────────────────────────────────────────────────────── */
+.card{background:white;border:1px solid var(--border);border-radius:8px;
+  padding:.85rem 1rem;box-shadow:0 2px 8px var(--shadow)}
+.card-title{font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--g-dk);margin-bottom:.55rem}
+
+/* ── Selectors ───────────────────────────────────────────────────── */
+.sel-group{display:flex;gap:.3rem;flex-wrap:wrap;margin-bottom:.45rem}
+.sel-btn{
+  font-family:'Outfit',sans-serif;font-size:.75rem;font-weight:500;
+  padding:.25rem .6rem;border-radius:5px;cursor:pointer;
+  border:1.5px solid var(--border-lt);background:var(--cream);color:var(--text-soft);
+  transition:all .12s;
+}
+.sel-btn:hover{background:var(--cream-mid)}
+.sel-btn.active{background:var(--g-mid);border-color:var(--g-mid);color:white}
+
+/* ── Toggle groups ───────────────────────────────────────────────── */
+.toggle-grp{
+  display:flex;gap:0;border-radius:6px;overflow:hidden;
+  border:1.5px solid var(--border);margin-bottom:.45rem;
+}
+.toggle-grp button{
+  font-family:'Outfit',sans-serif;font-size:.78rem;font-weight:500;
+  padding:.28rem 0;flex:1;border:none;cursor:pointer;
+  background:var(--cream);color:var(--text-soft);transition:all .12s;
+}
+.toggle-grp button.active{background:var(--g-mid);color:white}
+.toggle-grp button:not(.active):hover{background:var(--cream-mid)}
+
+/* ── Sliders ─────────────────────────────────────────────────────── */
+.srow{display:flex;align-items:center;gap:.45rem;margin-bottom:.2rem}
+.slbl{font-family:'IBM Plex Mono',monospace;font-size:.8rem;font-weight:500;
+  color:var(--g-dk);min-width:28px}
+input[type=range]{flex:1;appearance:none;-webkit-appearance:none;height:4px;
+  background:var(--cream-dk);border-radius:2px;cursor:pointer;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
+  border-radius:50%;background:var(--g-mid);border:2.5px solid white;
+  box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:pointer}
+.sval{font-family:'IBM Plex Mono',monospace;font-size:.76rem;
+  color:var(--text-muted);min-width:44px;text-align:right}
+.hint-txt{font-size:.7rem;color:var(--text-muted);font-style:italic;margin-top:.15rem}
+.param-lbl{font-size:.72rem;color:var(--text-soft);margin-bottom:.25rem;font-weight:500}
+
+/* ── Buttons ─────────────────────────────────────────────────────── */
+.ctrl-btns{display:flex;gap:.45rem;flex-wrap:wrap}
+.pbtn{
+  font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:600;
+  padding:.35rem .9rem;border-radius:6px;cursor:pointer;
+  border:1.5px solid var(--border);background:var(--cream);color:var(--g-dk);
+  transition:all .12s;
+}
+.pbtn:hover{background:var(--g-pale);border-color:var(--g-lt)}
+.pbtn.primary{background:var(--g-mid);border-color:var(--g-mid);color:white}
+.pbtn.primary:hover{background:var(--g-dk);border-color:var(--g-dk)}
+
+/* ── Annotation box ──────────────────────────────────────────────── */
+.anno-box{
+  border-radius:6px;padding:.55rem .75rem;font-size:.78rem;line-height:1.55;
+  background:var(--blue-pale);color:var(--blue);border-left:3px solid var(--blue);
+  min-height:3.2rem;
+}
+.anno-box.warn{background:var(--red-pale);color:var(--red);border-color:var(--red)}
+.anno-box.good{background:var(--g-pale);color:var(--g-dk);border-color:var(--g-mid)}
+.anno-box.neutral{background:var(--cream-mid);color:var(--text-soft);border-color:var(--border)}
+
+/* ── Key Concepts ────────────────────────────────────────────────── */
+.concepts-body{overflow:hidden;max-height:900px;transition:max-height .3s ease}
+.concepts-body.collapsed{max-height:0;margin-bottom:-.55rem}
+.concepts-item{font-size:.74rem;color:var(--text-soft);line-height:1.5;
+  margin-bottom:.45rem;padding-left:.9rem;position:relative}
+.concepts-item:last-child{margin-bottom:0}
+.concepts-item::before{content:'●';color:#2e7d32;position:absolute;left:0;top:0}
+.concepts-item strong{color:#2e7d32;font-weight:600}
+
+/* ── Plot label ──────────────────────────────────────────────────── */
+.plot-label{font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--text-muted);text-align:center;margin-bottom:.5rem}
+
+/* ── Legend ──────────────────────────────────────────────────────── */
+.legend{display:flex;gap:.75rem;flex-wrap:wrap;font-size:.72rem;
+  color:var(--text-soft);margin-top:.5rem;align-items:center}
+.legend-dot{width:10px;height:10px;border-radius:50%;display:inline-block;
+  vertical-align:middle;margin-right:.25rem;flex-shrink:0}
+.legend-line{width:22px;height:2.5px;display:inline-block;vertical-align:middle;
+  margin-right:.25rem;border-radius:2px;flex-shrink:0}
+.legend-sq{width:12px;height:12px;border-radius:2px;display:inline-block;
+  vertical-align:middle;margin-right:.25rem;flex-shrink:0}
+
+/* ── Tab panels ──────────────────────────────────────────────────── */
+.tab-panel{display:none}
+.tab-panel.active{display:flex;flex-direction:column;gap:.75rem}
+
+/* ────────────────────────────────────────────────────────────────── */
+/* ── Tab 1: Decision Boundary ────────────────────────────────────── */
+/* ────────────────────────────────────────────────────────────────── */
+#svg-decision{
+  width:100%;aspect-ratio:1/1;max-height:480px;display:block;
+  border-radius:6px;background:#FDFAF5;cursor:crosshair;
+}
+.click-hint{
+  font-size:.72rem;color:var(--text-muted);text-align:center;
+  font-style:italic;margin-top:.3rem;
+}
+/* Instruction pill */
+.click-pill{
+  display:inline-flex;align-items:center;gap:.4rem;
+  background:var(--nbr-pale);border:1.5px solid var(--nbr);
+  color:var(--nbr);border-radius:20px;padding:.2rem .65rem;
+  font-size:.72rem;font-weight:600;
+}
+.click-pill svg{flex-shrink:0}
+
+/* Selected point coords display */
+.coord-display{
+  font-family:'IBM Plex Mono',monospace;font-size:.75rem;
+  background:var(--cream-mid);border:1px solid var(--border-lt);
+  border-radius:5px;padding:.3rem .5rem;color:var(--g-dk);
+  display:flex;justify-content:space-between;align-items:center;
+}
+.coord-display .coord-lbl{color:var(--text-muted);font-size:.68rem}
+
+/* ────────────────────────────────────────────────────────────────── */
+/* ── Tab 2: Feature Importance ───────────────────────────────────── */
+/* ────────────────────────────────────────────────────────────────── */
+.fi-panels{
+  display:grid;grid-template-columns:1fr 1fr;gap:.75rem;
+}
+@media(max-width:640px){.fi-panels{grid-template-columns:1fr}}
+
+#svg-fi-boundary{
+  width:100%;aspect-ratio:1/1;max-height:240px;display:block;
+  border-radius:5px;background:#FDFAF5;
+}
+#svg-fi-bars{
+  width:100%;min-height:200px;display:block;border-radius:5px;background:#FDFAF5;
+}
+
+/* Feature weight bar rows (used for placeholder + D3 rendering) */
+.fi-bar-row{
+  display:flex;align-items:center;gap:.45rem;margin-bottom:.35rem;
+}
+.fi-bar-label{font-family:'IBM Plex Mono',monospace;font-size:.72rem;
+  color:var(--text-soft);min-width:28px;text-align:right}
+.fi-bar-track{flex:1;height:18px;background:var(--cream-mid);border-radius:3px;
+  position:relative;overflow:visible;}
+.fi-bar-fill{height:100%;border-radius:3px;transition:width .3s}
+.fi-bar-fill.pos{background:var(--pos-w)}
+.fi-bar-fill.neg{background:var(--neg-w)}
+.fi-bar-val{font-family:'IBM Plex Mono',monospace;font-size:.65rem;
+  min-width:40px;text-align:left;color:var(--text-muted)}
+
+/* ────────────────────────────────────────────────────────────────── */
+/* ── Tab 3: How LIME Works — step cards ──────────────────────────── */
+/* ────────────────────────────────────────────────────────────────── */
+.lime-steps{display:flex;flex-direction:column;gap:.6rem}
+.lime-step-card{
+  display:flex;gap:.75rem;align-items:flex-start;
+  background:var(--cream);border:1.5px solid var(--border-lt);
+  border-radius:8px;padding:.7rem .8rem;
+}
+.lime-step-card:hover{border-color:var(--g-lt);box-shadow:0 1px 5px var(--shadow)}
+.lime-step-num{
+  flex-shrink:0;width:26px;height:26px;border-radius:50%;
+  background:var(--g-mid);color:white;font-family:'Outfit',sans-serif;
+  font-size:.82rem;font-weight:700;display:flex;align-items:center;
+  justify-content:center;margin-top:.05rem;
+}
+.lime-step-body{flex:1 1 auto;min-width:0}
+.lime-step-title{font-size:.82rem;font-weight:700;color:var(--g-dk);margin-bottom:.2rem}
+.lime-step-desc{font-size:.72rem;color:var(--text-soft);line-height:1.5;margin-bottom:.4rem}
+.lime-step-illus{
+  width:100%;min-height:72px;border-radius:5px;background:#FDFAF5;
+  border:1px solid var(--border-lt);display:flex;align-items:center;
+  justify-content:center;
+}
+.lime-step-illus-txt{
+  font-size:.65rem;color:rgba(0,0,0,.2);font-family:'Outfit',sans-serif;
+  text-align:center;
+}
+/* Step accent colors per step */
+.lime-step-card:nth-child(1) .lime-step-num{background:var(--class0)}
+.lime-step-card:nth-child(2) .lime-step-num{background:var(--nbr)}
+.lime-step-card:nth-child(3) .lime-step-num{background:var(--yellow-hi)}
+.lime-step-card:nth-child(4) .lime-step-num{background:var(--local)}
+.lime-step-card:nth-child(5) .lime-step-num{background:var(--orange)}
+
+/* ── Right panel ─────────────────────────────────────────────────── */
+.stat-row{
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:.7rem;padding:.22rem 0;border-bottom:1px solid var(--border-lt);
+}
+.stat-row:last-child{border-bottom:none}
+.sr-lbl{color:var(--text-muted);font-family:'IBM Plex Mono',monospace}
+.sr-val{font-weight:600;font-family:'IBM Plex Mono',monospace;color:var(--g-dk)}
+
+/* Class badge */
+.class-badge{
+  display:inline-block;padding:.08rem .45rem;border-radius:4px;
+  font-size:.67rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+}
+.class-badge.c0{background:var(--class0-pale);color:var(--class0)}
+.class-badge.c1{background:var(--class1-pale);color:var(--class1-dark,var(--orange-dk))}
+
+/* Confidence bar */
+.conf-track{
+  width:100%;height:6px;background:var(--cream-dk);border-radius:3px;
+  margin-top:.2rem;overflow:hidden;
+}
+.conf-fill{height:100%;border-radius:3px;background:var(--g-mid);transition:width .35s}
+
+/* LIME weight rows in right panel */
+.weight-row{
+  display:flex;align-items:center;gap:.35rem;padding:.2rem 0;
+  border-bottom:1px solid var(--border-lt);
+}
+.weight-row:last-child{border-bottom:none}
+.wr-feat{font-family:'IBM Plex Mono',monospace;font-size:.68rem;
+  color:var(--text-soft);min-width:26px}
+.wr-track{flex:1;height:8px;background:var(--cream-mid);border-radius:3px;
+  position:relative;overflow:hidden;}
+.wr-fill{position:absolute;top:0;height:100%;border-radius:3px}
+.wr-fill.pos{background:var(--pos-w);right:50%;transform-origin:right}
+.wr-fill.neg{background:var(--neg-w);left:50%;transform-origin:left}
+.wr-val{font-family:'IBM Plex Mono',monospace;font-size:.65rem;
+  min-width:38px;text-align:right;color:var(--text-muted)}
+
+/* R² display */
+.r2-box{
+  text-align:center;padding:.5rem;border-radius:6px;
+  border:1px solid var(--border-lt);background:var(--cream);margin-top:.3rem;
+}
+.r2-val{display:block;font-family:'IBM Plex Mono',monospace;font-size:1.1rem;
+  font-weight:700;line-height:1.2}
+.r2-lbl{font-size:.62rem;color:var(--text-muted);margin-top:.1rem}
+
+/* Neighborhood info */
+.nbr-info{
+  display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin-top:.3rem;
+}
+.nbr-cell{
+  background:var(--nbr-pale);border:1px solid var(--nbr);border-radius:5px;
+  padding:.3rem .4rem;text-align:center;
+}
+.nbr-cell .nc-val{font-family:'IBM Plex Mono',monospace;font-size:.8rem;
+  font-weight:700;color:var(--nbr);display:block}
+.nbr-cell .nc-lbl{font-size:.6rem;color:var(--text-muted)}
+</style>
+</head>
+<body>
+
+<div class="cr-top">© 2026 Greg T. Chism · <a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a></div>
+
+<div class="wrap">
+
+<header>
+  <div class="hdr">
+    <div>
+      <h1>LIME — Local Interpretable Model-Agnostic Explanations</h1>
+      <p class="subtitle">Click any point in the decision space to generate a local linear explanation — see how complex model decisions can be approximated locally</p>
+    </div>
+  </div>
+  <hr class="hdr-rule">
+</header>
+
+<!-- Tab bar -->
+<div class="tab-bar" id="tab-bar">
+  <button class="active" data-tab="boundary">Decision Boundary</button>
+  <button data-tab="importance">Feature Importance</button>
+  <button data-tab="howlime">How LIME Works</button>
+</div>
+
+<!-- Main explorer -->
+<div class="explorer-grid">
+
+  <!-- ══ LEFT: Controls ══════════════════════════════════════════════ -->
+  <div class="left-col">
+
+    <!-- Model & dataset selectors -->
+    <div class="card">
+      <div class="card-title">Model &amp; Data</div>
+
+      <div class="param-lbl">Model</div>
+      <div class="sel-group" id="model-selector">
+        <button class="sel-btn active" data-model="nn">Neural Net</button>
+        <button class="sel-btn" data-model="rf">Random Forest</button>
+        <button class="sel-btn" data-model="svm">SVM</button>
+      </div>
+
+      <div class="param-lbl">Dataset</div>
+      <div class="sel-group" id="dataset-selector">
+        <button class="sel-btn active" data-ds="moons">Moons</button>
+        <button class="sel-btn" data-ds="circles">Circles</button>
+        <button class="sel-btn" data-ds="blobs">Blobs</button>
+      </div>
+    </div>
+
+    <!-- LIME parameters -->
+    <div class="card">
+      <div class="card-title">LIME Parameters</div>
+
+      <div class="param-lbl">Neighborhood Radius</div>
+      <div class="srow">
+        <span class="slbl">r</span>
+        <input type="range" id="sld-radius" min="0.1" max="1.0" step="0.05" value="0.3">
+        <span class="sval" id="val-radius">0.30</span>
+      </div>
+      <div class="hint-txt">Smaller radius = more local; larger = more global</div>
+
+      <div class="param-lbl" style="margin-top:.4rem">Neighbor Samples</div>
+      <div class="srow">
+        <span class="slbl">n</span>
+        <input type="range" id="sld-samples" min="50" max="500" step="10" value="150">
+        <span class="sval" id="val-samples">150</span>
+      </div>
+      <div class="hint-txt">More samples = more stable explanation</div>
+    </div>
+
+    <!-- Click instruction -->
+    <div class="card">
+      <div class="card-title">Explain a Point</div>
+      <div style="display:flex;justify-content:center;margin-bottom:.55rem">
+        <span class="click-pill">
+          <svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="5" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="6" cy="6" r="2" fill="currentColor"/></svg>
+          Click anywhere on the decision boundary
+        </span>
+      </div>
+      <div class="coord-display" id="coord-display">
+        <span class="coord-lbl">Selected point</span>
+        <span id="coord-val" style="font-size:.72rem">— click to select —</span>
+      </div>
+      <div style="margin-top:.45rem">
+        <div class="ctrl-btns">
+          <button id="btn-explain" class="pbtn primary" style="flex:1" disabled>⚡ Explain</button>
+          <button id="btn-clear"   class="pbtn">✕ Clear</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Annotation -->
+    <div class="card">
+      <div class="card-title">What's happening?</div>
+      <div class="anno-box neutral" id="anno-box">Click any point on the decision boundary to run LIME and see why the model makes that prediction at that location.</div>
+    </div>
+
+    <!-- Key Concepts -->
+    <div class="card">
+      <div class="card-title" style="cursor:pointer;user-select:none" id="concepts-toggle">
+        Key Concepts <span id="concepts-arrow">▾</span>
+      </div>
+      <div class="concepts-body" id="concepts-body">
+        <div class="concepts-item"><strong>What LIME is:</strong> LIME (Local Interpretable Model-Agnostic Explanations) explains any black-box classifier by fitting a simple linear model around a specific point of interest — the local behavior of a complex model is often much simpler than its global behavior.</div>
+        <div class="concepts-item"><strong>Local linearity:</strong> even if a neural network draws a highly curved decision boundary globally, the boundary near one specific point can be well-approximated by a straight line. LIME exploits this by explaining the local behavior only.</div>
+        <div class="concepts-item"><strong>Neighborhood radius:</strong> controls how far from the selected point LIME samples neighbors. Smaller radius → explanation is very local and may not generalize. Larger radius → smoother but less precise explanation.</div>
+        <div class="concepts-item"><strong>Model-agnostic:</strong> LIME only requires the ability to query the model for predictions — it never looks inside the model. The same algorithm explains neural networks, random forests, SVMs, or any other classifier.</div>
+        <div class="concepts-item"><strong>Feature weights:</strong> positive weight for feature xᵢ means increasing xᵢ pushes the prediction toward class 1; negative weight means increasing xᵢ pushes toward class 0. Larger magnitude = stronger influence.</div>
+      </div>
+    </div>
+
+  </div><!-- end left-col -->
+
+  <!-- ══ CENTER: Tab panels ══════════════════════════════════════════ -->
+  <div class="center-col">
+
+    <!-- ─ Tab 1: Decision Boundary ──────────────────────────────────── -->
+    <div class="tab-panel active" id="panel-boundary">
+      <div class="card">
+        <div class="plot-label" id="boundary-label">Decision Boundary — Neural Net on Moons dataset</div>
+
+        <!-- D3 decision boundary SVG -->
+        <svg id="svg-decision">
+          <rect width="100%" height="100%" fill="#FDFAF5"/>
+          <text x="50%" y="46%" text-anchor="middle" dominant-baseline="middle"
+                fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="13">
+            Decision boundary
+          </text>
+          <text x="50%" y="54%" text-anchor="middle" dominant-baseline="middle"
+                fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="10">
+            click to select a point and run LIME
+          </text>
+        </svg>
+
+        <div class="legend" style="margin-top:.5rem;justify-content:center;flex-wrap:wrap;gap:.5rem">
+          <span><span class="legend-sq" style="background:var(--class0);opacity:.35"></span>Model → Class 0</span>
+          <span><span class="legend-sq" style="background:var(--class1);opacity:.35"></span>Model → Class 1</span>
+          <span><span class="legend-dot" style="background:var(--class0);border:2px solid white;box-shadow:0 0 0 1.5px var(--class0)"></span>Train class 0</span>
+          <span><span class="legend-dot" style="background:var(--class1);border:2px solid white;box-shadow:0 0 0 1.5px var(--class1)"></span>Train class 1</span>
+          <span><span class="legend-dot" style="background:var(--nbr);border:2px solid white"></span>LIME neighbors</span>
+          <span><span class="legend-line" style="background:var(--local);border-top:2px dashed var(--local)"></span>Local boundary</span>
+        </div>
+      </div>
+    </div><!-- end panel-boundary -->
+
+    <!-- ─ Tab 2: Feature Importance ──────────────────────────────────── -->
+    <div class="tab-panel" id="panel-importance">
+      <div class="card">
+        <div class="plot-label">LIME Feature Importance — local linear approximation</div>
+        <div class="fi-panels">
+
+          <!-- Left: mini decision boundary with selected point -->
+          <div>
+            <div style="font-size:.67rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;
+                        color:var(--text-muted);text-align:center;margin-bottom:.35rem">
+              Selected point in decision space
+            </div>
+            <svg id="svg-fi-boundary">
+              <rect width="100%" height="100%" fill="#FDFAF5"/>
+              <text x="50%" y="44%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="10">
+                Mini decision boundary
+              </text>
+              <text x="50%" y="56%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="8">
+                select a point on Tab 1
+              </text>
+            </svg>
+          </div>
+
+          <!-- Right: LIME feature weight bar chart -->
+          <div>
+            <div style="font-size:.67rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;
+                        color:var(--text-muted);text-align:center;margin-bottom:.35rem">
+              Feature weights (push toward class →)
+            </div>
+            <svg id="svg-fi-bars">
+              <rect width="100%" height="200" fill="#FDFAF5"/>
+              <text x="50%" y="92" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="10">
+                Feature importance bars
+              </text>
+              <text x="50%" y="110" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="8">
+                rendered by D3
+              </text>
+            </svg>
+            <div class="legend" style="margin-top:.35rem;justify-content:center">
+              <span><span class="legend-sq" style="background:var(--pos-w)"></span>Pushes toward class 1</span>
+              <span><span class="legend-sq" style="background:var(--neg-w)"></span>Pushes toward class 0</span>
+            </div>
+          </div>
+
+        </div><!-- end fi-panels -->
+
+        <!-- Feature importance annotation -->
+        <div class="anno-box neutral" id="fi-anno" style="margin-top:.6rem;font-size:.75rem">
+          Select a point on the Decision Boundary tab, then switch here to see the LIME feature importance explanation.
+        </div>
+      </div>
+    </div><!-- end panel-importance -->
+
+    <!-- ─ Tab 3: How LIME Works ───────────────────────────────────────── -->
+    <div class="tab-panel" id="panel-howlime">
+      <div class="card">
+        <div class="plot-label">How LIME Works — 5-step algorithm</div>
+
+        <div class="lime-steps">
+
+          <!-- Step 1 -->
+          <div class="lime-step-card">
+            <div class="lime-step-num">1</div>
+            <div class="lime-step-body">
+              <div class="lime-step-title">Select a point to explain</div>
+              <div class="lime-step-desc">Pick any input point x* whose prediction you want to understand. This is the point whose local neighborhood LIME will explore.</div>
+              <div class="lime-step-illus">
+                <svg width="100%" height="72" id="svg-step1">
+                  <rect width="100%" height="72" fill="#FDFAF5"/>
+                  <text x="50%" y="32" text-anchor="middle" dominant-baseline="middle"
+                        fill="rgba(0,0,0,.2)" font-family="Outfit,sans-serif" font-size="9">
+                    decision boundary + selected point x*
+                  </text>
+                  <text x="50%" y="50" text-anchor="middle" dominant-baseline="middle"
+                        fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="8">
+                    rendered by D3
+                  </text>
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="lime-step-card">
+            <div class="lime-step-num">2</div>
+            <div class="lime-step-body">
+              <div class="lime-step-title">Sample neighbors in the neighborhood</div>
+              <div class="lime-step-desc">Randomly sample points z in the neighborhood of x* (within radius r), then query the black-box model f(z) to get their predicted classes.</div>
+              <div class="lime-step-illus">
+                <svg width="100%" height="72" id="svg-step2">
+                  <rect width="100%" height="72" fill="#FDFAF5"/>
+                  <text x="50%" y="32" text-anchor="middle" dominant-baseline="middle"
+                        fill="rgba(0,0,0,.2)" font-family="Outfit,sans-serif" font-size="9">
+                    neighborhood circle + sampled points
+                  </text>
+                  <text x="50%" y="50" text-anchor="middle" dominant-baseline="middle"
+                        fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="8">
+                    rendered by D3
+                  </text>
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="lime-step-card">
+            <div class="lime-step-num">3</div>
+            <div class="lime-step-body">
+              <div class="lime-step-title">Weight neighbors by proximity</div>
+              <div class="lime-step-desc">Assign weight πₓ*(z) = exp(−d(x*,z)²/σ²) to each neighbor — points closer to x* get higher weight. This ensures the local model focuses on the immediate region.</div>
+              <div class="lime-step-illus">
+                <svg width="100%" height="72" id="svg-step3">
+                  <rect width="100%" height="72" fill="#FDFAF5"/>
+                  <text x="50%" y="32" text-anchor="middle" dominant-baseline="middle"
+                        fill="rgba(0,0,0,.2)" font-family="Outfit,sans-serif" font-size="9">
+                    neighbor points sized by proximity weight
+                  </text>
+                  <text x="50%" y="50" text-anchor="middle" dominant-baseline="middle"
+                        fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="8">
+                    rendered by D3
+                  </text>
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 4 -->
+          <div class="lime-step-card">
+            <div class="lime-step-num">4</div>
+            <div class="lime-step-body">
+              <div class="lime-step-title">Fit a weighted linear model</div>
+              <div class="lime-step-desc">Minimize ξ(x) = argmin_{g∈G} L(f, g, πₓ*) + Ω(g) — find the simplest linear model g that best approximates f locally. The weights πₓ* ensure fidelity near x*.</div>
+              <div class="lime-step-illus">
+                <svg width="100%" height="72" id="svg-step4">
+                  <rect width="100%" height="72" fill="#FDFAF5"/>
+                  <text x="50%" y="32" text-anchor="middle" dominant-baseline="middle"
+                        fill="rgba(0,0,0,.2)" font-family="Outfit,sans-serif" font-size="9">
+                    local linear boundary (dashed) fitted to neighbors
+                  </text>
+                  <text x="50%" y="50" text-anchor="middle" dominant-baseline="middle"
+                        fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="8">
+                    rendered by D3
+                  </text>
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 5 -->
+          <div class="lime-step-card">
+            <div class="lime-step-num">5</div>
+            <div class="lime-step-body">
+              <div class="lime-step-title">Coefficients = the explanation</div>
+              <div class="lime-step-desc">The linear model coefficients w₁, w₂ are the LIME explanation. w₁ &gt; 0 means feature x₁ pushes toward class 1; w₁ &lt; 0 means it pushes toward class 0. Magnitude shows importance.</div>
+              <div class="lime-step-illus">
+                <svg width="100%" height="72" id="svg-step5">
+                  <rect width="100%" height="72" fill="#FDFAF5"/>
+                  <text x="50%" y="32" text-anchor="middle" dominant-baseline="middle"
+                        fill="rgba(0,0,0,.2)" font-family="Outfit,sans-serif" font-size="9">
+                    feature weight bar chart — the explanation
+                  </text>
+                  <text x="50%" y="50" text-anchor="middle" dominant-baseline="middle"
+                        fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="8">
+                    rendered by D3
+                  </text>
+                </svg>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- end lime-steps -->
+      </div>
+    </div><!-- end panel-howlime -->
+
+  </div><!-- end center-col -->
+
+  <!-- ══ RIGHT: Live stats ════════════════════════════════════════════ -->
+  <div class="right-col">
+
+    <!-- Selected point info -->
+    <div class="card">
+      <div class="card-title">Selected Point</div>
+      <div class="stat-row">
+        <span class="sr-lbl">x₁</span>
+        <span class="sr-val" id="rp-x1">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="sr-lbl">x₂</span>
+        <span class="sr-val" id="rp-x2">—</span>
+      </div>
+      <div class="stat-row" style="padding-top:.35rem;border-top:1px solid var(--border-lt)">
+        <span class="sr-lbl">Class</span>
+        <span id="rp-class">
+          <span class="class-badge" id="class-badge">—</span>
+        </span>
+      </div>
+      <div class="stat-row">
+        <span class="sr-lbl">Confidence</span>
+        <span class="sr-val" id="rp-conf">—</span>
+      </div>
+      <div class="conf-track">
+        <div class="conf-fill" id="conf-fill" style="width:0%"></div>
+      </div>
+    </div>
+
+    <!-- LIME explanation weights -->
+    <div class="card">
+      <div class="card-title">LIME Explanation</div>
+      <div id="lime-weights">
+        <!-- Rendered by JS -->
+        <div class="weight-row">
+          <span class="wr-feat">x₁</span>
+          <div class="wr-track">
+            <div class="wr-fill pos" id="w1-fill" style="width:0%"></div>
+          </div>
+          <span class="wr-val" id="w1-val">—</span>
+        </div>
+        <div class="weight-row">
+          <span class="wr-feat">x₂</span>
+          <div class="wr-track">
+            <div class="wr-fill pos" id="w2-fill" style="width:0%"></div>
+          </div>
+          <span class="wr-val" id="w2-val">—</span>
+        </div>
+      </div>
+      <div class="legend" style="margin-top:.4rem;font-size:.65rem">
+        <span><span class="legend-sq" style="background:var(--pos-w);width:8px;height:8px"></span>→ class 1</span>
+        <span><span class="legend-sq" style="background:var(--neg-w);width:8px;height:8px"></span>→ class 0</span>
+      </div>
+    </div>
+
+    <!-- Local model fit quality -->
+    <div class="card">
+      <div class="card-title">Local Model Fit</div>
+      <div class="r2-box">
+        <span class="r2-val" id="r2-val" style="color:var(--text-muted)">—</span>
+        <div class="r2-lbl">R² of local linear model</div>
+      </div>
+      <div style="font-size:.66rem;color:var(--text-muted);margin-top:.4rem;line-height:1.5;font-style:italic">
+        R² near 1.0 = local model fits well. Low R² = neighborhood too large or boundary too curved.
+      </div>
+    </div>
+
+    <!-- Neighborhood info -->
+    <div class="card">
+      <div class="card-title">Neighborhood</div>
+      <div class="nbr-info">
+        <div class="nbr-cell">
+          <span class="nc-val" id="nbr-radius">0.30</span>
+          <div class="nc-lbl">radius r</div>
+        </div>
+        <div class="nbr-cell">
+          <span class="nc-val" id="nbr-samples">150</span>
+          <div class="nc-lbl">samples n</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end right-col -->
+
+</div><!-- end .explorer-grid -->
+
+</div><!-- end .wrap -->
+
+<script>
+/* Stage 1 — structural interactivity only. Full LIME simulation added in Stage 2. */
+(function(){
+'use strict';
+
+/* Tab switching */
+document.getElementById('tab-bar').addEventListener('click',function(e){
+  var btn=e.target.closest('button');
+  if(!btn||!btn.dataset.tab) return;
+  document.querySelectorAll('#tab-bar button').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('active');});
+  document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
+});
+
+/* Key Concepts collapse */
+document.getElementById('concepts-toggle').addEventListener('click',function(){
+  var body=document.getElementById('concepts-body');
+  var arrow=document.getElementById('concepts-arrow');
+  body.classList.toggle('collapsed');
+  arrow.textContent=body.classList.contains('collapsed')?'▸':'▾';
+});
+
+/* Model selector */
+document.getElementById('model-selector').addEventListener('click',function(e){
+  var btn=e.target.closest('.sel-btn');
+  if(!btn) return;
+  document.querySelectorAll('#model-selector .sel-btn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+});
+
+/* Dataset selector */
+document.getElementById('dataset-selector').addEventListener('click',function(e){
+  var btn=e.target.closest('.sel-btn');
+  if(!btn) return;
+  document.querySelectorAll('#dataset-selector .sel-btn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+});
+
+/* Slider label updates */
+document.getElementById('sld-radius').addEventListener('input',function(){
+  var v=(+this.value).toFixed(2);
+  document.getElementById('val-radius').textContent=v;
+  document.getElementById('nbr-radius').textContent=v;
+});
+document.getElementById('sld-samples').addEventListener('input',function(){
+  document.getElementById('val-samples').textContent=this.value;
+  document.getElementById('nbr-samples').textContent=this.value;
+});
+
+/* Clear button */
+document.getElementById('btn-clear').addEventListener('click',function(){
+  document.getElementById('coord-val').textContent='— click to select —';
+  document.getElementById('btn-explain').disabled=true;
+  document.getElementById('rp-x1').textContent='—';
+  document.getElementById('rp-x2').textContent='—';
+  document.getElementById('class-badge').textContent='—';
+  document.getElementById('class-badge').className='class-badge';
+  document.getElementById('rp-conf').textContent='—';
+  document.getElementById('conf-fill').style.width='0%';
+  document.getElementById('w1-val').textContent='—';
+  document.getElementById('w2-val').textContent='—';
+  document.getElementById('r2-val').textContent='—';
+  document.getElementById('r2-val').style.color='var(--text-muted)';
+  document.getElementById('anno-box').textContent='Click any point on the decision boundary to run LIME and see why the model makes that prediction at that location.';
+  document.getElementById('anno-box').className='anno-box neutral';
+});
+
+})();
+</script>
+
+<footer id="course-nav-footer" style="margin-top:1.5rem;padding:0.75rem 0 0 1rem;border-top:1px solid #E0DAC0;font-size:0.8rem;color:#78786A;text-align:left;">
+  <a href="../" style="color:#2e7d32;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">&larr; All course visualizations</a>
+</footer>
+<script>
+if (window.self !== window.top) { var f = document.getElementById('course-nav-footer'); if (f) { f.style.display = 'none'; } }
+</script>
+
+</body>
+</html>
