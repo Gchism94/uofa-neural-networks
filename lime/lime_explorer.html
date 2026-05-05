@@ -449,7 +449,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
       </div>
       <div style="margin-top:.45rem">
         <div class="ctrl-btns">
-          <button id="btn-explain" class="pbtn primary" style="flex:1" disabled>⚡ Explain</button>
+          <button id="btn-explain" class="pbtn primary" style="flex:1">🎲 Random Point</button>
           <button id="btn-clear"   class="pbtn">✕ Clear</button>
         </div>
       </div>
@@ -1068,7 +1068,7 @@ function updatePanel(){
     document.getElementById('r2-val').textContent='—';
     document.getElementById('r2-val').style.color='var(--text-muted)';
     document.getElementById('coord-val').textContent='— click to select —';
-    document.getElementById('btn-explain').disabled=true;
+    // btn-explain is always enabled (random point)
     setWeight('w1-fill','w1-val',0,1);
     setWeight('w2-fill','w2-val',0,1);
     return;
@@ -1077,7 +1077,7 @@ function updatePanel(){
   document.getElementById('rp-x1').textContent=lr.x0.toFixed(3);
   document.getElementById('rp-x2').textContent=lr.y0.toFixed(3);
   document.getElementById('coord-val').textContent='('+lr.x0.toFixed(2)+', '+lr.y0.toFixed(2)+')';
-  document.getElementById('btn-explain').disabled=false;
+  // btn-explain is always enabled (random point)
 
   var badge=document.getElementById('class-badge');
   badge.textContent='Class '+lr.predClass;
@@ -1193,7 +1193,8 @@ document.getElementById('sld-samples').addEventListener('change',function(){
 });
 
 document.getElementById('btn-explain').addEventListener('click',function(){
-  if(selectedPt) onSVGClick(selectedPt.x,selectedPt.y);
+  var rx=(Math.random()*2-1)*DR, ry=(Math.random()*2-1)*DR;
+  onSVGClick(rx,ry);
 });
 document.getElementById('btn-clear').addEventListener('click',function(){
   selectedPt=null; limeResult=null;
