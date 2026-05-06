@@ -182,6 +182,7 @@ Add a row to the appropriate table under `## Contents`:
 - `convolution/conv_explorer.html`
 - `vanishing_gradients/vg_explorer.html`
 - `lime/lime_explorer.html`
+- `gradient_attribution/ga_explorer.html`
 
 ---
 

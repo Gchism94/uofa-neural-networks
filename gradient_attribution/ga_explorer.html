@@ -362,6 +362,12 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 
 /* Speed row */
 .speed-row{display:flex;align-items:center;gap:.45rem;margin-top:.35rem}
+
+/* ── Comparison panel stat line ──────────────────────────────────── */
+.cmp-stat{
+  font-family:'IBM Plex Mono',monospace;font-size:.65rem;font-weight:600;
+  text-align:center;margin-top:.2rem;min-height:1rem;
+}
 </style>
 </head>
 <body>
@@ -472,11 +478,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
         Key Concepts <span id="concepts-arrow">▾</span>
       </div>
       <div class="concepts-body" id="concepts-body">
-        <div class="concepts-item"><strong>Saliency maps:</strong> compute ∂f/∂x — the gradient of the model output with respect to each input pixel. Large absolute gradient = the model is sensitive to that pixel at this input. Fast to compute but noisy near saturated activations.</div>
-        <div class="concepts-item"><strong>Why vanilla gradients are noisy:</strong> gradients reflect local sensitivity, not contribution. Near saturation regions (ReLU dead zones, sigmoid tails) gradients vanish even when a feature genuinely influenced the output — the map can mislead.</div>
-        <div class="concepts-item"><strong>Integrated gradients (Sundararajan et al.):</strong> accumulate gradients along a straight-line path from a baseline x′ to the input x: IG(x) = (x−x′) · ∫₀¹ ∂f(x′+α(x−x′))/∂x dα. This captures contributions at all activation levels, not just the endpoint.</div>
-        <div class="concepts-item"><strong>Completeness axiom:</strong> IG attributions sum exactly to f(x) − f(x′). Every unit of prediction difference is "accounted for" by exactly one pixel's attribution. This makes IG attributions faithful — they are provably tied to the prediction gap.</div>
-        <div class="concepts-item"><strong>GradCAM:</strong> weights each feature map's gradient globally (average over spatial dimensions), then forms a linear combination of feature maps. Produces a class-discriminative coarse localization map — useful for CNNs, less fine-grained than pixel-level methods.</div>
+        <div class="concepts-item"><strong>Saliency maps:</strong> compute ∂output/∂input — shows which pixels, if changed slightly, would most change the prediction. Fast but sensitive to noise and saturation near ReLU dead zones or sigmoid tails.</div>
+        <div class="concepts-item"><strong>Integrated gradients:</strong> accumulate gradients along a straight path from a baseline to the input — IG(x) = (x−x′) × ∫₀¹ ∂F(x′+α(x−x′))/∂x dα. Captures contributions at all activation levels, not just the endpoint. Satisfies the completeness axiom.</div>
+        <div class="concepts-item"><strong>Completeness axiom:</strong> attributions must sum to F(input) − F(baseline) — every unit of prediction difference is accounted for. Vanilla gradients do NOT satisfy this; integrated gradients do by construction.</div>
+        <div class="concepts-item"><strong>SmoothGrad:</strong> average gradients over N noisy copies of the input x + ε, ε ~ N(0, σ²). Reduces visual noise and sharpens the attribution map without changing the fundamental gradient method.</div>
+        <div class="concepts-item"><strong>GradCAM vs pixel attribution:</strong> GradCAM uses gradients of the class score with respect to feature map activations — gives coarser but more spatially coherent explanations than pixel-level gradients. Best for spatial localization in CNNs.</div>
       </div>
     </div>
 
@@ -635,15 +641,15 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     <!-- ─ Tab 3: Attribution Comparison ─────────────────────────────── -->
     <div class="tab-panel" id="panel-comparison">
       <div class="card">
-        <div class="plot-label">Attribution Comparison — same input, three methods</div>
+        <div class="plot-label">Attribution Comparison — Vanilla Gradients · Integrated Gradients · SmoothGrad</div>
 
         <div class="cmp-panels">
 
           <!-- Vanilla Gradients -->
           <div class="grid-wrap">
             <div class="method-badge vanilla">Vanilla Gradients</div>
-            <div class="panel-sub">∂f/∂x at input x</div>
-            <svg id="svg-cmp-vanilla" class="grid-svg">
+            <div class="panel-sub">Fast but can be noisy — gradient at input only</div>
+            <svg id="svg-cmp-vanilla" class="grid-svg" style="cursor:pointer" title="Click to expand">
               <rect width="100%" height="100%" fill="#FDFAF5"/>
               <text x="50%" y="44%" text-anchor="middle" dominant-baseline="middle"
                     fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="10">
@@ -654,13 +660,14 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
                 rendered by D3
               </text>
             </svg>
+            <div class="cmp-stat" id="cmp-snr-vanilla" style="color:var(--method-vanilla)">SNR: —</div>
           </div>
 
           <!-- Integrated Gradients -->
           <div class="grid-wrap">
             <div class="method-badge ig">Integrated Gradients</div>
-            <div class="panel-sub">∫₀¹ ∂f(x′+α·Δ)/∂x dα · Δ</div>
-            <svg id="svg-cmp-ig" class="grid-svg">
+            <div class="panel-sub">Faithful — accumulates gradients from baseline to input</div>
+            <svg id="svg-cmp-ig" class="grid-svg" style="cursor:pointer" title="Click to expand">
               <rect width="100%" height="100%" fill="#FDFAF5"/>
               <text x="50%" y="44%" text-anchor="middle" dominant-baseline="middle"
                     fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="10">
@@ -671,23 +678,25 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
                 rendered by D3
               </text>
             </svg>
+            <div class="cmp-stat" id="cmp-compl-ig" style="color:var(--method-ig)">Σ attr − Δf = —</div>
           </div>
 
-          <!-- GradCAM -->
+          <!-- SmoothGrad -->
           <div class="grid-wrap">
-            <div class="method-badge gcam">GradCAM</div>
-            <div class="panel-sub">ReLU(Σ αₖ · Aₖ)</div>
-            <svg id="svg-cmp-gcam" class="grid-svg">
+            <div class="method-badge gcam">SmoothGrad</div>
+            <div class="panel-sub">Denoised — averages gradients over noisy samples</div>
+            <svg id="svg-cmp-gcam" class="grid-svg" style="cursor:pointer" title="Click to expand">
               <rect width="100%" height="100%" fill="#FDFAF5"/>
               <text x="50%" y="44%" text-anchor="middle" dominant-baseline="middle"
                     fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="10">
-                GradCAM map
+                SmoothGrad map
               </text>
               <text x="50%" y="58%" text-anchor="middle" dominant-baseline="middle"
                     fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="8">
                 rendered by D3
               </text>
             </svg>
+            <div class="cmp-stat" id="cmp-snr-sg" style="color:var(--method-gcam)">SNR: —</div>
           </div>
 
         </div><!-- end cmp-panels -->
@@ -888,6 +897,10 @@ var patternName='edge';
 var targetCls=0;
 var customGrid=new Array(64).fill(0);
 var playTimer=null;
+var activeTab='saliency';
+var igStep=0;
+var igAccum=new Array(64).fill(0);
+var lastVGrads=null, lastIGGrads=null, lastSGGrads=null;
 
 function currentGrid(){
   if(patternName==='edge')     return genEdge();
@@ -1070,20 +1083,295 @@ function updateSaliency(){
   document.getElementById('step-total').textContent=PATTERN_KEYS.length;
 }
 
+// ── PRNG (mulberry32) ──────────────────────────────────────────────
+function makeRng(seed){
+  return function(){
+    seed|=0; seed=seed+0x6D2B79F5|0;
+    var t=Math.imul(seed^seed>>>15,1|seed);
+    t=t+Math.imul(t^t>>>7,61|t)^t;
+    return((t^t>>>14)>>>0)/4294967296;
+  };
+}
+function gaussRng(rng){
+  var u1=Math.max(1e-10,rng()),u2=rng();
+  return Math.sqrt(-2*Math.log(u1))*Math.cos(2*Math.PI*u2);
+}
+
+// ── Tab dispatcher ─────────────────────────────────────────────────
+function updateCurrentTab(){
+  if(activeTab==='saliency') updateSaliency();
+  else if(activeTab==='integrated') renderIG();
+  else updateComparison();
+}
+
+// ── Baseline helpers ───────────────────────────────────────────────
+function getBaselineName(){
+  var b=document.querySelector('#baseline-selector .sel-btn.active');
+  return b?b.dataset.baseline:'black';
+}
+function getBaseline(){
+  var n=getBaselineName();
+  if(n==='white') return new Array(64).fill(1);
+  if(n==='noise'){var rng=makeRng(99);return Array.from({length:64},function(){return rng();});}
+  return new Array(64).fill(0);
+}
+function igSteps(){return +document.getElementById('sld-steps').value;}
+
+// ── Full IG (all steps at once) ────────────────────────────────────
+function computeFullIG(grid, baseline, steps){
+  var accum=new Array(64).fill(0);
+  for(var k=1;k<=steps;k++){
+    var alpha=k/steps;
+    var interp=grid.map(function(v,i){return baseline[i]+alpha*(v-baseline[i]);});
+    var g=computeGradient(interp,targetCls);
+    for(var i=0;i<64;i++) accum[i]+=g[i]*(grid[i]-baseline[i])/steps;
+  }
+  return accum;
+}
+
+// ── SmoothGrad (average over noisy samples) ────────────────────────
+function computeSmoothGrad(grid, nSamples, sigma){
+  var rng=makeRng(42+targetCls*17);
+  var accum=new Array(64).fill(0);
+  for(var s=0;s<nSamples;s++){
+    var noisy=grid.map(function(v){return Math.max(0,Math.min(1,v+gaussRng(rng)*sigma));});
+    var g=computeGradient(noisy,targetCls);
+    for(var i=0;i<64;i++) accum[i]+=g[i];
+  }
+  return accum.map(function(v){return v/nSamples;});
+}
+
+// ── IG tab: step-by-step ───────────────────────────────────────────
+function resetIG(){
+  igStep=0; igAccum=new Array(64).fill(0);
+  renderIG();
+}
+
+function doIGStep(){
+  var m=igSteps();
+  if(igStep>=m){stopPlay();return;}
+  igStep++;
+  var alpha=igStep/m, grid=currentGrid(), baseline=getBaseline();
+  var interp=grid.map(function(v,i){return baseline[i]+alpha*(v-baseline[i]);});
+  var g=computeGradient(interp,targetCls);
+  for(var i=0;i<64;i++) igAccum[i]+=g[i]*(grid[i]-baseline[i])/m;
+  renderIG();
+}
+
+function renderIG(){
+  var m=igSteps(), grid=currentGrid(), baseline=getBaseline();
+  var alpha=igStep/m;
+  var interp=grid.map(function(v,i){return baseline[i]+alpha*(v-baseline[i]);});
+
+  renderInputGrid('svg-baseline',baseline,false);
+  renderInputGrid('svg-interp',interp,false);
+  renderHeatmap('svg-accum',igAccum);
+
+  // Progress UI
+  var pct=(igStep/m*100).toFixed(0);
+  document.getElementById('ig-progress-fill').style.width=pct+'%';
+  document.getElementById('ig-step-lbl').textContent='step '+igStep+' / '+m;
+  document.getElementById('ig-alpha-display').textContent='α = '+alpha.toFixed(3);
+  document.getElementById('alpha-sub').textContent='α = '+alpha.toFixed(3)+' (step '+igStep+'/'+m+')';
+  var blLbls={black:'Black (all zeros)',white:'White (all ones)',noise:'Random noise'};
+  document.getElementById('baseline-sub').textContent=blLbls[getBaselineName()]||getBaselineName();
+
+  // Right panel
+  var pred=predict(grid);
+  var badge=document.getElementById('class-badge');
+  badge.textContent='Class '+pred.cls; badge.className='class-badge '+(pred.cls===0?'c0':'c1');
+  document.getElementById('rp-fx').textContent=pred.prob.toFixed(4);
+  var fx0=predictProb(baseline);
+  document.getElementById('rp-fx0').textContent=fx0.toFixed(4);
+  var df=pred.prob-fx0;
+  var dfEl=document.getElementById('rp-df');
+  dfEl.textContent=(df>=0?'+':'')+df.toFixed(4);
+  dfEl.style.color=df>0?'#2D5A1B':df<0?'#B0321D':'#888';
+  var cf=document.getElementById('conf-fill');
+  cf.style.width=Math.round(pred.conf*100)+'%';
+  cf.style.background=pred.cls===0?'#1A56A0':'#B0321D';
+
+  // Top 5 pixels
+  var indexed=igAccum.map(function(v,i){return{i:i,v:v,a:Math.abs(v)};});
+  indexed.sort(function(a,b){return b.a-a.a;});
+  var top5=indexed.slice(0,5), maxA=top5[0]?top5[0].a:0.001;
+  var cont=document.getElementById('top-pixels'); cont.innerHTML='';
+  top5.forEach(function(px){
+    var r2=Math.floor(px.i/N),c2=px.i%N;
+    var row=document.createElement('div'); row.className='pixel-row';
+    row.innerHTML='<span class="px-coord">('+r2+','+c2+')</span>'+
+      '<div class="px-bar-track"><div class="px-bar-fill '+(px.v>=0?'pos':'neg')+
+      '" style="width:'+Math.round(px.a/maxA*100)+'%"></div></div>'+
+      '<span class="px-val">'+(px.v>=0?'+':'')+px.v.toFixed(3)+'</span>';
+    cont.appendChild(row);
+  });
+
+  // Completeness + annotation
+  var attrSum=igAccum.reduce(function(a,b){return a+b;},0);
+  var err=Math.abs(attrSum-df);
+  var compEl=document.getElementById('completeness-val');
+  if(igStep>=m){
+    compEl.textContent=err.toFixed(4);
+    compEl.style.color=err<Math.abs(df)*0.05?'#2D5A1B':'#B08000';
+    var igAnno=document.getElementById('ig-anno');
+    if(igAnno){
+      var errPct=(err/Math.max(Math.abs(df),1e-6)*100).toFixed(1);
+      igAnno.textContent='Integration complete ('+m+' steps). Attribution sum = '+attrSum.toFixed(4)+
+        ', Δf = '+df.toFixed(4)+'. Error = '+err.toFixed(4)+' ('+errPct+'%). '+
+        (err<Math.abs(df)*0.05?'Completeness satisfied ✓':'Increase steps for tighter completeness.');
+      igAnno.className='anno-box '+(err<Math.abs(df)*0.05?'good':'neutral');
+    }
+  } else {
+    compEl.textContent='…'; compEl.style.color='var(--text-muted)';
+    var igAnno2=document.getElementById('ig-anno');
+    if(igAnno2){
+      igAnno2.textContent='α = '+alpha.toFixed(2)+': evaluating ∂f/∂x at the interpolated input '+
+        'x′+'+alpha.toFixed(2)+'(x−x′). Each gradient (weighted by Δx/m) accumulates '+
+        'in the right panel. Completeness is verified when all '+m+' steps complete.';
+      igAnno2.className='anno-box neutral';
+    }
+  }
+}
+
+// ── Comparison tab ─────────────────────────────────────────────────
+function snrOf(grads){
+  var abs=grads.map(function(v){return Math.abs(v);});
+  var maxG=Math.max.apply(null,abs)||0.001;
+  var meanG=abs.reduce(function(a,b){return a+b;},0)/64;
+  return meanG>1e-7?maxG/meanG:0;
+}
+
+function renderCmpBars(vG,igG,sgG){
+  var el=document.getElementById('svg-cmp-bars'); if(!el) return;
+  var bcr=el.getBoundingClientRect();
+  var W=Math.max(220,bcr.width||500),H=110;
+  var svg=d3.select(el);
+  svg.selectAll('*').remove();
+  svg.attr('viewBox','0 0 '+W+' '+H).attr('width','100%');
+  svg.append('rect').attr('width',W).attr('height',H).attr('fill','#FDFAF5');
+  var meanAbs=function(g){return g.reduce(function(s,v){return s+Math.abs(v);},0)/g.length;};
+  var vals=[
+    {lbl:'Vanilla Grad',v:meanAbs(vG),col:'#1A56A0'},
+    {lbl:'Integ. Grad', v:meanAbs(igG),col:'#2D5A1B'},
+    {lbl:'SmoothGrad',  v:meanAbs(sgG),col:'#E8630A'}
+  ];
+  var maxV=Math.max.apply(null,vals.map(function(d){return d.v;}))||0.001;
+  var P={t:16,r:12,b:30,l:12},iw=W-P.l-P.r,ih=H-P.t-P.b;
+  var g=svg.append('g').attr('transform','translate('+P.l+','+P.t+')');
+  var slot=iw/3;
+  vals.forEach(function(d,i){
+    var bw=Math.min(slot*.58,52),bx=i*slot+(slot-bw)/2;
+    var bh=Math.max(2,Math.round(d.v/maxV*ih)),by=ih-bh;
+    g.append('rect').attr('x',bx).attr('y',by).attr('width',bw).attr('height',bh)
+     .attr('rx',3).attr('fill',d.col).attr('opacity',.85);
+    g.append('text').attr('x',bx+bw/2).attr('y',ih+18).attr('text-anchor','middle')
+     .attr('font-size',8).attr('font-family','Outfit,sans-serif').attr('fill','#555').text(d.lbl);
+    g.append('text').attr('x',bx+bw/2).attr('y',by-5).attr('text-anchor','middle')
+     .attr('font-size',7.5).attr('font-family','IBM Plex Mono,monospace').attr('fill',d.col)
+     .attr('font-weight','600').text(d.v.toFixed(3));
+  });
+}
+
+function showExpand(grads, title){
+  var old=document.getElementById('expand-overlay'); if(old) old.remove();
+  var ov=document.createElement('div');
+  ov.id='expand-overlay';
+  ov.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;z-index:2000;'+
+    'background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;cursor:pointer';
+  var card=document.createElement('div');
+  card.style.cssText='background:white;border-radius:12px;padding:1.25rem;width:min(480px,92vw);'+
+    'box-shadow:0 8px 40px rgba(0,0,0,.35);cursor:default';
+  card.innerHTML=
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">'+
+    '<span style="font-weight:700;font-size:.88rem;color:#1C3A0E">'+title+'</span>'+
+    '<button id="expand-close" style="background:none;border:none;font-size:1.1rem;cursor:pointer;color:#888">✕</button></div>'+
+    '<svg id="svg-expand" style="width:100%;aspect-ratio:1/1;display:block;border-radius:6px;'+
+    'background:#FDFAF5;border:1px solid #DDD6BE"></svg>'+
+    '<div class="cmap-legend" style="margin-top:.45rem"><div class="cmap-bar" style="width:150px;margin:auto"></div>'+
+    '<div class="cmap-ticks" style="width:150px;margin:auto"><span style="color:#1A56A0">− Negative</span><span>0</span><span style="color:#B0321D">+ Positive</span></div></div>';
+  ov.appendChild(card);
+  document.body.appendChild(ov);
+  renderHeatmap('svg-expand', grads);
+  ov.addEventListener('click',function(e){if(e.target===ov) ov.remove();});
+  document.getElementById('expand-close').addEventListener('click',function(){ov.remove();});
+}
+
+function updateComparison(){
+  var grid=currentGrid(), baseline=getBaseline();
+  var vG=computeGradient(grid.slice(),targetCls);
+  var igG=computeFullIG(grid,baseline,50);
+  var sgG=computeSmoothGrad(grid,20,0.1);
+  lastVGrads=vG; lastIGGrads=igG; lastSGGrads=sgG;
+
+  renderHeatmap('svg-cmp-vanilla',vG);
+  renderHeatmap('svg-cmp-ig',igG);
+  renderHeatmap('svg-cmp-gcam',sgG);
+  renderCmpBars(vG,igG,sgG);
+
+  // Stat lines
+  var vSnr=snrOf(vG), sgSnr=snrOf(sgG);
+  var vStat=document.getElementById('cmp-snr-vanilla');
+  var sgStat=document.getElementById('cmp-snr-sg');
+  var igStat=document.getElementById('cmp-compl-ig');
+  if(vStat) vStat.textContent='SNR: '+vSnr.toFixed(1)+'×';
+  if(sgStat) sgStat.textContent='SNR: '+sgSnr.toFixed(1)+'×';
+  if(igStat){
+    var fx=predictProb(grid),fx0=predictProb(baseline),df=fx-fx0;
+    var aSum=igG.reduce(function(a,b){return a+b;},0);
+    var err=aSum-df;
+    igStat.textContent='Σ attr − Δf = '+(err>=0?'+':'')+err.toFixed(4);
+    igStat.style.color=Math.abs(err)<Math.abs(df)*0.05?'#2D5A1B':'#B08000';
+  }
+
+  // Right panel: use vanilla grads for top pixels and SNR
+  var badge=document.getElementById('class-badge');
+  var pred=predict(grid);
+  badge.textContent='Class '+pred.cls; badge.className='class-badge '+(pred.cls===0?'c0':'c1');
+  document.getElementById('rp-fx').textContent=pred.prob.toFixed(4);
+  var fx0b=predictProb(baseline);
+  document.getElementById('rp-fx0').textContent=fx0b.toFixed(4);
+  var dfb=pred.prob-fx0b;
+  var dfEl=document.getElementById('rp-df');
+  dfEl.textContent=(dfb>=0?'+':'')+dfb.toFixed(4);
+  dfEl.style.color=dfb>0?'#2D5A1B':dfb<0?'#B0321D':'#888';
+  var cf=document.getElementById('conf-fill');
+  cf.style.width=Math.round(pred.conf*100)+'%';
+  cf.style.background=pred.cls===0?'#1A56A0':'#B0321D';
+  var snrEl=document.getElementById('snr-val');
+  snrEl.textContent=vSnr.toFixed(1)+'× → '+sgSnr.toFixed(1)+'×';
+  snrEl.style.color=sgSnr>vSnr?'#2D5A1B':'#B08000';
+
+  // Attribution quality annotation
+  var cmpAnno=document.getElementById('cmp-anno');
+  if(cmpAnno){
+    cmpAnno.textContent='Vanilla SNR = '+vSnr.toFixed(1)+'×, SmoothGrad SNR = '+sgSnr.toFixed(1)+'×. '+
+      (sgSnr>vSnr?'SmoothGrad sharpened the attribution by averaging over 20 noisy inputs (σ=0.1). ':
+       'SNR improvement minimal — try Edge or Circle for a clearer difference. ')+
+      'IG satisfies completeness: Σ attr ≈ f(x)−f(x′). Click any panel to expand.';
+    cmpAnno.className='anno-box '+(sgSnr>vSnr?'good':'neutral');
+  }
+}
+
 // ── Playback ───────────────────────────────────────────────────────
 function speedToMs(){
   var s=+document.getElementById('sld-speed').value;
   return [2000,1400,850,500,220][Math.max(0,Math.min(4,s-1))];
 }
 
-function doStep(){
+// Cycles patterns (used by Tab 1 and Tab 3 play)
+function doSaliencyStep(){
   var idx=PATTERN_KEYS.indexOf(patternName);
   var next=PATTERN_KEYS[(idx+1)%PATTERN_KEYS.length];
   patternName=next;
   document.querySelectorAll('#pattern-selector .sel-btn').forEach(function(b){
     b.classList.toggle('active',b.dataset.pattern===next);
   });
-  updateSaliency();
+  updateCurrentTab();
+}
+
+function doStep(){
+  if(activeTab==='integrated') doIGStep();
+  else doSaliencyStep();
 }
 
 function stopPlay(){
@@ -1099,11 +1387,15 @@ function doPlay(){
 
 function doReset(){
   stopPlay();
-  patternName='edge';
-  document.querySelectorAll('#pattern-selector .sel-btn').forEach(function(b){
-    b.classList.toggle('active',b.dataset.pattern==='edge');
-  });
-  updateSaliency();
+  if(activeTab==='integrated'){
+    resetIG();
+  } else {
+    patternName='edge';
+    document.querySelectorAll('#pattern-selector .sel-btn').forEach(function(b){
+      b.classList.toggle('active',b.dataset.pattern==='edge');
+    });
+    updateCurrentTab();
+  }
 }
 
 // ── Event wiring ───────────────────────────────────────────────────
@@ -1113,17 +1405,21 @@ document.getElementById('tab-bar').addEventListener('click',function(e){
   btn.classList.add('active');
   document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('active');});
   document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
+  activeTab=btn.dataset.tab;
+  stopPlay();
+  if(activeTab==='integrated') renderIG();
+  else if(activeTab==='comparison') updateComparison();
 });
 
 document.getElementById('pattern-selector').addEventListener('click',function(e){
   var btn=e.target.closest('.sel-btn'); if(!btn) return;
   var newP=btn.dataset.pattern;
-  // When switching to custom, seed from the current pattern
-  if(newP==='custom' && patternName!=='custom') customGrid=currentGrid();
+  if(newP==='custom'&&patternName!=='custom') customGrid=currentGrid();
   document.querySelectorAll('#pattern-selector .sel-btn').forEach(function(b){b.classList.remove('active');});
   btn.classList.add('active');
   patternName=newP;
-  updateSaliency();
+  if(activeTab==='integrated'){igStep=0;igAccum=new Array(64).fill(0);}
+  updateCurrentTab();
 });
 
 document.getElementById('class-selector').addEventListener('click',function(e){
@@ -1131,13 +1427,20 @@ document.getElementById('class-selector').addEventListener('click',function(e){
   document.querySelectorAll('#class-selector button').forEach(function(b){b.classList.remove('active');});
   btn.classList.add('active');
   targetCls=+btn.dataset.cls;
-  updateSaliency();
+  if(activeTab==='integrated'){igStep=0;igAccum=new Array(64).fill(0);}
+  updateCurrentTab();
+});
+
+document.getElementById('baseline-selector').addEventListener('click',function(e){
+  var btn=e.target.closest('.sel-btn'); if(!btn) return;
+  document.querySelectorAll('#baseline-selector .sel-btn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  if(activeTab==='integrated'){igStep=0;igAccum=new Array(64).fill(0);}
+  updateCurrentTab();
 });
 
 document.getElementById('btn-play').addEventListener('click',doPlay);
-document.getElementById('btn-step').addEventListener('click',function(){
-  stopPlay(); doStep();
-});
+document.getElementById('btn-step').addEventListener('click',function(){stopPlay();doStep();});
 document.getElementById('btn-reset').addEventListener('click',doReset);
 
 document.getElementById('sld-speed').addEventListener('input',function(){
@@ -1147,12 +1450,25 @@ document.getElementById('sld-speed').addEventListener('input',function(){
 
 document.getElementById('sld-steps').addEventListener('input',function(){
   document.getElementById('val-steps').textContent=this.value;
+  document.getElementById('step-total').textContent=this.value;
+  if(activeTab==='integrated'){igStep=0;igAccum=new Array(64).fill(0);renderIG();}
 });
 
 document.getElementById('concepts-toggle').addEventListener('click',function(){
   var body=document.getElementById('concepts-body'),arrow=document.getElementById('concepts-arrow');
   body.classList.toggle('collapsed');
   arrow.textContent=body.classList.contains('collapsed')?'▸':'▾';
+});
+
+// Expand-on-click for comparison panels
+document.getElementById('svg-cmp-vanilla').addEventListener('click',function(){
+  if(lastVGrads) showExpand(lastVGrads,'Vanilla Gradients — ∂f/∂x at input x');
+});
+document.getElementById('svg-cmp-ig').addEventListener('click',function(){
+  if(lastIGGrads) showExpand(lastIGGrads,'Integrated Gradients — 50 steps from baseline');
+});
+document.getElementById('svg-cmp-gcam').addEventListener('click',function(){
+  if(lastSGGrads) showExpand(lastSGGrads,'SmoothGrad — average over 20 noisy samples (σ=0.1)');
 });
 
 // ── Boot ───────────────────────────────────────────────────────────
