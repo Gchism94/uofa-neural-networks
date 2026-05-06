@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<!-- Copyright © 2026 Greg T. Chism. University of Arizona, College of Information Science.
+     INFO 557: Neural Networks. MIT License. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gradient Attribution — Interactive Explorer | INFO 557: Neural Networks</title>
+<meta name="description" content="See which input features drive model predictions — explore saliency maps, integrated gradients, and attribution comparison across methods.">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Gradient Attribution — Interactive Explorer">
+<meta property="og:description" content="See which input features drive model predictions — explore saliency maps, integrated gradients, and attribution comparison across methods.">
+<meta property="og:image" content="https://gchism94.github.io/uofa-neural-networks/gradient_attribution/ga_explorer-preview.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="600">
+<meta property="og:url" content="https://gchism94.github.io/uofa-neural-networks/gradient_attribution/ga_explorer.html">
+<meta property="fb:app_id" content="2385695445236853">
+
+<!-- Twitter/X card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Gradient Attribution — Interactive Explorer">
+<meta name="twitter:description" content="See which input features drive model predictions — explore saliency maps, integrated gradients, and attribution comparison across methods.">
+<meta name="twitter:image" content="https://gchism94.github.io/uofa-neural-networks/gradient_attribution/ga_explorer-preview.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+
+<style>
+/* ── Design tokens ──────────────────────────────────────────────── */
+:root{
+  --cream:#FAF7F0;--cream-mid:#F0EBE0;--cream-dk:#E2D9C5;
+  --g-dk:#1C3A0E;--g-mid:#2D5A1B;--g-lt:#4A8C2F;--g-pale:#C8E6A8;
+  --orange:#E8630A;--orange-lt:#F08C50;--orange-dk:#C0500A;
+  --blue:#1A56A0;--blue-pale:#D0E4F8;
+  --red:#B0321D;--red-pale:#F8DDD8;
+  --purple:#7B3FC4;--purple-pale:#E8D8F8;
+  --yellow:#B08000;--yellow-pale:#FBF0C8;--yellow-hi:#D4A017;
+  --text:#1A1A1A;--text-muted:#888;--text-soft:#555;
+  --border:#C8BE9A;--border-lt:#DDD6BE;--shadow:rgba(44,90,27,.10);
+
+  /* Attribution-specific palette */
+  --pos-attr:#B0321D;    /* red  = positive gradient (pushes toward prediction) */
+  --neg-attr:#1A56A0;    /* blue = negative gradient */
+  --neu-attr:#F8F5F0;    /* near-white = neutral */
+  --pos-attr-pale:#F8DDD8;
+  --neg-attr-pale:#D0E4F8;
+  --method-vanilla:#1A56A0;
+  --method-ig:#2D5A1B;
+  --method-gcam:#E8630A;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:'Outfit',sans-serif;background:var(--cream);color:var(--text);
+  padding:1.25rem 1rem 2rem;min-height:100vh;line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:.85rem}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+.hdr{display:flex;justify-content:space-between;align-items:flex-start;column-gap:1rem;row-gap:.35rem;flex-wrap:wrap}
+.hdr>div:first-child{flex:1 1 auto;min-width:0}
+.hdr h1{font-size:clamp(1.2rem,2.1vw,1.55rem);font-weight:700;color:var(--g-dk);letter-spacing:-.02em;line-height:1.2}
+.hdr p.subtitle{font-size:.86rem;color:var(--text-muted);margin-top:.18rem}
+.hdr-rule{border:none;border-top:2.5px solid var(--g-dk);margin-top:.55rem}
+
+/* ── Fixed copyright ─────────────────────────────────────────────── */
+.cr-top{
+  position:fixed;top:.75rem;right:1rem;z-index:1000;
+  font-size:.72rem;color:var(--text-muted);text-align:right;
+  background:rgba(250,247,240,.92);padding:.2rem 1.5rem .2rem .5rem;
+  border-radius:5px;backdrop-filter:blur(4px);
+  border:1px solid var(--border-lt);white-space:nowrap;min-width:max-content;
+}
+.cr-top a{color:var(--orange);text-decoration:none}
+.cr-top a:hover{text-decoration:underline}
+
+/* ── Tab bar ─────────────────────────────────────────────────────── */
+.tab-bar{
+  display:flex;gap:.35rem;background:var(--cream-mid);
+  border:1px solid var(--border);border-radius:8px;
+  padding:.3rem;width:fit-content;
+}
+.tab-bar button{
+  font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:500;
+  padding:.3rem .9rem;border-radius:6px;cursor:pointer;
+  border:none;background:transparent;color:var(--text-soft);transition:all .15s;
+}
+.tab-bar button:hover{background:white;color:var(--g-dk)}
+.tab-bar button.active{background:white;color:var(--g-dk);font-weight:600;
+  box-shadow:0 1px 4px var(--shadow);}
+
+/* ── Explorer grid ───────────────────────────────────────────────── */
+.explorer-grid{
+  display:grid;
+  grid-template-columns:250px 1fr 210px;
+  gap:.85rem;align-items:start;
+}
+@media(max-width:980px){
+  .explorer-grid{grid-template-columns:250px 1fr}
+  .right-col{display:none}
+}
+@media(max-width:680px){.explorer-grid{grid-template-columns:1fr}}
+.left-col{display:flex;flex-direction:column;gap:.75rem}
+.center-col{display:flex;flex-direction:column;gap:.75rem}
+.right-col{display:flex;flex-direction:column;gap:.75rem}
+
+/* ── Cards ───────────────────────────────────────────────────────── */
+.card{background:white;border:1px solid var(--border);border-radius:8px;
+  padding:.85rem 1rem;box-shadow:0 2px 8px var(--shadow)}
+.card-title{font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--g-dk);margin-bottom:.55rem}
+
+/* ── Selectors ───────────────────────────────────────────────────── */
+.sel-group{display:flex;gap:.3rem;flex-wrap:wrap;margin-bottom:.45rem}
+.sel-btn{
+  font-family:'Outfit',sans-serif;font-size:.75rem;font-weight:500;
+  padding:.25rem .6rem;border-radius:5px;cursor:pointer;
+  border:1.5px solid var(--border-lt);background:var(--cream);color:var(--text-soft);
+  transition:all .12s;
+}
+.sel-btn:hover{background:var(--cream-mid)}
+.sel-btn.active{background:var(--g-mid);border-color:var(--g-mid);color:white}
+
+/* ── Toggle groups ───────────────────────────────────────────────── */
+.toggle-grp{
+  display:flex;gap:0;border-radius:6px;overflow:hidden;
+  border:1.5px solid var(--border);margin-bottom:.45rem;
+}
+.toggle-grp button{
+  font-family:'Outfit',sans-serif;font-size:.78rem;font-weight:500;
+  padding:.28rem 0;flex:1;border:none;cursor:pointer;
+  background:var(--cream);color:var(--text-soft);transition:all .12s;
+}
+.toggle-grp button.active{background:var(--g-mid);color:white}
+.toggle-grp button:not(.active):hover{background:var(--cream-mid)}
+
+/* ── Sliders ─────────────────────────────────────────────────────── */
+.srow{display:flex;align-items:center;gap:.45rem;margin-bottom:.2rem}
+.slbl{font-family:'IBM Plex Mono',monospace;font-size:.8rem;font-weight:500;
+  color:var(--g-dk);min-width:28px}
+input[type=range]{flex:1;appearance:none;-webkit-appearance:none;height:4px;
+  background:var(--cream-dk);border-radius:2px;cursor:pointer;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
+  border-radius:50%;background:var(--g-mid);border:2.5px solid white;
+  box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:pointer}
+.sval{font-family:'IBM Plex Mono',monospace;font-size:.76rem;
+  color:var(--text-muted);min-width:44px;text-align:right}
+.hint-txt{font-size:.7rem;color:var(--text-muted);font-style:italic;margin-top:.15rem}
+.param-lbl{font-size:.72rem;color:var(--text-soft);margin-bottom:.25rem;font-weight:500}
+
+/* ── Buttons ─────────────────────────────────────────────────────── */
+.ctrl-btns{display:flex;gap:.45rem;flex-wrap:wrap}
+.pbtn{
+  font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:600;
+  padding:.35rem .9rem;border-radius:6px;cursor:pointer;
+  border:1.5px solid var(--border);background:var(--cream);color:var(--g-dk);
+  transition:all .12s;
+}
+.pbtn:hover{background:var(--g-pale);border-color:var(--g-lt)}
+.pbtn.primary{background:var(--g-mid);border-color:var(--g-mid);color:white}
+.pbtn.primary:hover{background:var(--g-dk);border-color:var(--g-dk)}
+
+/* ── Annotation box ──────────────────────────────────────────────── */
+.anno-box{
+  border-radius:6px;padding:.55rem .75rem;font-size:.78rem;line-height:1.55;
+  background:var(--blue-pale);color:var(--blue);border-left:3px solid var(--blue);
+  min-height:3.2rem;
+}
+.anno-box.warn{background:var(--red-pale);color:var(--red);border-color:var(--red)}
+.anno-box.good{background:var(--g-pale);color:var(--g-dk);border-color:var(--g-mid)}
+.anno-box.neutral{background:var(--cream-mid);color:var(--text-soft);border-color:var(--border)}
+
+/* ── Key Concepts ────────────────────────────────────────────────── */
+.concepts-body{overflow:hidden;max-height:900px;transition:max-height .3s ease}
+.concepts-body.collapsed{max-height:0;margin-bottom:-.55rem}
+.concepts-item{font-size:.74rem;color:var(--text-soft);line-height:1.5;
+  margin-bottom:.45rem;padding-left:.9rem;position:relative}
+.concepts-item:last-child{margin-bottom:0}
+.concepts-item::before{content:'●';color:#2e7d32;position:absolute;left:0;top:0}
+.concepts-item strong{color:#2e7d32;font-weight:600}
+
+/* ── Plot label ──────────────────────────────────────────────────── */
+.plot-label{font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--text-muted);text-align:center;margin-bottom:.5rem}
+.panel-title{font-size:.74rem;font-weight:700;color:var(--g-dk);text-align:center;
+  margin-bottom:.3rem}
+.panel-sub{font-size:.64rem;color:var(--text-muted);text-align:center;
+  margin-bottom:.4rem;font-style:italic}
+
+/* ── Legend ──────────────────────────────────────────────────────── */
+.legend{display:flex;gap:.75rem;flex-wrap:wrap;font-size:.72rem;
+  color:var(--text-soft);margin-top:.5rem;align-items:center}
+.legend-dot{width:10px;height:10px;border-radius:50%;display:inline-block;
+  vertical-align:middle;margin-right:.25rem;flex-shrink:0}
+.legend-sq{width:12px;height:12px;border-radius:2px;display:inline-block;
+  vertical-align:middle;margin-right:.25rem;flex-shrink:0}
+
+/* ── Tab panels ──────────────────────────────────────────────────── */
+.tab-panel{display:none}
+.tab-panel.active{display:flex;flex-direction:column;gap:.75rem}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* ── Shared: 8×8 grid SVG container ─────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────── */
+.grid-wrap{
+  display:flex;flex-direction:column;align-items:center;gap:.3rem;
+}
+.grid-svg{
+  width:100%;max-width:240px;aspect-ratio:1/1;display:block;
+  border-radius:5px;background:#FDFAF5;border:1px solid var(--border-lt);
+}
+.grid-label{
+  font-size:.64rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--text-muted);text-align:center;
+}
+
+/* ── Heatmap colormap legend ─────────────────────────────────────── */
+.cmap-legend{
+  display:flex;flex-direction:column;align-items:center;gap:.15rem;
+  margin-top:.3rem;
+}
+.cmap-bar{
+  width:120px;height:10px;border-radius:3px;
+  background:linear-gradient(to right,var(--neg-attr),var(--neu-attr),var(--pos-attr));
+  border:1px solid var(--border-lt);
+}
+.cmap-ticks{
+  display:flex;justify-content:space-between;width:120px;
+  font-family:'IBM Plex Mono',monospace;font-size:.6rem;color:var(--text-muted);
+}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* ── Tab 1: Saliency Maps — two-panel layout ─────────────────────── */
+/* ─────────────────────────────────────────────────────────────────── */
+.saliency-panels{
+  display:grid;grid-template-columns:1fr 1fr;gap:1rem;
+  align-items:start;justify-items:center;
+}
+@media(max-width:560px){.saliency-panels{grid-template-columns:1fr}}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* ── Tab 2: Integrated Gradients — three-panel layout ───────────── */
+/* ─────────────────────────────────────────────────────────────────── */
+.ig-panels{
+  display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem;
+  align-items:start;justify-items:center;
+}
+@media(max-width:640px){.ig-panels{grid-template-columns:1fr}}
+
+/* Integration progress bar */
+.ig-progress-wrap{
+  display:flex;flex-direction:column;gap:.3rem;margin-top:.3rem;
+}
+.ig-progress-lbl{
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:.7rem;color:var(--text-soft);
+}
+.ig-progress-lbl span:last-child{
+  font-family:'IBM Plex Mono',monospace;color:var(--g-dk);font-weight:600;
+}
+.ig-progress-track{
+  width:100%;height:8px;background:var(--cream-dk);border-radius:4px;overflow:hidden;
+}
+.ig-progress-fill{
+  height:100%;border-radius:4px;
+  background:linear-gradient(to right,var(--g-pale),var(--g-mid));
+  width:50%;transition:width .2s;
+}
+.ig-alpha-display{
+  text-align:center;font-family:'IBM Plex Mono',monospace;
+  font-size:.76rem;font-weight:600;color:var(--g-dk);margin-top:.15rem;
+}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* ── Tab 3: Attribution Comparison — three-panel layout ─────────── */
+/* ─────────────────────────────────────────────────────────────────── */
+.cmp-panels{
+  display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem;
+  align-items:start;justify-items:center;
+}
+@media(max-width:640px){.cmp-panels{grid-template-columns:1fr}}
+
+.method-badge{
+  display:inline-block;padding:.12rem .5rem;border-radius:4px;
+  font-size:.65rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+  margin-bottom:.25rem;
+}
+.method-badge.vanilla{background:var(--blue-pale);color:var(--method-vanilla)}
+.method-badge.ig{background:var(--g-pale);color:var(--method-ig)}
+.method-badge.gcam{background:var(--red-pale);color:var(--method-gcam)}
+
+/* Attribution comparison bar chart SVG */
+#svg-cmp-bars{
+  width:100%;min-height:110px;display:block;
+  border-radius:5px;background:#FDFAF5;border:1px solid var(--border-lt);
+}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* ── Right panel ─────────────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────── */
+.stat-row{
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:.7rem;padding:.22rem 0;border-bottom:1px solid var(--border-lt);
+}
+.stat-row:last-child{border-bottom:none}
+.sr-lbl{color:var(--text-muted);font-family:'IBM Plex Mono',monospace}
+.sr-val{font-weight:600;font-family:'IBM Plex Mono',monospace;color:var(--g-dk)}
+
+/* Class badge */
+.class-badge{
+  display:inline-block;padding:.08rem .45rem;border-radius:4px;
+  font-size:.67rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+}
+.class-badge.c0{background:var(--blue-pale);color:var(--blue)}
+.class-badge.c1{background:var(--red-pale);color:var(--red)}
+
+/* Confidence bar */
+.conf-track{
+  width:100%;height:6px;background:var(--cream-dk);border-radius:3px;
+  margin-top:.2rem;overflow:hidden;
+}
+.conf-fill{height:100%;border-radius:3px;background:var(--g-mid);transition:width .35s}
+
+/* Top pixels list */
+.pixel-row{
+  display:flex;align-items:center;gap:.35rem;padding:.18rem 0;
+  border-bottom:1px solid var(--border-lt);font-size:.67rem;
+}
+.pixel-row:last-child{border-bottom:none}
+.px-coord{font-family:'IBM Plex Mono',monospace;color:var(--text-soft);min-width:54px}
+.px-bar-track{flex:1;height:6px;background:var(--cream-mid);border-radius:3px;
+  position:relative;overflow:hidden}
+.px-bar-fill{position:absolute;top:0;left:0;height:100%;border-radius:3px}
+.px-bar-fill.pos{background:var(--pos-attr)}
+.px-bar-fill.neg{background:var(--neg-attr)}
+.px-val{font-family:'IBM Plex Mono',monospace;font-size:.63rem;
+  min-width:38px;text-align:right;color:var(--text-muted)}
+
+/* Completeness / SNR boxes */
+.metric-box{
+  text-align:center;padding:.45rem .3rem;border-radius:6px;
+  border:1px solid var(--border-lt);background:var(--cream);margin-top:.25rem;
+}
+.metric-val{display:block;font-family:'IBM Plex Mono',monospace;font-size:1rem;
+  font-weight:700;line-height:1.2;color:var(--g-dk)}
+.metric-lbl{font-size:.6rem;color:var(--text-muted);margin-top:.08rem}
+
+/* Step counter display */
+.step-counter{
+  display:flex;justify-content:center;align-items:center;
+  gap:.4rem;font-family:'IBM Plex Mono',monospace;font-size:.8rem;
+  color:var(--g-dk);font-weight:600;margin-top:.3rem;
+}
+.step-counter span.step-num{
+  background:var(--g-mid);color:white;border-radius:4px;
+  padding:.1rem .45rem;font-size:.78rem;
+}
+
+/* Speed row */
+.speed-row{display:flex;align-items:center;gap:.45rem;margin-top:.35rem}
+</style>
+</head>
+<body>
+
+<div class="cr-top">© 2026 Greg T. Chism · <a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a></div>
+
+<div class="wrap">
+
+<header>
+  <div class="hdr">
+    <div>
+      <h1>Gradient Attribution — Interactive Explorer</h1>
+      <p class="subtitle">See which input features drive model predictions — explore saliency maps, integrated gradients, and attribution comparison</p>
+    </div>
+  </div>
+  <hr class="hdr-rule">
+</header>
+
+<!-- Tab bar -->
+<div class="tab-bar" id="tab-bar">
+  <button class="active" data-tab="saliency">Saliency Maps</button>
+  <button data-tab="integrated">Integrated Gradients</button>
+  <button data-tab="comparison">Attribution Comparison</button>
+</div>
+
+<!-- Main explorer -->
+<div class="explorer-grid">
+
+  <!-- ══ LEFT: Controls ══════════════════════════════════════════════ -->
+  <div class="left-col">
+
+    <!-- Input pattern -->
+    <div class="card">
+      <div class="card-title">Input Pattern</div>
+      <div class="sel-group" id="pattern-selector">
+        <button class="sel-btn active" data-pattern="edge">Edge</button>
+        <button class="sel-btn" data-pattern="circle">Circle</button>
+        <button class="sel-btn" data-pattern="diagonal">Diagonal</button>
+        <button class="sel-btn" data-pattern="custom">Custom</button>
+      </div>
+      <div class="hint-txt">Click cells on the grid to paint a custom pattern</div>
+    </div>
+
+    <!-- Model settings -->
+    <div class="card">
+      <div class="card-title">Model Settings</div>
+
+      <div class="param-lbl">Target Class</div>
+      <div class="toggle-grp" id="class-selector">
+        <button class="active" data-cls="0">Class 0</button>
+        <button data-cls="1">Class 1</button>
+      </div>
+
+      <div class="param-lbl" style="margin-top:.35rem">Baseline (for IG)</div>
+      <div class="sel-group" id="baseline-selector">
+        <button class="sel-btn active" data-baseline="black">Black</button>
+        <button class="sel-btn" data-baseline="white">White</button>
+        <button class="sel-btn" data-baseline="noise">Noise</button>
+      </div>
+      <div class="hint-txt">Black = zeros, White = ones, Noise = random</div>
+    </div>
+
+    <!-- Integration settings -->
+    <div class="card">
+      <div class="card-title">Integration</div>
+
+      <div class="param-lbl">Steps (m)</div>
+      <div class="srow">
+        <span class="slbl">m</span>
+        <input type="range" id="sld-steps" min="10" max="100" step="5" value="50">
+        <span class="sval" id="val-steps">50</span>
+      </div>
+      <div class="hint-txt">More steps = more accurate but slower</div>
+    </div>
+
+    <!-- Playback controls -->
+    <div class="card">
+      <div class="card-title">Playback</div>
+
+      <div class="ctrl-btns" style="margin-bottom:.45rem">
+        <button id="btn-play" class="pbtn primary" style="flex:1">▶ Play</button>
+        <button id="btn-step" class="pbtn">→ Step</button>
+        <button id="btn-reset" class="pbtn">↺ Reset</button>
+      </div>
+
+      <div class="step-counter">
+        Step <span class="step-num" id="step-display">0</span> / <span id="step-total">50</span>
+      </div>
+
+      <div class="speed-row">
+        <span class="slbl" style="min-width:44px;font-size:.7rem">Speed</span>
+        <input type="range" id="sld-speed" min="1" max="5" step="1" value="3">
+        <span class="sval" id="val-speed">3×</span>
+      </div>
+    </div>
+
+    <!-- Annotation -->
+    <div class="card">
+      <div class="card-title">What's happening?</div>
+      <div class="anno-box neutral" id="anno-box">
+        Select an input pattern and press Play to step through gradient attribution. Each step shows how the gradient at that interpolated input contributes to the final attribution map.
+      </div>
+    </div>
+
+    <!-- Key Concepts -->
+    <div class="card">
+      <div class="card-title" style="cursor:pointer;user-select:none" id="concepts-toggle">
+        Key Concepts <span id="concepts-arrow">▾</span>
+      </div>
+      <div class="concepts-body" id="concepts-body">
+        <div class="concepts-item"><strong>Saliency maps:</strong> compute ∂f/∂x — the gradient of the model output with respect to each input pixel. Large absolute gradient = the model is sensitive to that pixel at this input. Fast to compute but noisy near saturated activations.</div>
+        <div class="concepts-item"><strong>Why vanilla gradients are noisy:</strong> gradients reflect local sensitivity, not contribution. Near saturation regions (ReLU dead zones, sigmoid tails) gradients vanish even when a feature genuinely influenced the output — the map can mislead.</div>
+        <div class="concepts-item"><strong>Integrated gradients (Sundararajan et al.):</strong> accumulate gradients along a straight-line path from a baseline x′ to the input x: IG(x) = (x−x′) · ∫₀¹ ∂f(x′+α(x−x′))/∂x dα. This captures contributions at all activation levels, not just the endpoint.</div>
+        <div class="concepts-item"><strong>Completeness axiom:</strong> IG attributions sum exactly to f(x) − f(x′). Every unit of prediction difference is "accounted for" by exactly one pixel's attribution. This makes IG attributions faithful — they are provably tied to the prediction gap.</div>
+        <div class="concepts-item"><strong>GradCAM:</strong> weights each feature map's gradient globally (average over spatial dimensions), then forms a linear combination of feature maps. Produces a class-discriminative coarse localization map — useful for CNNs, less fine-grained than pixel-level methods.</div>
+      </div>
+    </div>
+
+  </div><!-- end left-col -->
+
+  <!-- ══ CENTER: Tab panels ══════════════════════════════════════════ -->
+  <div class="center-col">
+
+    <!-- ─ Tab 1: Saliency Maps ──────────────────────────────────────── -->
+    <div class="tab-panel active" id="panel-saliency">
+      <div class="card">
+        <div class="plot-label" id="saliency-label">Saliency Maps — Edge pattern · Neural Net · Class 0</div>
+
+        <div class="saliency-panels">
+
+          <!-- Input grid -->
+          <div class="grid-wrap">
+            <div class="panel-title">Input Pattern</div>
+            <div class="panel-sub">8 × 8 pixel grid</div>
+            <svg id="svg-input" class="grid-svg">
+              <rect width="100%" height="100%" fill="#FDFAF5"/>
+              <text x="50%" y="44%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="11">
+                8×8 input pattern
+              </text>
+              <text x="50%" y="58%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="9">
+                rendered by D3
+              </text>
+            </svg>
+            <div class="legend" style="justify-content:center">
+              <span><span class="legend-sq" style="background:#111"></span>pixel = 0</span>
+              <span><span class="legend-sq" style="background:#EEE;border:1px solid #ccc"></span>pixel = 1</span>
+            </div>
+          </div>
+
+          <!-- Gradient heatmap -->
+          <div class="grid-wrap">
+            <div class="panel-title">Gradient Heatmap</div>
+            <div class="panel-sub">∂f/∂x at this input</div>
+            <svg id="svg-saliency" class="grid-svg">
+              <rect width="100%" height="100%" fill="#FDFAF5"/>
+              <text x="50%" y="44%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="11">
+                Saliency map
+              </text>
+              <text x="50%" y="58%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="9">
+                rendered by D3
+              </text>
+            </svg>
+            <div class="cmap-legend">
+              <div class="cmap-bar"></div>
+              <div class="cmap-ticks">
+                <span style="color:var(--neg-attr)">− (toward 0)</span>
+                <span>0</span>
+                <span style="color:var(--pos-attr)">+ (toward 1)</span>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- end saliency-panels -->
+
+        <div class="anno-box neutral" id="saliency-anno" style="margin-top:.65rem;font-size:.75rem">
+          The saliency map shows ∂f/∂x — red pixels pushed the prediction toward class 1, blue pixels pushed it toward class 0. Magnitude shows sensitivity strength.
+        </div>
+      </div>
+    </div><!-- end panel-saliency -->
+
+    <!-- ─ Tab 2: Integrated Gradients ──────────────────────────────── -->
+    <div class="tab-panel" id="panel-integrated">
+      <div class="card">
+        <div class="plot-label">Integrated Gradients — step-by-step accumulation</div>
+
+        <div class="ig-panels">
+
+          <!-- Baseline -->
+          <div class="grid-wrap">
+            <div class="panel-title">Baseline x′</div>
+            <div class="panel-sub" id="baseline-sub">Black (all zeros)</div>
+            <svg id="svg-baseline" class="grid-svg">
+              <rect width="100%" height="100%" fill="#FDFAF5"/>
+              <text x="50%" y="44%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="11">
+                Baseline input
+              </text>
+              <text x="50%" y="58%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="9">
+                rendered by D3
+              </text>
+            </svg>
+          </div>
+
+          <!-- Interpolated input at current α -->
+          <div class="grid-wrap">
+            <div class="panel-title">Interpolated x′ + α(x − x′)</div>
+            <div class="panel-sub" id="alpha-sub">α = 0.50 (step 25 / 50)</div>
+            <svg id="svg-interp" class="grid-svg">
+              <rect width="100%" height="100%" fill="#FDFAF5"/>
+              <text x="50%" y="44%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="11">
+                Interpolated input
+              </text>
+              <text x="50%" y="58%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="9">
+                rendered by D3
+              </text>
+            </svg>
+          </div>
+
+          <!-- Accumulated attribution -->
+          <div class="grid-wrap">
+            <div class="panel-title">Accumulated Attribution</div>
+            <div class="panel-sub">∑ gradients so far</div>
+            <svg id="svg-accum" class="grid-svg">
+              <rect width="100%" height="100%" fill="#FDFAF5"/>
+              <text x="50%" y="44%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="11">
+                IG attribution map
+              </text>
+              <text x="50%" y="58%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="9">
+                builds step by step
+              </text>
+            </svg>
+            <div class="cmap-legend">
+              <div class="cmap-bar"></div>
+              <div class="cmap-ticks">
+                <span style="color:var(--neg-attr)">−</span>
+                <span>0</span>
+                <span style="color:var(--pos-attr)">+</span>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- end ig-panels -->
+
+        <!-- Integration progress bar -->
+        <div class="ig-progress-wrap" style="margin-top:.75rem">
+          <div class="ig-progress-lbl">
+            <span>Integration progress</span>
+            <span id="ig-step-lbl">step 0 / 50</span>
+          </div>
+          <div class="ig-progress-track">
+            <div class="ig-progress-fill" id="ig-progress-fill" style="width:0%"></div>
+          </div>
+          <div class="ig-alpha-display" id="ig-alpha-display">α = 0.00</div>
+        </div>
+
+        <div class="anno-box neutral" id="ig-anno" style="margin-top:.55rem;font-size:.75rem">
+          Each step α ∈ [0, 1] evaluates ∂f/∂x at x′ + α(x − x′). After all steps the accumulated gradients are scaled by (x − x′)/m — the result satisfies the completeness axiom: attributions sum to f(x) − f(x′).
+        </div>
+      </div>
+    </div><!-- end panel-integrated -->
+
+    <!-- ─ Tab 3: Attribution Comparison ─────────────────────────────── -->
+    <div class="tab-panel" id="panel-comparison">
+      <div class="card">
+        <div class="plot-label">Attribution Comparison — same input, three methods</div>
+
+        <div class="cmp-panels">
+
+          <!-- Vanilla Gradients -->
+          <div class="grid-wrap">
+            <div class="method-badge vanilla">Vanilla Gradients</div>
+            <div class="panel-sub">∂f/∂x at input x</div>
+            <svg id="svg-cmp-vanilla" class="grid-svg">
+              <rect width="100%" height="100%" fill="#FDFAF5"/>
+              <text x="50%" y="44%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="10">
+                Vanilla gradient map
+              </text>
+              <text x="50%" y="58%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="8">
+                rendered by D3
+              </text>
+            </svg>
+          </div>
+
+          <!-- Integrated Gradients -->
+          <div class="grid-wrap">
+            <div class="method-badge ig">Integrated Gradients</div>
+            <div class="panel-sub">∫₀¹ ∂f(x′+α·Δ)/∂x dα · Δ</div>
+            <svg id="svg-cmp-ig" class="grid-svg">
+              <rect width="100%" height="100%" fill="#FDFAF5"/>
+              <text x="50%" y="44%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="10">
+                Integrated gradient map
+              </text>
+              <text x="50%" y="58%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="8">
+                rendered by D3
+              </text>
+            </svg>
+          </div>
+
+          <!-- GradCAM -->
+          <div class="grid-wrap">
+            <div class="method-badge gcam">GradCAM</div>
+            <div class="panel-sub">ReLU(Σ αₖ · Aₖ)</div>
+            <svg id="svg-cmp-gcam" class="grid-svg">
+              <rect width="100%" height="100%" fill="#FDFAF5"/>
+              <text x="50%" y="44%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="10">
+                GradCAM map
+              </text>
+              <text x="50%" y="58%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="8">
+                rendered by D3
+              </text>
+            </svg>
+          </div>
+
+        </div><!-- end cmp-panels -->
+
+        <!-- Shared colormap legend for comparison -->
+        <div class="cmap-legend" style="margin-top:.55rem">
+          <div class="cmap-bar" style="width:180px"></div>
+          <div class="cmap-ticks" style="width:180px">
+            <span style="color:var(--neg-attr)">Negative</span>
+            <span>Neutral</span>
+            <span style="color:var(--pos-attr)">Positive</span>
+          </div>
+        </div>
+
+        <!-- Method comparison bar chart -->
+        <div style="margin-top:.75rem">
+          <div class="plot-label" style="margin-bottom:.35rem">Total Attribution Magnitude per Method</div>
+          <svg id="svg-cmp-bars">
+            <rect width="100%" height="110" fill="#FDFAF5"/>
+            <text x="50%" y="48" text-anchor="middle" dominant-baseline="middle"
+                  fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="11">
+              Attribution magnitude comparison
+            </text>
+            <text x="50%" y="66" text-anchor="middle" dominant-baseline="middle"
+                  fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="9">
+              rendered by D3
+            </text>
+          </svg>
+        </div>
+
+        <div class="anno-box neutral" id="cmp-anno" style="margin-top:.55rem;font-size:.75rem">
+          Vanilla gradients can highlight irrelevant pixels near saturation. Integrated gradients respect the completeness axiom — attribution sum equals the prediction gap. GradCAM is coarser but more spatially stable.
+        </div>
+      </div>
+    </div><!-- end panel-comparison -->
+
+  </div><!-- end center-col -->
+
+  <!-- ══ RIGHT: Live stats ════════════════════════════════════════════ -->
+  <div class="right-col">
+
+    <!-- Prediction -->
+    <div class="card">
+      <div class="card-title">Prediction</div>
+      <div class="stat-row">
+        <span class="sr-lbl">Class</span>
+        <span id="rp-class"><span class="class-badge" id="class-badge">—</span></span>
+      </div>
+      <div class="stat-row">
+        <span class="sr-lbl">f(x)</span>
+        <span class="sr-val" id="rp-fx">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="sr-lbl">f(x′)</span>
+        <span class="sr-val" id="rp-fx0">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="sr-lbl">Δf</span>
+        <span class="sr-val" id="rp-df">—</span>
+      </div>
+      <div class="conf-track" style="margin-top:.25rem">
+        <div class="conf-fill" id="conf-fill" style="width:0%"></div>
+      </div>
+    </div>
+
+    <!-- Top attributed pixels -->
+    <div class="card">
+      <div class="card-title">Top Attributed Pixels</div>
+      <div id="top-pixels">
+        <div class="pixel-row" style="opacity:.35">
+          <span class="px-coord">(—, —)</span>
+          <div class="px-bar-track"><div class="px-bar-fill pos" style="width:0%"></div></div>
+          <span class="px-val">—</span>
+        </div>
+        <div class="pixel-row" style="opacity:.35">
+          <span class="px-coord">(—, —)</span>
+          <div class="px-bar-track"><div class="px-bar-fill pos" style="width:0%"></div></div>
+          <span class="px-val">—</span>
+        </div>
+        <div class="pixel-row" style="opacity:.35">
+          <span class="px-coord">(—, —)</span>
+          <div class="px-bar-track"><div class="px-bar-fill pos" style="width:0%"></div></div>
+          <span class="px-val">—</span>
+        </div>
+        <div class="pixel-row" style="opacity:.35">
+          <span class="px-coord">(—, —)</span>
+          <div class="px-bar-track"><div class="px-bar-fill neg" style="width:0%"></div></div>
+          <span class="px-val">—</span>
+        </div>
+      </div>
+      <div class="hint-txt" style="margin-top:.2rem">row, col · attribution value</div>
+    </div>
+
+    <!-- Completeness -->
+    <div class="card">
+      <div class="card-title">Completeness (IG)</div>
+      <div class="metric-box">
+        <span class="metric-val" id="completeness-val" style="color:var(--text-muted)">—</span>
+        <div class="metric-lbl">Σ IG(x) − Δf</div>
+      </div>
+      <div style="font-size:.64rem;color:var(--text-muted);margin-top:.35rem;line-height:1.5;font-style:italic">
+        Should be ≈ 0 when integration is complete. Nonzero = more steps needed.
+      </div>
+    </div>
+
+    <!-- SNR -->
+    <div class="card">
+      <div class="card-title">Attribution Quality</div>
+      <div class="metric-box">
+        <span class="metric-val" id="snr-val" style="color:var(--text-muted)">—</span>
+        <div class="metric-lbl">Signal-to-noise ratio</div>
+      </div>
+      <div style="font-size:.64rem;color:var(--text-muted);margin-top:.35rem;line-height:1.5;font-style:italic">
+        High SNR = attribution signal concentrated on few pixels. Low SNR = diffuse, noisy map.
+      </div>
+    </div>
+
+  </div><!-- end right-col -->
+
+</div><!-- end .explorer-grid -->
+
+</div><!-- end .wrap -->
+
+<footer id="course-nav-footer" style="margin-top:1.5rem;padding:0.75rem 0 0 1rem;border-top:1px solid #E0DAC0;font-size:0.8rem;color:#78786A;text-align:left;">
+  <a href="../" style="color:#2e7d32;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">&larr; All course visualizations</a>
+</footer>
+<script>
+if (window.self !== window.top) { var f = document.getElementById('course-nav-footer'); if (f) { f.style.display = 'none'; } }
+</script>
+
+</body>
+</html>
