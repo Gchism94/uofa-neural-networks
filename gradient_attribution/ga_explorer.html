@@ -811,6 +811,356 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 
 </div><!-- end .wrap -->
 
+<script>
+(function(){
+'use strict';
+
+// ── Grid constants ─────────────────────────────────────────────────
+var N=8, CELL=20, GS=N*CELL; // 160×160 viewBox, 18×18 cells (1px gap)
+
+// ── Model: weights + bias ──────────────────────────────────────────
+// P(class 1) = sigmoid(W·x + B)
+// Design: left-heavy input → class 0  |  center-blob → class 1
+var W=(function(){
+  var w=[];
+  for(var r=0;r<N;r++) for(var c=0;c<N;c++){
+    var dr=r-3.5, dc=c-3.5;
+    // Horizontal gradient: left=negative, right=positive
+    var hw=dc*0.28;
+    // Center Gaussian detector — center pixels boost class 1
+    var cw=0.82*Math.exp(-(dr*dr+dc*dc)/5.5);
+    w.push(hw+cw);
+  }
+  return w;
+})();
+var B=-0.15;
+
+// ── Model math ─────────────────────────────────────────────────────
+function sig(z){return 1/(1+Math.exp(-z));}
+function predictProb(x){
+  var s=B;
+  for(var i=0;i<64;i++) s+=W[i]*x[i];
+  return sig(s);
+}
+function predict(x){
+  var p=predictProb(x);
+  return {prob:p, cls:p>0.5?1:0, conf:p>0.5?p:1-p};
+}
+
+// Finite-difference gradient. Sign convention: positive = pushes toward targetCls.
+function computeGradient(x, tCls){
+  var eps=0.01, g=[];
+  for(var i=0;i<64;i++){
+    var xi=x[i];
+    x[i]=xi+eps; var pp=predictProb(x);
+    x[i]=xi-eps; var pm=predictProb(x);
+    x[i]=xi; // restore
+    var raw=(pp-pm)/(2*eps);
+    g.push(tCls===1?raw:-raw);
+  }
+  return g;
+}
+
+// ── Input pattern generators ───────────────────────────────────────
+function genEdge(){
+  var g=[];
+  for(var r=0;r<N;r++) for(var c=0;c<N;c++) g.push(c<4?0.9:0.1);
+  return g;
+}
+function genCircle(){
+  var g=[];
+  for(var r=0;r<N;r++) for(var c=0;c<N;c++){
+    var d=Math.sqrt((r-3.5)*(r-3.5)+(c-3.5)*(c-3.5));
+    g.push(d<=2.2?0.92:d<=2.8?0.45:0.06);
+  }
+  return g;
+}
+function genDiagonal(){
+  var g=[];
+  for(var r=0;r<N;r++) for(var c=0;c<N;c++) g.push(1-(r+c)/14);
+  return g;
+}
+
+// ── State ──────────────────────────────────────────────────────────
+var PATTERN_KEYS=['edge','circle','diagonal'];
+var PATTERN_LABELS={edge:'Edge',circle:'Circle',diagonal:'Diagonal',custom:'Custom'};
+var patternName='edge';
+var targetCls=0;
+var customGrid=new Array(64).fill(0);
+var playTimer=null;
+
+function currentGrid(){
+  if(patternName==='edge')     return genEdge();
+  if(patternName==='circle')   return genCircle();
+  if(patternName==='diagonal') return genDiagonal();
+  return customGrid.slice();
+}
+
+// ── Color helpers ──────────────────────────────────────────────────
+function grayFill(v){
+  var L=Math.round((1-Math.max(0,Math.min(1,v)))*255);
+  return 'rgb('+L+','+L+','+L+')';
+}
+// Diverging: negative → blue, zero → white, positive → red
+function heatFill(v, maxV){
+  var t=Math.max(0,Math.min(1,(v/maxV+1)/2));
+  if(t<=0.5){
+    var s=t*2;
+    return 'rgb('+Math.round(s*255)+','+Math.round(s*255)+',255)';
+  }
+  var s=(t-0.5)*2;
+  return 'rgb(255,'+Math.round((1-s)*255)+','+Math.round((1-s)*255)+')';
+}
+
+// ── Input grid renderer ────────────────────────────────────────────
+function renderInputGrid(svgId, grid, interactive){
+  var el=document.getElementById(svgId); if(!el) return;
+  var svg=d3.select(el);
+  svg.selectAll('*').remove();
+  svg.attr('viewBox','0 0 '+GS+' '+GS).attr('width','100%')
+     .attr('preserveAspectRatio','xMidYMid meet');
+  for(var r=0;r<N;r++) for(var c=0;c<N;c++){
+    var v=grid[r*N+c];
+    var cell=svg.append('rect')
+      .attr('x',c*CELL+1).attr('y',r*CELL+1)
+      .attr('width',CELL-2).attr('height',CELL-2)
+      .attr('rx',2).attr('fill',grayFill(v))
+      .attr('stroke','#DDD6BE').attr('stroke-width',0.5);
+    if(interactive){
+      (function(ri,ci,cellEl){
+        cellEl.style('cursor','pointer').on('click',function(){
+          customGrid[ri*N+ci]=customGrid[ri*N+ci]>0.5?0:1;
+          updateSaliency();
+        });
+      })(r,c,cell);
+    }
+  }
+}
+
+// ── Saliency heatmap renderer ──────────────────────────────────────
+function renderHeatmap(svgId, grads){
+  var el=document.getElementById(svgId); if(!el) return;
+  var absArr=grads.map(function(v){return Math.abs(v);});
+  var maxG=Math.max.apply(null,absArr)||0.001;
+  var svg=d3.select(el);
+  svg.selectAll('*').remove();
+  svg.attr('viewBox','0 0 '+GS+' '+GS).attr('width','100%')
+     .attr('preserveAspectRatio','xMidYMid meet');
+  for(var r=0;r<N;r++) for(var c=0;c<N;c++){
+    var gv=grads[r*N+c];
+    svg.append('rect')
+      .attr('x',c*CELL+1).attr('y',r*CELL+1)
+      .attr('width',CELL-2).attr('height',CELL-2)
+      .attr('rx',2).attr('fill',heatFill(gv,maxG))
+      .attr('stroke','#DDD6BE').attr('stroke-width',0.5);
+    if(Math.abs(gv)>maxG*0.22){
+      svg.append('text')
+        .attr('x',c*CELL+CELL/2).attr('y',r*CELL+CELL/2)
+        .attr('text-anchor','middle').attr('dominant-baseline','middle')
+        .attr('font-size',6).attr('font-family','IBM Plex Mono,monospace')
+        .attr('fill',Math.abs(gv)>maxG*0.62?'rgba(255,255,255,.88)':'rgba(0,0,0,.5)')
+        .text((gv>=0?'+':'')+gv.toFixed(2));
+    }
+  }
+}
+
+// ── Right panel updater ────────────────────────────────────────────
+function updatePanel(grid, grads){
+  var pred=predict(grid);
+  var p=pred.prob;
+
+  // Class badge + confidence
+  var badge=document.getElementById('class-badge');
+  badge.textContent='Class '+pred.cls;
+  badge.className='class-badge '+(pred.cls===0?'c0':'c1');
+  document.getElementById('rp-fx').textContent=p.toFixed(4);
+  var cf=document.getElementById('conf-fill');
+  cf.style.width=Math.round(pred.conf*100)+'%';
+  cf.style.background=pred.cls===0?'#1A56A0':'#B0321D';
+
+  // f(x') for black baseline
+  var x0=new Array(64).fill(0);
+  var p0=predictProb(x0);
+  document.getElementById('rp-fx0').textContent=p0.toFixed(4);
+  var df=p-p0;
+  var dfEl=document.getElementById('rp-df');
+  dfEl.textContent=(df>=0?'+':'')+df.toFixed(4);
+  dfEl.style.color=df>0?'#2D5A1B':df<0?'#B0321D':'#888';
+
+  // Top 5 pixels by |gradient|
+  var indexed=grads.map(function(v,i){return {i:i,v:v,a:Math.abs(v)};});
+  indexed.sort(function(a,b){return b.a-a.a;});
+  var top5=indexed.slice(0,5);
+  var maxA=top5[0]?top5[0].a:0.001;
+  var container=document.getElementById('top-pixels');
+  container.innerHTML='';
+  top5.forEach(function(px){
+    var r2=Math.floor(px.i/N), c2=px.i%N;
+    var pct=Math.round(px.a/maxA*100);
+    var isPos=px.v>=0;
+    var row=document.createElement('div');
+    row.className='pixel-row';
+    row.innerHTML=
+      '<span class="px-coord">('+r2+','+c2+')</span>'+
+      '<div class="px-bar-track"><div class="px-bar-fill '+(isPos?'pos':'neg')+
+      '" style="width:'+pct+'%"></div></div>'+
+      '<span class="px-val">'+(px.v>=0?'+':'')+px.v.toFixed(3)+'</span>';
+    container.appendChild(row);
+  });
+
+  // SNR: max(|grad|) / mean(|grad|)
+  var sumAbs=0; for(var j=0;j<64;j++) sumAbs+=Math.abs(grads[j]);
+  var meanG=sumAbs/64;
+  var maxG=Math.max.apply(null,grads.map(function(v){return Math.abs(v);}));
+  var snr=meanG>1e-7?maxG/meanG:0;
+  var snrEl=document.getElementById('snr-val');
+  snrEl.textContent=snr.toFixed(1)+'×';
+  snrEl.style.color=snr>5?'#2D5A1B':snr>2.5?'#B08000':'#B0321D';
+
+  // Completeness: N/A for saliency (only meaningful for IG)
+  document.getElementById('completeness-val').textContent='—';
+  document.getElementById('completeness-val').style.color='var(--text-muted)';
+
+  return {pred:pred, snr:snr};
+}
+
+// ── Annotation ─────────────────────────────────────────────────────
+function updateAnno(pLabel, pred, snr){
+  var el=document.getElementById('anno-box');
+  var sEl=document.getElementById('saliency-anno');
+  var confPct=Math.round(pred.conf*100);
+  var clsName='Class '+pred.cls;
+  var msg, cls;
+  if(snr>5){
+    msg='Clean saliency map — a few pixels dominate. The model uses a clear local feature for this prediction.';
+    cls='good';
+  } else if(snr<2.5){
+    msg='Noisy saliency map — many pixels have similar small gradients. Consider using Integrated Gradients for a cleaner attribution.';
+    cls='warn';
+  } else {
+    msg='Saliency map computed for '+pLabel+' → '+clsName+'. Red pixels push the prediction toward Class 1, blue pixels push away. The brightest pixels are most influential.';
+    cls='neutral';
+  }
+  el.textContent=msg; el.className='anno-box '+cls;
+  if(sEl){
+    sEl.textContent='Pattern: '+pLabel+' | Target: Class '+targetCls+
+      ' | Predicted: '+clsName+' ('+confPct+'% conf) | SNR = '+snr.toFixed(1)+'×'+
+      (snr<2.5?' — diffuse map, try Integrated Gradients':'');
+    sEl.className='anno-box '+(pred.cls===targetCls?'good':'neutral');
+  }
+}
+
+// ── Main saliency update ───────────────────────────────────────────
+function updateSaliency(){
+  var grid=currentGrid();
+  renderInputGrid('svg-input', grid, patternName==='custom');
+  var grads=computeGradient(grid, targetCls);
+  renderHeatmap('svg-saliency', grads);
+  var stats=updatePanel(grid, grads);
+  var pLabel=PATTERN_LABELS[patternName]||patternName;
+  updateAnno(pLabel, stats.pred, stats.snr);
+
+  // Update header label
+  var lEl=document.getElementById('saliency-label');
+  if(lEl) lEl.textContent='Saliency Maps — '+pLabel+' pattern · target: Class '+targetCls;
+
+  // Step counter — shows pattern position for Tab 1
+  var idx=PATTERN_KEYS.indexOf(patternName);
+  document.getElementById('step-display').textContent=idx>=0?idx+1:'—';
+  document.getElementById('step-total').textContent=PATTERN_KEYS.length;
+}
+
+// ── Playback ───────────────────────────────────────────────────────
+function speedToMs(){
+  var s=+document.getElementById('sld-speed').value;
+  return [2000,1400,850,500,220][Math.max(0,Math.min(4,s-1))];
+}
+
+function doStep(){
+  var idx=PATTERN_KEYS.indexOf(patternName);
+  var next=PATTERN_KEYS[(idx+1)%PATTERN_KEYS.length];
+  patternName=next;
+  document.querySelectorAll('#pattern-selector .sel-btn').forEach(function(b){
+    b.classList.toggle('active',b.dataset.pattern===next);
+  });
+  updateSaliency();
+}
+
+function stopPlay(){
+  if(playTimer){clearInterval(playTimer);playTimer=null;}
+  document.getElementById('btn-play').textContent='▶ Play';
+}
+
+function doPlay(){
+  if(playTimer){stopPlay();return;}
+  document.getElementById('btn-play').textContent='■ Stop';
+  playTimer=setInterval(doStep,speedToMs());
+}
+
+function doReset(){
+  stopPlay();
+  patternName='edge';
+  document.querySelectorAll('#pattern-selector .sel-btn').forEach(function(b){
+    b.classList.toggle('active',b.dataset.pattern==='edge');
+  });
+  updateSaliency();
+}
+
+// ── Event wiring ───────────────────────────────────────────────────
+document.getElementById('tab-bar').addEventListener('click',function(e){
+  var btn=e.target.closest('button'); if(!btn||!btn.dataset.tab) return;
+  document.querySelectorAll('#tab-bar button').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('active');});
+  document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
+});
+
+document.getElementById('pattern-selector').addEventListener('click',function(e){
+  var btn=e.target.closest('.sel-btn'); if(!btn) return;
+  var newP=btn.dataset.pattern;
+  // When switching to custom, seed from the current pattern
+  if(newP==='custom' && patternName!=='custom') customGrid=currentGrid();
+  document.querySelectorAll('#pattern-selector .sel-btn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  patternName=newP;
+  updateSaliency();
+});
+
+document.getElementById('class-selector').addEventListener('click',function(e){
+  var btn=e.target.closest('button'); if(!btn) return;
+  document.querySelectorAll('#class-selector button').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  targetCls=+btn.dataset.cls;
+  updateSaliency();
+});
+
+document.getElementById('btn-play').addEventListener('click',doPlay);
+document.getElementById('btn-step').addEventListener('click',function(){
+  stopPlay(); doStep();
+});
+document.getElementById('btn-reset').addEventListener('click',doReset);
+
+document.getElementById('sld-speed').addEventListener('input',function(){
+  document.getElementById('val-speed').textContent=this.value+'×';
+  if(playTimer){clearInterval(playTimer);playTimer=setInterval(doStep,speedToMs());}
+});
+
+document.getElementById('sld-steps').addEventListener('input',function(){
+  document.getElementById('val-steps').textContent=this.value;
+});
+
+document.getElementById('concepts-toggle').addEventListener('click',function(){
+  var body=document.getElementById('concepts-body'),arrow=document.getElementById('concepts-arrow');
+  body.classList.toggle('collapsed');
+  arrow.textContent=body.classList.contains('collapsed')?'▸':'▾';
+});
+
+// ── Boot ───────────────────────────────────────────────────────────
+updateSaliency();
+
+})();
+</script>
+
 <footer id="course-nav-footer" style="margin-top:1.5rem;padding:0.75rem 0 0 1rem;border-top:1px solid #E0DAC0;font-size:0.8rem;color:#78786A;text-align:left;">
   <a href="../" style="color:#2e7d32;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">&larr; All course visualizations</a>
 </footer>
