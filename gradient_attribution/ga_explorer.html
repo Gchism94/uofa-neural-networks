@@ -1173,6 +1173,8 @@ function renderIG(){
   document.getElementById('ig-step-lbl').textContent='step '+igStep+' / '+m;
   document.getElementById('ig-alpha-display').textContent='α = '+alpha.toFixed(3);
   document.getElementById('alpha-sub').textContent='α = '+alpha.toFixed(3)+' (step '+igStep+'/'+m+')';
+  document.getElementById('step-display').textContent=igStep;
+  document.getElementById('step-total').textContent=m;
   var blLbls={black:'Black (all zeros)',white:'White (all ones)',noise:'Random noise'};
   document.getElementById('baseline-sub').textContent=blLbls[getBaselineName()]||getBaselineName();
 
@@ -1207,27 +1209,31 @@ function renderIG(){
   });
 
   // Completeness + annotation
+  // IG sums to F(x)−F(x′) where F=f for class 1, F=1−f for class 0 → df_signed = ±df
   var attrSum=igAccum.reduce(function(a,b){return a+b;},0);
-  var err=Math.abs(attrSum-df);
+  var df_signed=targetCls===1?df:-df;
+  var err=Math.abs(attrSum-df_signed);
+  var errTol=Math.max(Math.abs(df_signed),1e-6)*0.05;
   var compEl=document.getElementById('completeness-val');
   if(igStep>=m){
     compEl.textContent=err.toFixed(4);
-    compEl.style.color=err<Math.abs(df)*0.05?'#2D5A1B':'#B08000';
+    compEl.style.color=err<errTol?'#2D5A1B':'#B08000';
     var igAnno=document.getElementById('ig-anno');
     if(igAnno){
-      var errPct=(err/Math.max(Math.abs(df),1e-6)*100).toFixed(1);
+      var errPct=(err/Math.max(Math.abs(df_signed),1e-6)*100).toFixed(1);
       igAnno.textContent='Integration complete ('+m+' steps). Attribution sum = '+attrSum.toFixed(4)+
-        ', Δf = '+df.toFixed(4)+'. Error = '+err.toFixed(4)+' ('+errPct+'%). '+
-        (err<Math.abs(df)*0.05?'Completeness satisfied ✓':'Increase steps for tighter completeness.');
-      igAnno.className='anno-box '+(err<Math.abs(df)*0.05?'good':'neutral');
+        ', expected Δf_target = '+df_signed.toFixed(4)+'. Error = '+err.toFixed(4)+' ('+errPct+'%). '+
+        (err<errTol?'Completeness satisfied ✓':'Increase steps for tighter completeness.');
+      igAnno.className='anno-box '+(err<errTol?'good':'neutral');
     }
   } else {
     compEl.textContent='…'; compEl.style.color='var(--text-muted)';
     var igAnno2=document.getElementById('ig-anno');
     if(igAnno2){
-      igAnno2.textContent='α = '+alpha.toFixed(2)+': evaluating ∂f/∂x at the interpolated input '+
-        'x′+'+alpha.toFixed(2)+'(x−x′). Each gradient (weighted by Δx/m) accumulates '+
-        'in the right panel. Completeness is verified when all '+m+' steps complete.';
+      igAnno2.textContent='α = '+alpha.toFixed(2)+': evaluating ∂f/∂x at x′+'+alpha.toFixed(2)+
+        '(x−x′). Each gradient (weighted by Δx/m) accumulates in the right panel. '+
+        'Target: attribution sum → '+(df_signed>=0?'+':'')+df_signed.toFixed(4)+
+        ' = F(x)−F(x′). Completeness verified at step '+m+'.';
       igAnno2.className='anno-box neutral';
     }
   }
@@ -1299,7 +1305,7 @@ function showExpand(grads, title){
 function updateComparison(){
   var grid=currentGrid(), baseline=getBaseline();
   var vG=computeGradient(grid.slice(),targetCls);
-  var igG=computeFullIG(grid,baseline,50);
+  var igG=computeFullIG(grid,baseline,igSteps());
   var sgG=computeSmoothGrad(grid,20,0.1);
   lastVGrads=vG; lastIGGrads=igG; lastSGGrads=sgG;
 
@@ -1316,11 +1322,12 @@ function updateComparison(){
   if(vStat) vStat.textContent='SNR: '+vSnr.toFixed(1)+'×';
   if(sgStat) sgStat.textContent='SNR: '+sgSnr.toFixed(1)+'×';
   if(igStat){
-    var fx=predictProb(grid),fx0=predictProb(baseline),df=fx-fx0;
+    var fxi=predictProb(grid),fx0i=predictProb(baseline),dfi=fxi-fx0i;
+    var df_si=targetCls===1?dfi:-dfi;
     var aSum=igG.reduce(function(a,b){return a+b;},0);
-    var err=aSum-df;
-    igStat.textContent='Σ attr − Δf = '+(err>=0?'+':'')+err.toFixed(4);
-    igStat.style.color=Math.abs(err)<Math.abs(df)*0.05?'#2D5A1B':'#B08000';
+    var erri=aSum-df_si;
+    igStat.textContent='Σ attr − Δf_target = '+(erri>=0?'+':'')+erri.toFixed(4);
+    igStat.style.color=Math.abs(erri)<Math.max(Math.abs(df_si),1e-6)*0.05?'#2D5A1B':'#B08000';
   }
 
   // Right panel: use vanilla grads for top pixels and SNR
@@ -1407,8 +1414,7 @@ document.getElementById('tab-bar').addEventListener('click',function(e){
   document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
   activeTab=btn.dataset.tab;
   stopPlay();
-  if(activeTab==='integrated') renderIG();
-  else if(activeTab==='comparison') updateComparison();
+  updateCurrentTab();
 });
 
 document.getElementById('pattern-selector').addEventListener('click',function(e){
@@ -1452,6 +1458,7 @@ document.getElementById('sld-steps').addEventListener('input',function(){
   document.getElementById('val-steps').textContent=this.value;
   document.getElementById('step-total').textContent=this.value;
   if(activeTab==='integrated'){igStep=0;igAccum=new Array(64).fill(0);renderIG();}
+  else if(activeTab==='comparison') updateComparison();
 });
 
 document.getElementById('concepts-toggle').addEventListener('click',function(){
