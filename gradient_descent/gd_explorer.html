@@ -58,9 +58,9 @@ body{
 .cr-top{
   position:fixed;top:.75rem;right:1rem;z-index:1000;
   font-size:.72rem;color:var(--text-muted);text-align:right;
-  background:rgba(250,247,240,.92);padding:.2rem .5rem;
+  background:rgba(250,247,240,.92);padding:.2rem 1.5rem .2rem .5rem;
   border-radius:5px;backdrop-filter:blur(4px);
-  border:1px solid var(--border-lt);
+  border:1px solid var(--border-lt);white-space:nowrap;min-width:max-content;
 }
 .cr-top a{color:var(--orange);text-decoration:none}
 .cr-top a:hover{text-decoration:underline}
@@ -228,7 +228,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
       <div class="card-title">Simulation</div>
       <div class="ctrl-btns">
         <button id="btn-play" class="pbtn primary">▶ Play</button>
-        <button id="btn-step" class="pbtn">Step</button>
+        <button id="btn-step" class="pbtn">→ Step</button>
         <button id="btn-reset" class="pbtn">↺ Reset</button>
       </div>
       <div style="margin-top:.5rem;font-size:.7rem;color:var(--text-muted)">Click the landscape to reposition the ball</div>

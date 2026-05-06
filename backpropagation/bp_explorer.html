@@ -27,6 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 
 <style>
 /* ── Design tokens (identical to gd_explorer.html) ──────────────── */
@@ -58,9 +59,9 @@ body{
 .cr-top{
   position:fixed;top:.75rem;right:1rem;z-index:1000;
   font-size:.72rem;color:var(--text-muted);text-align:right;
-  background:rgba(250,247,240,.92);padding:.2rem .5rem;
+  background:rgba(250,247,240,.92);padding:.2rem 1.5rem .2rem .5rem;
   border-radius:5px;backdrop-filter:blur(4px);
-  border:1px solid var(--border-lt);
+  border:1px solid var(--border-lt);white-space:nowrap;min-width:max-content;
 }
 .cr-top a{color:var(--orange);text-decoration:none}
 .cr-top a:hover{text-decoration:underline}
