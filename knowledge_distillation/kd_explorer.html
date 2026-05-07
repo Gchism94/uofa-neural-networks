@@ -902,6 +902,408 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 
 </div><!-- end .wrap -->
 
+<script>
+(function(){
+'use strict';
+
+// ── Data ───────────────────────────────────────────────────────────
+var CLASSES=['Cat','Dog','Bird','Fish','Car'];
+var CLASS_COLORS=['#E8630A','#1A56A0','#2D5A1B','#B0321D','#7B3FC4'];
+
+// Pre-defined teacher output probs for each input class (sum=1)
+var TEACHER_BASE=[
+  [0.80,0.12,0.05,0.02,0.01], // Cat input
+  [0.10,0.78,0.08,0.03,0.01], // Dog input
+  [0.03,0.05,0.82,0.07,0.03], // Bird input
+  [0.02,0.03,0.08,0.83,0.04], // Fish input
+  [0.01,0.02,0.03,0.04,0.90], // Car input
+];
+// Distilled student probs — close to teacher but slightly off
+var STUDENT_DIST=[
+  [0.72,0.15,0.07,0.04,0.02],
+  [0.12,0.70,0.10,0.06,0.02],
+  [0.05,0.07,0.75,0.09,0.04],
+  [0.03,0.05,0.10,0.76,0.06],
+  [0.02,0.03,0.04,0.06,0.85],
+];
+
+// Network layer counts [input, ...hidden, output]
+var TEACHER_ARCH={
+  small: [5,8,8,8,5],
+  medium:[5,8,8,8,8,8,8,5],
+  large: [5,6,6,6,6,6,6,6,6,6,6,5]
+};
+var STUDENT_ARCH={
+  tiny:  [5,5,5],
+  small: [5,5,5,5],
+  medium:[5,6,6,6,5]
+};
+var TEACHER_INFO={
+  small: {layers:3,params:'~120k'},
+  medium:{layers:6,params:'~480k'},
+  large: {layers:10,params:'~2.4M'}
+};
+var STUDENT_INFO={
+  tiny:  {layers:1,params:'~8k'},
+  small: {layers:2,params:'~16k'},
+  medium:{layers:3,params:'~36k'}
+};
+
+// ── State ──────────────────────────────────────────────────────────
+var currentClass=0, teacherSize='small', studentSize='tiny';
+var tau=3.0, alpha=0.5;
+
+// ── PRNG (mulberry32) ──────────────────────────────────────────────
+function makeRng(seed){
+  return function(){
+    seed|=0; seed=seed+0x6D2B79F5|0;
+    var t=Math.imul(seed^seed>>>15,1|seed);
+    t=t+Math.imul(t^t>>>7,61|t)^t;
+    return((t^t>>>14)>>>0)/4294967296;
+  };
+}
+
+// ── Math ───────────────────────────────────────────────────────────
+// Temperature-scaled softmax — convert base probs → logits → scale by 1/τ → softmax
+function softmaxT(probs,t){
+  var logits=probs.map(function(p){return Math.log(Math.max(p,1e-9));});
+  var scaled=logits.map(function(l){return l/t;});
+  var mx=Math.max.apply(null,scaled);
+  var exps=scaled.map(function(l){return Math.exp(l-mx);});
+  var sum=exps.reduce(function(a,b){return a+b;},0);
+  return exps.map(function(e){return e/sum;});
+}
+
+function klDiv(p,q){
+  var kl=0;
+  for(var i=0;i<p.length;i++) if(p[i]>1e-10) kl+=p[i]*Math.log(p[i]/Math.max(q[i],1e-10));
+  return kl;
+}
+
+function argmax(arr){
+  return arr.reduce(function(mi,v,i){return v>arr[mi]?i:mi;},0);
+}
+
+// Simulated activation: nodes near the "pathway" for the true class are brighter
+function nodeAct(ni,n,cls,rng){
+  var targetIdx=(n>1)?(cls/4)*(n-1):0;
+  var dist=Math.abs(ni-targetIdx)/Math.max(n-1,1);
+  var base=Math.max(0.06,1-dist*2.4);
+  return Math.min(1,base+(rng()-0.5)*0.18);
+}
+
+// ── D3 network diagram ─────────────────────────────────────────────
+function renderNet(svgId,arch,trueClass,color){
+  var el=document.getElementById(svgId); if(!el) return;
+  var W=200, H=260, PAD=12;
+  var svg=d3.select(el);
+  svg.selectAll('*').remove();
+  svg.attr('viewBox','0 0 '+W+' '+H).attr('width','100%')
+     .attr('preserveAspectRatio','xMidYMid meet');
+  svg.append('rect').attr('width',W).attr('height',H).attr('fill','#FDFAF5');
+
+  var nL=arch.length;
+  var lx=arch.map(function(_,i){return PAD+i*(W-2*PAD)/(nL-1);});
+  var ly=arch.map(function(n){
+    return Array.from({length:n},function(_,j){
+      return n>1?PAD+j*(H-2*PAD)/(n-1):H/2;
+    });
+  });
+
+  // Node radius: fit within available space
+  var maxRH=(H-2*PAD)/Math.max.apply(null,arch)/2.4;
+  var maxRW=(W-2*PAD)/nL/2.8;
+  var R=Math.max(2,Math.min(6,maxRH,maxRW));
+
+  // Connections (all-to-all between adjacent layers, low opacity)
+  var connG=svg.append('g').attr('opacity',0.38);
+  for(var li=0;li<nL-1;li++){
+    for(var ni=0;ni<arch[li];ni++){
+      for(var nj=0;nj<arch[li+1];nj++){
+        connG.append('line')
+          .attr('x1',lx[li]).attr('y1',ly[li][ni])
+          .attr('x2',lx[li+1]).attr('y2',ly[li+1][nj])
+          .attr('stroke','#C8BE9A').attr('stroke-width',0.4);
+      }
+    }
+  }
+
+  // Nodes
+  var rng=makeRng(trueClass*97+(svgId==='svg-teacher-net'?7:13));
+  arch.forEach(function(n,li){
+    var isIn=li===0, isOut=li===nL-1;
+    ly[li].forEach(function(y,ni){
+      var act=nodeAct(ni,n,trueClass,rng);
+      var fill, sw=0.5, sc='#C8BE9A';
+      if(isIn){
+        fill=ni===trueClass?color:'#DDD6BE';
+        if(ni===trueClass){sw=1.8;sc=color;}
+      } else if(isOut){
+        var op=ni===trueClass?0.9:0.18;
+        fill=d3.interpolateRgb('#E8E4D8',CLASS_COLORS[ni])(op);
+        if(ni===trueClass){sw=1.5;sc=CLASS_COLORS[ni];}
+      } else {
+        fill=d3.interpolateRgb('#DDD6BE',color)(act);
+      }
+      svg.append('circle')
+        .attr('cx',lx[li]).attr('cy',y).attr('r',R)
+        .attr('fill',fill).attr('stroke',sc).attr('stroke-width',sw);
+    });
+  });
+
+  // Input / Output labels
+  svg.append('text').attr('x',lx[0]).attr('y',H-2).attr('text-anchor','middle')
+    .attr('font-size',7).attr('font-family','Outfit,sans-serif').attr('fill','#AAA').text('Input');
+  svg.append('text').attr('x',lx[nL-1]).attr('y',H-2).attr('text-anchor','middle')
+    .attr('font-size',7).attr('font-family','Outfit,sans-serif').attr('fill','#AAA').text('Output');
+
+  // Class label on active input node
+  if(ly[0][trueClass]!==undefined){
+    svg.append('text')
+      .attr('x',lx[0]-R-3).attr('y',ly[0][trueClass])
+      .attr('text-anchor','end').attr('dominant-baseline','middle')
+      .attr('font-size',6.5).attr('font-family','Outfit,sans-serif')
+      .attr('fill',color).attr('font-weight','700')
+      .text(CLASSES[trueClass]);
+  }
+}
+
+// ── D3 probability bar chart ───────────────────────────────────────
+function renderProbBars(svgId,probs,highlightIdx){
+  var el=document.getElementById(svgId); if(!el) return;
+  var bcr=el.getBoundingClientRect();
+  var W=Math.max(130,bcr.width||220), H=100;
+  var P={t:6,r:48,b:14,l:36};
+  var iw=W-P.l-P.r, ih=H-P.t-P.b;
+  var barH=Math.floor((ih-6)/5), gap=Math.floor((ih-barH*5)/6);
+  var xSc=d3.scaleLinear().domain([0,1]).range([0,iw]);
+
+  var svg=d3.select(el);
+  svg.selectAll('*').remove();
+  svg.attr('viewBox','0 0 '+W+' '+H).attr('width','100%');
+  svg.append('rect').attr('width',W).attr('height',H).attr('fill','#FDFAF5');
+
+  var g=svg.append('g').attr('transform','translate('+P.l+','+P.t+')');
+  // Zero line
+  g.append('line').attr('x1',0).attr('y1',0).attr('x2',0).attr('y2',ih)
+   .attr('stroke','#C8BE9A').attr('stroke-width',0.8);
+  // 0.5 guide
+  g.append('line').attr('x1',xSc(0.5)).attr('y1',0).attr('x2',xSc(0.5)).attr('y2',ih)
+   .attr('stroke','#E2D9C5').attr('stroke-width',0.5).attr('stroke-dasharray','2,2');
+  // x axis ticks
+  [0,0.5,1].forEach(function(v){
+    g.append('text').attr('x',xSc(v)).attr('y',ih+10).attr('text-anchor','middle')
+     .attr('font-size',6.5).attr('font-family','IBM Plex Mono,monospace').attr('fill','#AAA')
+     .text(v===0?'0':v===0.5?'.5':'1.0');
+  });
+
+  probs.forEach(function(p,i){
+    var y0=gap+i*(barH+gap);
+    var col=CLASS_COLORS[i];
+    var isH=i===highlightIdx;
+    // Track
+    g.append('rect').attr('x',0).attr('y',y0).attr('width',iw).attr('height',barH)
+     .attr('rx',2).attr('fill','#F0EDE5');
+    // Bar
+    g.append('rect').attr('x',0).attr('y',y0).attr('width',Math.max(0,xSc(p))).attr('height',barH)
+     .attr('rx',2).attr('fill',col).attr('opacity',isH?0.92:0.55);
+    // Class label
+    g.append('text').attr('x',-4).attr('y',y0+barH/2).attr('text-anchor','end')
+     .attr('dominant-baseline','middle')
+     .attr('font-size',7).attr('font-family','Outfit,sans-serif')
+     .attr('fill',isH?col:'#999').attr('font-weight',isH?'700':'400')
+     .text(CLASSES[i]);
+    // Value label
+    g.append('text').attr('x',xSc(p)+3).attr('y',y0+barH/2).attr('text-anchor','start')
+     .attr('dominant-baseline','middle')
+     .attr('font-size',6.5).attr('font-family','IBM Plex Mono,monospace')
+     .attr('fill',col).attr('font-weight','600')
+     .text(p.toFixed(2));
+  });
+}
+
+// ── Soft labels panel ──────────────────────────────────────────────
+function updateSoftPanel(cls,t){
+  var soft=softmaxT(TEACHER_BASE[cls],t);
+  var hdr=document.getElementById('tau-display-ts');
+  if(hdr) hdr.textContent=t.toFixed(1);
+
+  var rows=document.querySelectorAll('.soft-panel .soft-row');
+  rows.forEach(function(row,i){
+    var clsEl=row.querySelector('.soft-cls');
+    var hardBar=row.querySelector('.soft-bar-fill.hard');
+    var softBar=row.querySelector('.soft-bar-fill.soft');
+    var valEl=row.querySelector('.soft-val');
+    if(clsEl) clsEl.textContent=CLASSES[i];
+    if(hardBar) hardBar.style.width=(i===cls?100:0)+'%';
+    if(softBar) softBar.style.width=Math.round(soft[i]*100)+'%';
+    if(valEl) valEl.textContent=soft[i].toFixed(2);
+  });
+}
+
+// ── Right panel ────────────────────────────────────────────────────
+function updateRightPanel(cls,teacherP,studentP,t){
+  var tPred=argmax(teacherP), sPred=argmax(studentP);
+  setEl('rp-true',CLASSES[cls]);
+  setEl('rp-teacher-pred',CLASSES[tPred]+' ('+Math.round(teacherP[tPred]*100)+'%)');
+  setEl('rp-student-pred',CLASSES[sPred]+' ('+Math.round(studentP[sPred]*100)+'%)');
+
+  // Teacher bars
+  document.querySelectorAll('#teacher-prob-bars .prob-row').forEach(function(row,i){
+    var lbl=row.querySelector('.pr-lbl'), fill=row.querySelector('.pr-fill'), val=row.querySelector('.pr-val');
+    if(lbl) lbl.textContent=CLASSES[i];
+    if(fill) fill.style.width=Math.round(teacherP[i]*100)+'%';
+    if(val) val.textContent=teacherP[i].toFixed(3);
+  });
+  // Student bars
+  document.querySelectorAll('#student-prob-bars .prob-row').forEach(function(row,i){
+    var lbl=row.querySelector('.pr-lbl'), fill=row.querySelector('.pr-fill'), val=row.querySelector('.pr-val');
+    if(lbl) lbl.textContent=CLASSES[i];
+    if(fill) fill.style.width=Math.round(studentP[i]*100)+'%';
+    if(val) val.textContent=studentP[i].toFixed(3);
+  });
+
+  // KL divergence
+  var kl=klDiv(teacherP,studentP);
+  var klEl=document.getElementById('kl-val');
+  if(klEl){
+    klEl.textContent=kl.toFixed(4);
+    klEl.style.color=kl<0.05?'#2D5A1B':kl<0.15?'#B08000':'#B0321D';
+  }
+
+  // Temperature
+  setEl('tau-rp',t.toFixed(1));
+}
+
+function setEl(id,txt){var el=document.getElementById(id);if(el)el.textContent=txt;}
+
+// ── Architecture label update ──────────────────────────────────────
+function updateArchLabels(){
+  var ti=TEACHER_INFO[teacherSize], si=STUDENT_INFO[studentSize];
+  var tNet=document.getElementById('svg-teacher-net');
+  var sNet=document.getElementById('svg-student-net');
+  if(tNet&&tNet.previousElementSibling&&tNet.previousElementSibling.classList.contains('panel-sub'))
+    tNet.previousElementSibling.textContent=ti.layers+' hidden layers · '+ti.params+' params';
+  if(sNet&&sNet.previousElementSibling&&sNet.previousElementSibling.classList.contains('panel-sub'))
+    sNet.previousElementSibling.textContent=si.layers+' hidden '+(si.layers===1?'layer':'layers')+' · '+si.params+' params';
+  var lEl=document.getElementById('ts-label');
+  if(lEl){
+    var tn=teacherSize.charAt(0).toUpperCase()+teacherSize.slice(1);
+    var sn=studentSize.charAt(0).toUpperCase()+studentSize.slice(1);
+    lEl.textContent='Teacher vs Student — '+tn+' Teacher ('+ti.layers+' layers) · '+sn+' Student ('+si.layers+' layer'+(si.layers>1?'s':'')+')';
+  }
+}
+
+// ── Annotation ─────────────────────────────────────────────────────
+function updateAnno(cls,teacherP,t){
+  var el=document.getElementById('anno-box'), tsEl=document.getElementById('ts-anno');
+  var tPred=argmax(teacherP), conf=Math.round(teacherP[tPred]*100);
+  // Second most likely class
+  var sorted=teacherP.map(function(p,i){return{p:p,i:i};})
+    .filter(function(x){return x.i!==cls;}).sort(function(a,b){return b.p-a.p;});
+  var sim2=CLASSES[sorted[0].i], sim2pct=Math.round(sorted[0].p*100);
+
+  var msg, mcls;
+  if(t>=7){
+    msg='At τ='+t.toFixed(0)+', the teacher distribution is very soft — all classes receive more similar probabilities. This transfers richer dark knowledge about inter-class relationships but weakens the gradient signal for any single class.';
+    mcls='warn';
+  } else {
+    msg='Teacher predicts '+CLASSES[cls]+' with '+conf+'% confidence. The soft labels assign '+sim2pct+'% to '+sim2+', encoding class similarity that one-hot labels would completely discard.';
+    mcls='good';
+  }
+  if(el){el.textContent=msg; el.className='anno-box '+mcls;}
+  if(tsEl){
+    tsEl.textContent='Soft labels at τ='+t.toFixed(1)+': '+CLASSES[cls]+' shares '+sim2pct+'% probability mass with '+sim2+'. Hard labels show 0% — losing this similarity signal. Higher τ amplifies these inter-class relationships further.';
+    tsEl.className='anno-box '+(t>=5?'neutral':'good');
+  }
+}
+
+// ── Master update ──────────────────────────────────────────────────
+function updateAll(){
+  var teacherP=TEACHER_BASE[currentClass];
+  var studentP=STUDENT_DIST[currentClass];
+  var color=CLASS_COLORS[currentClass];
+
+  renderNet('svg-teacher-net',TEACHER_ARCH[teacherSize],currentClass,color);
+  renderNet('svg-student-net',STUDENT_ARCH[studentSize],currentClass,color);
+  renderProbBars('svg-teacher-probs',teacherP,currentClass);
+  renderProbBars('svg-student-probs',studentP,currentClass);
+  updateSoftPanel(currentClass,tau);
+  updateRightPanel(currentClass,teacherP,studentP,tau);
+  updateAnno(currentClass,teacherP,tau);
+  updateArchLabels();
+}
+
+// ── Event wiring ───────────────────────────────────────────────────
+document.getElementById('tab-bar').addEventListener('click',function(e){
+  var btn=e.target.closest('button'); if(!btn||!btn.dataset.tab) return;
+  document.querySelectorAll('#tab-bar button').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('active');});
+  document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
+  if(btn.dataset.tab==='teacher-student') updateAll();
+});
+
+document.getElementById('teacher-selector').addEventListener('click',function(e){
+  var btn=e.target.closest('.sel-btn'); if(!btn) return;
+  document.querySelectorAll('#teacher-selector .sel-btn').forEach(function(b){b.classList.remove('t-active');});
+  btn.classList.add('t-active');
+  teacherSize=btn.dataset.teacher;
+  updateAll();
+});
+
+document.getElementById('student-selector').addEventListener('click',function(e){
+  var btn=e.target.closest('.sel-btn'); if(!btn) return;
+  document.querySelectorAll('#student-selector .sel-btn').forEach(function(b){b.classList.remove('s-active');});
+  btn.classList.add('s-active');
+  studentSize=btn.dataset.student;
+  updateAll();
+});
+
+document.getElementById('sld-tau').addEventListener('input',function(){
+  tau=+this.value;
+  setEl('val-tau',tau.toFixed(1));
+  setEl('tau-rp',tau.toFixed(1));
+  updateSoftPanel(currentClass,tau);
+  updateAnno(currentClass,TEACHER_BASE[currentClass],tau);
+});
+
+document.getElementById('sld-alpha').addEventListener('input',function(){
+  alpha=+this.value;
+  setEl('val-alpha',alpha.toFixed(2));
+});
+
+document.getElementById('sld-speed').addEventListener('input',function(){
+  setEl('val-speed',this.value+'×');
+});
+
+// Play/Step/Reset — cycle through input classes on Tab 1
+document.getElementById('btn-play').addEventListener('click',function(){
+  currentClass=(currentClass+1)%CLASSES.length;
+  updateAll();
+});
+document.getElementById('btn-step').addEventListener('click',function(){
+  currentClass=(currentClass+1)%CLASSES.length;
+  updateAll();
+});
+document.getElementById('btn-reset').addEventListener('click',function(){
+  currentClass=0;
+  updateAll();
+});
+
+document.getElementById('concepts-toggle').addEventListener('click',function(){
+  var body=document.getElementById('concepts-body');
+  var arrow=document.getElementById('concepts-arrow');
+  body.classList.toggle('collapsed');
+  arrow.textContent=body.classList.contains('collapsed')?'▸':'▾';
+});
+
+// ── Boot ───────────────────────────────────────────────────────────
+updateAll();
+
+})();
+</script>
+
 <footer id="course-nav-footer" style="margin-top:1.5rem;padding:0.75rem 0 0 1rem;border-top:1px solid #E0DAC0;font-size:0.8rem;color:#78786A;text-align:left;">
   <a href="../" style="color:#2e7d32;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">&larr; All course visualizations</a>
 </footer>
