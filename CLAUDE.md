@@ -183,6 +183,7 @@ Add a row to the appropriate table under `## Contents`:
 - `vanishing_gradients/vg_explorer.html`
 - `lime/lime_explorer.html`
 - `gradient_attribution/ga_explorer.html`
+- `knowledge_distillation/kd_explorer.html`
 
 ---
 

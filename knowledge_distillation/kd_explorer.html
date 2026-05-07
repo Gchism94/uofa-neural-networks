@@ -245,7 +245,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   border-radius:3px;position:relative;overflow:hidden}
 .soft-bar-fill{position:absolute;top:0;left:0;height:100%;border-radius:3px;opacity:.82}
 .soft-bar-fill.hard{background:var(--red)}
-.soft-bar-fill.soft{background:var(--tau-color)}
+.soft-bar-fill.tau1{background:var(--teacher)}    /* teacher probs at τ=1 */
+.soft-bar-fill.soft{background:var(--tau-color)}  /* teacher probs at current τ */
 .soft-val{font-family:'IBM Plex Mono',monospace;font-size:.6rem;
   color:var(--text-muted);min-width:28px;text-align:right;flex-shrink:0}
 
@@ -479,11 +480,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
         Key Concepts <span id="concepts-arrow">▾</span>
       </div>
       <div class="concepts-body" id="concepts-body">
-        <div class="concepts-item"><strong>Knowledge distillation:</strong> transfer learning where a large pre-trained teacher network guides a smaller student network — the student learns not just the correct labels but the teacher's full probability distribution over all classes.</div>
-        <div class="concepts-item"><strong>Soft labels:</strong> instead of hard one-hot labels (100% class A, 0% everything else), the teacher provides soft probabilities over all classes — e.g., 70% cat, 20% dog, 10% fox. This reveals how the teacher "thinks" about similarity between classes.</div>
-        <div class="concepts-item"><strong>Temperature τ:</strong> divides logits before softmax — higher τ flattens the distribution, making soft labels softer and more informative. At τ=1, the teacher's output may be nearly one-hot; at τ=5 the probability spreads reveal inter-class similarities.</div>
-        <div class="concepts-item"><strong>Loss weight α:</strong> controls the trade-off between hard label loss (cross-entropy with true labels) and soft label loss (KL divergence with teacher's soft predictions). α=0.5 balances both; α→1 relies almost entirely on soft labels.</div>
-        <div class="concepts-item"><strong>Why distillation beats scratch:</strong> the teacher's soft labels encode dark knowledge — relationships between similar classes — that hard labels cannot capture. The student receives a richer training signal, converging to better accuracy with fewer parameters than the teacher.</div>
+        <div class="concepts-item"><strong>What is knowledge distillation?</strong> A technique where a small student network is trained to mimic a large teacher network's output distributions — not just the hard labels. The student learns the teacher's "dark knowledge" about how classes relate to each other.</div>
+        <div class="concepts-item"><strong>What are soft labels?</strong> Instead of [1,0,0,0,0], the teacher outputs [0.80,0.12,0.05,0.02,0.01]. These soft probabilities encode class similarities — the teacher knows cat and dog are more similar to each other than to car, and that information rides in the small non-zero probabilities.</div>
+        <div class="concepts-item"><strong>What does temperature do?</strong> Higher τ makes the teacher's distribution softer — probabilities become more uniform, making inter-class similarities more visible to the student. τ=1 preserves the original distribution; τ=5–10 is typical for distillation, amplifying dark knowledge.</div>
+        <div class="concepts-item"><strong>What does alpha control?</strong> α balances hard label loss (cross-entropy with true one-hot labels) and soft label loss (KL divergence from the teacher). α=0.5 is a common default — both contribute equally. α→0 ignores true labels; α→1 ignores the teacher.</div>
+        <div class="concepts-item"><strong>Why does distillation work?</strong> The teacher's soft labels contain more information per example than hard labels. A student trained with distillation reaches higher accuracy than one trained from scratch with the same architecture — same size model, significantly better performance.</div>
       </div>
     </div>
 
@@ -528,10 +529,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 
           <!-- Soft labels center panel -->
           <div class="soft-panel">
-            <div class="soft-panel-hdr">Soft Labels (τ = <span id="tau-display-ts">3.0</span>)</div>
+            <div class="soft-panel-hdr">Teacher Soft Labels (τ = <span id="tau-display-ts">3.0</span>)</div>
             <div class="soft-legend">
-              <span><span class="sl-dot" style="background:var(--red)"></span>Hard (1-hot)</span>
-              <span><span class="sl-dot" style="background:var(--tau-color)"></span>Soft (τ)</span>
+              <span><span class="sl-dot" style="background:var(--red)"></span>Hard</span>
+              <span><span class="sl-dot" style="background:var(--teacher)"></span>τ=1</span>
+              <span><span class="sl-dot" style="background:var(--tau-color)"></span>τ=cur</span>
             </div>
 
             <!-- Placeholder soft-label rows for 5 classes -->
@@ -665,6 +667,18 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 
         <div class="epoch-counter" style="margin-top:.5rem">
           Epoch <span class="epoch-num" id="epoch-display-2">0</span> / <span id="epoch-total-2">100</span>
+        </div>
+
+        <!-- KL divergence over epochs -->
+        <div style="margin-top:.55rem">
+          <div class="plot-label" style="margin-bottom:.3rem">Student → Teacher KL Divergence over Training</div>
+          <svg id="svg-kl-chart" style="width:100%;min-height:130px;display:block;border-radius:5px;background:#FDFAF5;border:1px solid var(--border-lt)">
+            <rect width="100%" height="130" fill="#FDFAF5"/>
+            <text x="50%" y="58" text-anchor="middle" dominant-baseline="middle"
+                  fill="rgba(0,0,0,.2)" font-family="Outfit,sans-serif" font-size="10">
+              KL divergence vs epoch — rendered by D3
+            </text>
+          </svg>
         </div>
 
         <!-- Teacher vs student prob comparison at current epoch -->
@@ -1124,19 +1138,27 @@ function renderProbBars(svgId,probs,highlightIdx){
 
 // ── Soft labels panel ──────────────────────────────────────────────
 function updateSoftPanel(cls,t){
-  var soft=softmaxT(TEACHER_BASE[cls],t);
+  var soft=softmaxT(TEACHER_BASE[cls],t);   // teacher at current τ
+  var soft1=TEACHER_BASE[cls];              // teacher at τ=1 (raw probs)
   var hdr=document.getElementById('tau-display-ts');
   if(hdr) hdr.textContent=t.toFixed(1);
 
   var rows=document.querySelectorAll('.soft-panel .soft-row');
   rows.forEach(function(row,i){
     var clsEl=row.querySelector('.soft-cls');
-    var hardBar=row.querySelector('.soft-bar-fill.hard');
-    var softBar=row.querySelector('.soft-bar-fill.soft');
+    var barsEl=row.querySelector('.soft-bars');
     var valEl=row.querySelector('.soft-val');
     if(clsEl) clsEl.textContent=CLASSES[i];
-    if(hardBar) hardBar.style.width=(i===cls?100:0)+'%';
-    if(softBar) softBar.style.width=Math.round(soft[i]*100)+'%';
+    // Dynamically rebuild all three bar tracks so τ=1 column is always present
+    if(barsEl){
+      var hw=(i===cls?100:0);
+      var t1w=Math.round(soft1[i]*100);
+      var sw=Math.round(soft[i]*100);
+      barsEl.innerHTML=
+        '<div class="soft-bar-track"><div class="soft-bar-fill hard" style="width:'+hw+'%"></div></div>'+
+        '<div class="soft-bar-track"><div class="soft-bar-fill tau1" style="width:'+t1w+'%"></div></div>'+
+        '<div class="soft-bar-track"><div class="soft-bar-fill soft" style="width:'+sw+'%"></div></div>';
+    }
     if(valEl) valEl.textContent=soft[i].toFixed(2);
   });
 }
@@ -1218,12 +1240,297 @@ function updateAnno(cls,teacherP,t){
   }
 }
 
-// ── Master update ──────────────────────────────────────────────────
+// ── Stage 3 data ────────────────────────────────────────────────────
+var TEACHER_PARAM_COUNT={small:'50K',medium:'500K',large:'5M'};
+var STUDENT_PARAM_COUNT={tiny:'5K',small:'20K',medium:'50K'};
+var TEACHER_ACC={small:92,medium:95,large:97};
+var SCRATCH_ACC={tiny:72,small:78,medium:82};
+var DISTILLED_ACC={tiny:88,small:91,medium:93};
+
+// ── Stage 3 state ───────────────────────────────────────────────────
+var currentEpoch=0, trainingTimer=null, activeTab='teacher-student';
+var lossCurves=null;
+
+// ── Loss curve generation ───────────────────────────────────────────
+function generateLossCurves(al,t){
+  var rng=makeRng(42);
+  var N=100, hard=[],soft=[],combined=[],klST=[];
+  for(var e=0;e<N;e++){
+    var frac=e/(N-1);
+    var h=0.18+1.82*Math.exp(-frac*4.2)+(rng()-0.5)*0.06;
+    var s=0.06+1.44*Math.exp(-frac*(3.8+t*0.12))+(rng()-0.5)*0.05;
+    var c=al*h+(1-al)*s;
+    var kl=0.02+0.78*Math.exp(-frac*3.5)+(rng()-0.5)*0.04;
+    hard.push(Math.max(0.05,h));
+    soft.push(Math.max(0.02,s));
+    combined.push(Math.max(0.04,c));
+    klST.push(Math.max(0.01,kl));
+  }
+  return{hard:hard,soft:soft,combined:combined,klST:klST};
+}
+function getLossCurves(){
+  if(!lossCurves) lossCurves=generateLossCurves(alpha,tau);
+  return lossCurves;
+}
+
+// ── D3 loss chart ───────────────────────────────────────────────────
+function renderLossChart(svgId,curves,epoch){
+  var el=document.getElementById(svgId); if(!el) return;
+  var bcr=el.getBoundingClientRect();
+  var W=Math.max(300,bcr.width||500), H=220;
+  var P={t:20,r:22,b:35,l:48};
+  var iw=W-P.l-P.r, ih=H-P.t-P.b;
+  var xSc=d3.scaleLinear().domain([0,99]).range([0,iw]);
+  var allV=curves.hard.concat(curves.soft,curves.combined);
+  var yMax=Math.min(2.5,Math.max.apply(null,allV)*1.05)||2;
+  var ySc=d3.scaleLinear().domain([0,yMax]).range([ih,0]);
+  var svg=d3.select(el);
+  svg.selectAll('*').remove();
+  svg.attr('viewBox','0 0 '+W+' '+H).attr('width','100%');
+  svg.append('rect').attr('width',W).attr('height',H).attr('fill','#FDFAF5');
+  var g=svg.append('g').attr('transform','translate('+P.l+','+P.t+')');
+  ySc.ticks(5).forEach(function(v){
+    g.append('line').attr('x1',0).attr('y1',ySc(v)).attr('x2',iw).attr('y2',ySc(v))
+     .attr('stroke','#E2D9C5').attr('stroke-width',0.5);
+    g.append('text').attr('x',-5).attr('y',ySc(v)).attr('text-anchor','end')
+     .attr('dominant-baseline','middle').attr('font-size',8)
+     .attr('font-family','IBM Plex Mono,monospace').attr('fill','#AAA').text(v.toFixed(1));
+  });
+  [0,25,50,75,99].forEach(function(e){
+    g.append('text').attr('x',xSc(e)).attr('y',ih+14).attr('text-anchor','middle')
+     .attr('font-size',8).attr('font-family','IBM Plex Mono,monospace').attr('fill','#AAA')
+     .text(e===99?100:e);
+  });
+  g.append('text').attr('x',iw/2).attr('y',ih+28).attr('text-anchor','middle')
+   .attr('font-size',8.5).attr('font-family','Outfit,sans-serif').attr('fill','#999').text('Epoch');
+  g.append('text').attr('transform','rotate(-90)').attr('x',-ih/2).attr('y',-36)
+   .attr('text-anchor','middle').attr('font-size',8.5)
+   .attr('font-family','Outfit,sans-serif').attr('fill','#999').text('Loss');
+  g.append('line').attr('x1',0).attr('y1',0).attr('x2',0).attr('y2',ih)
+   .attr('stroke','#C8BE9A').attr('stroke-width',1);
+  g.append('line').attr('x1',0).attr('y1',ih).attr('x2',iw).attr('y2',ih)
+   .attr('stroke','#C8BE9A').attr('stroke-width',1);
+  if(epoch<1) return;
+  var n=Math.min(epoch,100);
+  var lineGen=d3.line().x(function(_,i){return xSc(i);}).y(function(d){return ySc(d);})
+    .curve(d3.curveCatmullRom.alpha(0.5));
+  var areaGen=d3.area().x(function(_,i){return xSc(i);}).y0(ih).y1(function(d){return ySc(d);})
+    .curve(d3.curveCatmullRom.alpha(0.5));
+  g.append('path').attr('d',areaGen(curves.combined.slice(0,n)))
+   .attr('fill','#1A56A0').attr('opacity',0.07);
+  [{data:curves.hard,col:'#2D5A1B',dash:'',w:2},
+   {data:curves.soft,col:'#E8630A',dash:'',w:2},
+   {data:curves.combined,col:'#1A56A0',dash:'5,2',w:2.5}
+  ].forEach(function(s){
+    g.append('path').attr('d',lineGen(s.data.slice(0,n)))
+     .attr('fill','none').attr('stroke',s.col).attr('stroke-width',s.w)
+     .attr('stroke-dasharray',s.dash||null);
+  });
+  if(n<100){
+    g.append('line').attr('x1',xSc(n-1)).attr('y1',0).attr('x2',xSc(n-1)).attr('y2',ih)
+     .attr('stroke','#888').attr('stroke-width',0.8).attr('stroke-dasharray','3,2').attr('opacity',0.6);
+  }
+}
+
+// ── D3 KL chart ─────────────────────────────────────────────────────
+function renderKLChart(svgId,klData,epoch){
+  var el=document.getElementById(svgId); if(!el) return;
+  var bcr=el.getBoundingClientRect();
+  var W=Math.max(300,bcr.width||500), H=130;
+  var P={t:14,r:22,b:30,l:48};
+  var iw=W-P.l-P.r, ih=H-P.t-P.b;
+  var xSc=d3.scaleLinear().domain([0,99]).range([0,iw]);
+  var ySc=d3.scaleLinear().domain([0,1.0]).range([ih,0]);
+  var svg=d3.select(el);
+  svg.selectAll('*').remove();
+  svg.attr('viewBox','0 0 '+W+' '+H).attr('width','100%');
+  svg.append('rect').attr('width',W).attr('height',H).attr('fill','#FDFAF5');
+  var g=svg.append('g').attr('transform','translate('+P.l+','+P.t+')');
+  // Threshold
+  var ty=ySc(0.1);
+  g.append('rect').attr('x',0).attr('y',ty).attr('width',iw).attr('height',ih-ty)
+   .attr('fill','#C8E6A8').attr('opacity',0.2);
+  g.append('line').attr('x1',0).attr('y1',ty).attr('x2',iw).attr('y2',ty)
+   .attr('stroke','#2D5A1B').attr('stroke-width',1).attr('stroke-dasharray','6,3').attr('opacity',0.65);
+  g.append('text').attr('x',iw).attr('y',ty-4).attr('text-anchor','end')
+   .attr('font-size',7.5).attr('font-family','Outfit,sans-serif').attr('fill','#2D5A1B')
+   .text('Good agreement (KL<0.1)');
+  // Y ticks
+  [0,0.25,0.5,0.75,1.0].forEach(function(v){
+    g.append('text').attr('x',-5).attr('y',ySc(v)).attr('text-anchor','end')
+     .attr('dominant-baseline','middle').attr('font-size',7.5)
+     .attr('font-family','IBM Plex Mono,monospace').attr('fill','#AAA').text(v.toFixed(2));
+  });
+  [0,25,50,75,99].forEach(function(e){
+    g.append('text').attr('x',xSc(e)).attr('y',ih+12).attr('text-anchor','middle')
+     .attr('font-size',7.5).attr('font-family','IBM Plex Mono,monospace').attr('fill','#AAA')
+     .text(e===99?100:e);
+  });
+  g.append('text').attr('x',iw/2).attr('y',ih+24).attr('text-anchor','middle')
+   .attr('font-size',8).attr('font-family','Outfit,sans-serif').attr('fill','#999')
+   .text('KL(teacher ∥ student) over epochs');
+  g.append('line').attr('x1',0).attr('y1',0).attr('x2',0).attr('y2',ih)
+   .attr('stroke','#C8BE9A').attr('stroke-width',1);
+  g.append('line').attr('x1',0).attr('y1',ih).attr('x2',iw).attr('y2',ih)
+   .attr('stroke','#C8BE9A').attr('stroke-width',1);
+  if(epoch<1) return;
+  var n=Math.min(epoch,100);
+  var lineGen=d3.line().x(function(_,i){return xSc(i);}).y(function(d){return ySc(d);})
+    .curve(d3.curveCatmullRom.alpha(0.5));
+  g.append('path').attr('d',lineGen(klData.slice(0,n)))
+   .attr('fill','none').attr('stroke','#7B3FC4').attr('stroke-width',2);
+  var lastKL=klData[n-1];
+  g.append('circle').attr('cx',xSc(n-1)).attr('cy',ySc(lastKL)).attr('r',3.5)
+   .attr('fill','#7B3FC4').attr('stroke','white').attr('stroke-width',1.5);
+}
+
+// ── Student probs at epoch (eased interpolation toward distilled) ────
+function studentProbAtEpoch(cls,e){
+  var tgt=STUDENT_DIST[cls];
+  var uni=1/CLASSES.length;
+  var ease=1-Math.pow(1-Math.min(1,e/80),2.2);
+  return tgt.map(function(tp){return uni+ease*(tp-uni);});
+}
+
+// ── Epoch probability comparison (Tab 2 bottom) ──────────────────────
+function renderEpochComparison(epoch){
+  var teacherP=softmaxT(TEACHER_BASE[currentClass],tau);
+  var studentP=studentProbAtEpoch(currentClass,epoch);
+  renderProbBars('svg-dt-teacher-probs',teacherP,currentClass);
+  renderProbBars('svg-dt-student-probs',studentP,currentClass);
+}
+
+// ── Tab 2 master update ──────────────────────────────────────────────
+function updateTraining(e){
+  var curves=getLossCurves();
+  setEl('epoch-display',e); setEl('epoch-display-2',e);
+  renderLossChart('svg-loss-curves',curves,e);
+  renderKLChart('svg-kl-chart',curves.klST,e);
+  renderEpochComparison(e);
+  var el=document.getElementById('training-anno');
+  if(!el) return;
+  if(e<1){
+    el.textContent='Press Play to start training. The soft loss (orange) decreases faster early — the teacher\'s soft labels provide richer gradient signal than hard one-hot labels alone.';
+    el.className='anno-box neutral';
+  } else if(e>=100){
+    el.textContent='Training complete (100 epochs). The distilled student has converged — it reaches much closer to teacher accuracy than a student trained from scratch with identical architecture.';
+    el.className='anno-box good';
+  } else {
+    var kl=curves.klST[e-1];
+    var klMsg=kl<0.1?'KL < 0.1 — student and teacher are now in good agreement. ':
+              kl<0.3?'Student rapidly converging to teacher distribution. ':'';
+    el.textContent='Epoch '+e+'/100 · Hard='+curves.hard[e-1].toFixed(3)+
+      ' · Soft='+curves.soft[e-1].toFixed(3)+' · Combined='+curves.combined[e-1].toFixed(3)+'. '+klMsg;
+    el.className='anno-box '+(kl<0.1?'good':'neutral');
+  }
+}
+
+// ── Compression cards (Tab 3) ────────────────────────────────────────
+function renderComparisonCards(){
+  var tAcc=TEACHER_ACC[teacherSize], scAcc=SCRATCH_ACC[studentSize], dAcc=DISTILLED_ACC[studentSize];
+  var ti=TEACHER_INFO[teacherSize], si=STUDENT_INFO[studentSize];
+  setEl('cmp-teacher-params',TEACHER_PARAM_COUNT[teacherSize]);
+  setEl('cmp-teacher-acc',tAcc+'%');
+  setEl('cmp-teacher-layers',ti.layers);
+  setEl('cmp-scratch-params',STUDENT_PARAM_COUNT[studentSize]);
+  setEl('cmp-scratch-acc',scAcc+'%');
+  setEl('cmp-scratch-layers',si.layers);
+  setEl('cmp-distilled-params',STUDENT_PARAM_COUNT[studentSize]);
+  setEl('cmp-distilled-acc',dAcc+'%');
+  setEl('cmp-distilled-layers',si.layers);
+  var af=document.getElementById('acc-fill-teacher');
+  var bf=document.getElementById('acc-fill-scratch');
+  var cf=document.getElementById('acc-fill-distilled');
+  if(af) af.style.width=tAcc+'%';
+  if(bf) bf.style.width=scAcc+'%';
+  if(cf) cf.style.width=dAcc+'%';
+}
+
+// ── D3 scatter plot (Tab 3) ─────────────────────────────────────────
+function renderScatter(){
+  var el=document.getElementById('svg-scatter'); if(!el) return;
+  var bcr=el.getBoundingClientRect();
+  var W=Math.max(300,bcr.width||500), H=200;
+  var P={t:20,r:44,b:40,l:55};
+  var iw=W-P.l-P.r, ih=H-P.t-P.b;
+  var tAcc=TEACHER_ACC[teacherSize], scAcc=SCRATCH_ACC[studentSize], dAcc=DISTILLED_ACC[studentSize];
+  var tLogP=Math.log10({small:50000,medium:500000,large:5000000}[teacherSize]);
+  var sLogP=Math.log10({tiny:5000,small:20000,medium:50000}[studentSize]);
+  var xSc=d3.scaleLinear().domain([3.5,7]).range([0,iw]);
+  var ySc=d3.scaleLinear().domain([60,100]).range([ih,0]);
+  var svg=d3.select(el);
+  svg.selectAll('*').remove();
+  svg.attr('viewBox','0 0 '+W+' '+H).attr('width','100%');
+  svg.append('rect').attr('width',W).attr('height',H).attr('fill','#FDFAF5');
+  var g=svg.append('g').attr('transform','translate('+P.l+','+P.t+')');
+  // Grid
+  [70,80,90,100].forEach(function(v){
+    g.append('line').attr('x1',0).attr('y1',ySc(v)).attr('x2',iw).attr('y2',ySc(v))
+     .attr('stroke','#E2D9C5').attr('stroke-width',0.5);
+    g.append('text').attr('x',-5).attr('y',ySc(v)).attr('text-anchor','end')
+     .attr('dominant-baseline','middle').attr('font-size',8)
+     .attr('font-family','IBM Plex Mono,monospace').attr('fill','#AAA').text(v+'%');
+  });
+  [{v:4,l:'10K'},{v:5,l:'100K'},{v:6,l:'1M'},{v:7,l:'10M'}].forEach(function(t){
+    g.append('text').attr('x',xSc(t.v)).attr('y',ih+14).attr('text-anchor','middle')
+     .attr('font-size',8).attr('font-family','IBM Plex Mono,monospace').attr('fill','#AAA').text(t.l);
+  });
+  g.append('text').attr('x',iw/2).attr('y',ih+28).attr('text-anchor','middle')
+   .attr('font-size',8.5).attr('font-family','Outfit,sans-serif').attr('fill','#999').text('Parameters (log scale)');
+  g.append('text').attr('transform','rotate(-90)').attr('x',-ih/2).attr('y',-42)
+   .attr('text-anchor','middle').attr('font-size',8.5)
+   .attr('font-family','Outfit,sans-serif').attr('fill','#999').text('Accuracy (%)');
+  g.append('line').attr('x1',0).attr('y1',0).attr('x2',0).attr('y2',ih)
+   .attr('stroke','#C8BE9A').attr('stroke-width',1);
+  g.append('line').attr('x1',0).attr('y1',ih).attr('x2',iw).attr('y2',ih)
+   .attr('stroke','#C8BE9A').attr('stroke-width',1);
+  // Sweet spot shading
+  var sx=xSc(sLogP), sy=ySc(dAcc);
+  g.append('ellipse').attr('cx',sx).attr('cy',sy).attr('rx',Math.min(60,iw*0.18)).attr('ry',20)
+   .attr('fill','#C8E6A8').attr('opacity',0.45);
+  g.append('text').attr('x',sx).attr('y',sy+30).attr('text-anchor','middle')
+   .attr('font-size',7.5).attr('font-family','Outfit,sans-serif').attr('fill','#2D5A1B').text('sweet spot');
+  // Knowledge transfer arrow Teacher → Distilled
+  var tx=xSc(tLogP), ty=ySc(tAcc);
+  var dx=sx-tx, dy2=sy-ty, len=Math.sqrt(dx*dx+dy2*dy2);
+  var ux=dx/len, uy=dy2/len, R=9;
+  svg.append('defs').append('marker').attr('id','kd-arr')
+   .attr('markerWidth',8).attr('markerHeight',8).attr('refX',5).attr('refY',3).attr('orient','auto')
+   .append('path').attr('d','M0,0L6,3L0,6Z').attr('fill','#7B3FC4').attr('opacity',0.75);
+  g.append('line')
+   .attr('x1',tx+ux*R).attr('y1',ty+uy*R)
+   .attr('x2',sx-ux*(R+4)).attr('y2',sy-uy*(R+4))
+   .attr('stroke','#7B3FC4').attr('stroke-width',1.6).attr('opacity',0.72)
+   .attr('stroke-dasharray','5,3').attr('marker-end','url(#kd-arr)');
+  g.append('text').attr('x',(tx+sx)/2+10).attr('y',(ty+sy)/2-7)
+   .attr('font-size',7.5).attr('font-family','Outfit,sans-serif').attr('fill','#7B3FC4').attr('opacity',0.9)
+   .text('knowledge transfer');
+  // Points
+  [{x:tLogP,y:tAcc,col:'#2D5A1B',lbl:'Teacher',R:9,ly:-13},
+   {x:sLogP-0.04,y:scAcc,col:'#1A56A0',lbl:'Scratch',R:7.5,ly:16},
+   {x:sLogP+0.04,y:dAcc,col:'#7B3FC4',lbl:'Distilled',R:7.5,ly:-13}
+  ].forEach(function(pt){
+    g.append('circle').attr('cx',xSc(pt.x)).attr('cy',ySc(pt.y)).attr('r',pt.R)
+     .attr('fill',pt.col).attr('stroke','white').attr('stroke-width',1.5);
+    g.append('text').attr('x',xSc(pt.x)).attr('y',ySc(pt.y)+pt.ly)
+     .attr('text-anchor','middle').attr('font-size',9)
+     .attr('font-family','Outfit,sans-serif').attr('fill',pt.col).attr('font-weight','700')
+     .text(pt.lbl);
+  });
+}
+
+// ── Tab 3 master update ──────────────────────────────────────────────
+function updateResults(){
+  renderComparisonCards();
+  renderScatter();
+}
+
+// ── Master update (Tab 1 + regenerate curves + Tab 3) ────────────────
 function updateAll(){
+  lossCurves=null; // force regeneration with current alpha/tau
   var teacherP=TEACHER_BASE[currentClass];
   var studentP=STUDENT_DIST[currentClass];
   var color=CLASS_COLORS[currentClass];
-
   renderNet('svg-teacher-net',TEACHER_ARCH[teacherSize],currentClass,color);
   renderNet('svg-student-net',STUDENT_ARCH[studentSize],currentClass,color);
   renderProbBars('svg-teacher-probs',teacherP,currentClass);
@@ -1232,16 +1539,39 @@ function updateAll(){
   updateRightPanel(currentClass,teacherP,studentP,tau);
   updateAnno(currentClass,teacherP,tau);
   updateArchLabels();
+  updateResults();
+}
+
+// ── Playback helpers ─────────────────────────────────────────────────
+function speedToMs(){
+  var s=+document.getElementById('sld-speed').value;
+  return [800,500,300,150,60][Math.max(0,Math.min(4,s-1))];
+}
+
+function stopPlay(){
+  if(trainingTimer){clearInterval(trainingTimer);trainingTimer=null;}
+  var btn=document.getElementById('btn-play');
+  if(btn) btn.textContent='⏵ Play';
+}
+
+function doEpochStep(){
+  if(currentEpoch>=100){stopPlay();return;}
+  currentEpoch++;
+  updateTraining(currentEpoch);
 }
 
 // ── Event wiring ───────────────────────────────────────────────────
 document.getElementById('tab-bar').addEventListener('click',function(e){
   var btn=e.target.closest('button'); if(!btn||!btn.dataset.tab) return;
+  stopPlay();
   document.querySelectorAll('#tab-bar button').forEach(function(b){b.classList.remove('active');});
   btn.classList.add('active');
   document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('active');});
   document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
-  if(btn.dataset.tab==='teacher-student') updateAll();
+  activeTab=btn.dataset.tab;
+  if(activeTab==='teacher-student') updateAll();
+  else if(activeTab==='training') updateTraining(currentEpoch);
+  else if(activeTab==='results') updateResults();
 });
 
 document.getElementById('teacher-selector').addEventListener('click',function(e){
@@ -1249,6 +1579,7 @@ document.getElementById('teacher-selector').addEventListener('click',function(e)
   document.querySelectorAll('#teacher-selector .sel-btn').forEach(function(b){b.classList.remove('t-active');});
   btn.classList.add('t-active');
   teacherSize=btn.dataset.teacher;
+  lossCurves=null;
   updateAll();
 });
 
@@ -1257,38 +1588,63 @@ document.getElementById('student-selector').addEventListener('click',function(e)
   document.querySelectorAll('#student-selector .sel-btn').forEach(function(b){b.classList.remove('s-active');});
   btn.classList.add('s-active');
   studentSize=btn.dataset.student;
+  lossCurves=null;
   updateAll();
 });
 
 document.getElementById('sld-tau').addEventListener('input',function(){
   tau=+this.value;
-  setEl('val-tau',tau.toFixed(1));
-  setEl('tau-rp',tau.toFixed(1));
+  setEl('val-tau',tau.toFixed(1)); setEl('tau-rp',tau.toFixed(1));
   updateSoftPanel(currentClass,tau);
   updateAnno(currentClass,TEACHER_BASE[currentClass],tau);
+  lossCurves=null;
+  if(activeTab==='training') updateTraining(currentEpoch);
 });
 
 document.getElementById('sld-alpha').addEventListener('input',function(){
   alpha=+this.value;
   setEl('val-alpha',alpha.toFixed(2));
+  lossCurves=null;
+  if(activeTab==='training') updateTraining(currentEpoch);
 });
 
 document.getElementById('sld-speed').addEventListener('input',function(){
   setEl('val-speed',this.value+'×');
+  if(trainingTimer){clearInterval(trainingTimer);trainingTimer=setInterval(doEpochStep,speedToMs());}
 });
 
-// Play/Step/Reset — cycle through input classes on Tab 1
 document.getElementById('btn-play').addEventListener('click',function(){
-  currentClass=(currentClass+1)%CLASSES.length;
-  updateAll();
+  if(activeTab==='training'){
+    if(trainingTimer){stopPlay();}
+    else{
+      if(currentEpoch>=100) currentEpoch=0;
+      var btn=document.getElementById('btn-play');
+      if(btn) btn.textContent='■ Stop';
+      trainingTimer=setInterval(doEpochStep,speedToMs());
+    }
+  } else if(activeTab==='teacher-student'){
+    currentClass=(currentClass+1)%CLASSES.length;
+    updateAll();
+  }
 });
+
 document.getElementById('btn-step').addEventListener('click',function(){
-  currentClass=(currentClass+1)%CLASSES.length;
-  updateAll();
+  stopPlay();
+  if(activeTab==='training'){
+    if(currentEpoch<100){currentEpoch++;updateTraining(currentEpoch);}
+  } else if(activeTab==='teacher-student'){
+    currentClass=(currentClass+1)%CLASSES.length;
+    updateAll();
+  }
 });
+
 document.getElementById('btn-reset').addEventListener('click',function(){
-  currentClass=0;
-  updateAll();
+  stopPlay();
+  if(activeTab==='training'){
+    currentEpoch=0; updateTraining(0);
+  } else if(activeTab==='teacher-student'){
+    currentClass=0; updateAll();
+  }
 });
 
 document.getElementById('concepts-toggle').addEventListener('click',function(){
@@ -1300,6 +1656,7 @@ document.getElementById('concepts-toggle').addEventListener('click',function(){
 
 // ── Boot ───────────────────────────────────────────────────────────
 updateAll();
+updateTraining(0);
 
 })();
 </script>
