@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<!-- Copyright © 2026 Greg T. Chism. University of Arizona, College of Information Science.
+     INFO 557: Neural Networks. MIT License. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Knowledge Distillation — Interactive Explorer | INFO 557: Neural Networks</title>
+<meta name="description" content="Watch a small student network learn from a large teacher's soft predictions — see how temperature scaling transfers richer knowledge than hard labels alone.">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Knowledge Distillation — Interactive Explorer">
+<meta property="og:description" content="Watch a small student network learn from a large teacher's soft predictions — see how temperature scaling transfers richer knowledge than hard labels alone.">
+<meta property="og:image" content="https://gchism94.github.io/uofa-neural-networks/knowledge_distillation/kd_explorer-preview.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="600">
+<meta property="og:url" content="https://gchism94.github.io/uofa-neural-networks/knowledge_distillation/kd_explorer.html">
+<meta property="fb:app_id" content="2385695445236853">
+
+<!-- Twitter/X card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Knowledge Distillation — Interactive Explorer">
+<meta name="twitter:description" content="Watch a small student network learn from a large teacher's soft predictions — see how temperature scaling transfers richer knowledge than hard labels alone.">
+<meta name="twitter:image" content="https://gchism94.github.io/uofa-neural-networks/knowledge_distillation/kd_explorer-preview.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+
+<style>
+/* ── Design tokens ──────────────────────────────────────────────── */
+:root{
+  --cream:#FAF7F0;--cream-mid:#F0EBE0;--cream-dk:#E2D9C5;
+  --g-dk:#1C3A0E;--g-mid:#2D5A1B;--g-lt:#4A8C2F;--g-pale:#C8E6A8;
+  --orange:#E8630A;--orange-lt:#F08C50;--orange-dk:#C0500A;
+  --blue:#1A56A0;--blue-pale:#D0E4F8;
+  --red:#B0321D;--red-pale:#F8DDD8;
+  --purple:#7B3FC4;--purple-pale:#E8D8F8;
+  --yellow:#B08000;--yellow-pale:#FBF0C8;--yellow-hi:#D4A017;
+  --text:#1A1A1A;--text-muted:#888;--text-soft:#555;
+  --border:#C8BE9A;--border-lt:#DDD6BE;--shadow:rgba(44,90,27,.10);
+
+  /* KD-specific palette */
+  --teacher:#2D5A1B;     --teacher-pale:#C8E6A8;
+  --student:#1A56A0;     --student-pale:#D0E4F8;
+  --distilled:#7B3FC4;   --distilled-pale:#E8D8F8;
+  --hard-loss:#2D5A1B;
+  --soft-loss:#E8630A;
+  --combined-loss:#1A56A0;
+  --tau-color:#B08000;   --tau-pale:#FBF0C8;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:'Outfit',sans-serif;background:var(--cream);color:var(--text);
+  padding:1.25rem 1rem 2rem;min-height:100vh;line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:.85rem}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+.hdr{display:flex;justify-content:space-between;align-items:flex-start;column-gap:1rem;row-gap:.35rem;flex-wrap:wrap}
+.hdr>div:first-child{flex:1 1 auto;min-width:0}
+.hdr h1{font-size:clamp(1.2rem,2.1vw,1.55rem);font-weight:700;color:var(--g-dk);letter-spacing:-.02em;line-height:1.2}
+.hdr p.subtitle{font-size:.86rem;color:var(--text-muted);margin-top:.18rem}
+.hdr-rule{border:none;border-top:2.5px solid var(--g-dk);margin-top:.55rem}
+
+/* ── Fixed copyright ─────────────────────────────────────────────── */
+.cr-top{
+  position:fixed;top:.75rem;right:1rem;z-index:1000;
+  font-size:.72rem;color:var(--text-muted);text-align:right;
+  background:rgba(250,247,240,.92);padding:.2rem 1.5rem .2rem .5rem;
+  border-radius:5px;backdrop-filter:blur(4px);
+  border:1px solid var(--border-lt);white-space:nowrap;min-width:max-content;
+}
+.cr-top a{color:var(--orange);text-decoration:none}
+.cr-top a:hover{text-decoration:underline}
+
+/* ── Tab bar ─────────────────────────────────────────────────────── */
+.tab-bar{
+  display:flex;gap:.35rem;background:var(--cream-mid);
+  border:1px solid var(--border);border-radius:8px;
+  padding:.3rem;width:fit-content;
+}
+.tab-bar button{
+  font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:500;
+  padding:.3rem .9rem;border-radius:6px;cursor:pointer;
+  border:none;background:transparent;color:var(--text-soft);transition:all .15s;
+}
+.tab-bar button:hover{background:white;color:var(--g-dk)}
+.tab-bar button.active{background:white;color:var(--g-dk);font-weight:600;
+  box-shadow:0 1px 4px var(--shadow);}
+
+/* ── Explorer grid ───────────────────────────────────────────────── */
+.explorer-grid{
+  display:grid;
+  grid-template-columns:250px 1fr 210px;
+  gap:.85rem;align-items:start;
+}
+@media(max-width:980px){
+  .explorer-grid{grid-template-columns:250px 1fr}
+  .right-col{display:none}
+}
+@media(max-width:680px){.explorer-grid{grid-template-columns:1fr}}
+.left-col{display:flex;flex-direction:column;gap:.75rem}
+.center-col{display:flex;flex-direction:column;gap:.75rem}
+.right-col{display:flex;flex-direction:column;gap:.75rem}
+
+/* ── Cards ───────────────────────────────────────────────────────── */
+.card{background:white;border:1px solid var(--border);border-radius:8px;
+  padding:.85rem 1rem;box-shadow:0 2px 8px var(--shadow)}
+.card-title{font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--g-dk);margin-bottom:.55rem}
+
+/* ── Selectors ───────────────────────────────────────────────────── */
+.sel-group{display:flex;gap:.3rem;flex-wrap:wrap;margin-bottom:.45rem}
+.sel-btn{
+  font-family:'Outfit',sans-serif;font-size:.75rem;font-weight:500;
+  padding:.25rem .6rem;border-radius:5px;cursor:pointer;
+  border:1.5px solid var(--border-lt);background:var(--cream);color:var(--text-soft);
+  transition:all .12s;
+}
+.sel-btn:hover{background:var(--cream-mid)}
+.sel-btn.active{background:var(--g-mid);border-color:var(--g-mid);color:white}
+.sel-btn.t-active{background:var(--teacher);border-color:var(--teacher);color:white}
+.sel-btn.s-active{background:var(--student);border-color:var(--student);color:white}
+
+/* ── Sliders ─────────────────────────────────────────────────────── */
+.srow{display:flex;align-items:center;gap:.45rem;margin-bottom:.2rem}
+.slbl{font-family:'IBM Plex Mono',monospace;font-size:.8rem;font-weight:500;
+  color:var(--g-dk);min-width:28px}
+input[type=range]{flex:1;appearance:none;-webkit-appearance:none;height:4px;
+  background:var(--cream-dk);border-radius:2px;cursor:pointer;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
+  border-radius:50%;background:var(--g-mid);border:2.5px solid white;
+  box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:pointer}
+.sval{font-family:'IBM Plex Mono',monospace;font-size:.76rem;
+  color:var(--text-muted);min-width:44px;text-align:right}
+.hint-txt{font-size:.7rem;color:var(--text-muted);font-style:italic;margin-top:.15rem}
+.param-lbl{font-size:.72rem;color:var(--text-soft);margin-bottom:.25rem;font-weight:500}
+
+/* ── Buttons ─────────────────────────────────────────────────────── */
+.ctrl-btns{display:flex;gap:.45rem;flex-wrap:wrap}
+.pbtn{
+  font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:600;
+  padding:.35rem .9rem;border-radius:6px;cursor:pointer;
+  border:1.5px solid var(--border);background:var(--cream);color:var(--g-dk);
+  transition:all .12s;
+}
+.pbtn:hover{background:var(--g-pale);border-color:var(--g-lt)}
+.pbtn.primary{background:var(--g-mid);border-color:var(--g-mid);color:white}
+.pbtn.primary:hover{background:var(--g-dk);border-color:var(--g-dk)}
+
+/* ── Annotation box ──────────────────────────────────────────────── */
+.anno-box{
+  border-radius:6px;padding:.55rem .75rem;font-size:.78rem;line-height:1.55;
+  background:var(--blue-pale);color:var(--blue);border-left:3px solid var(--blue);
+  min-height:3.2rem;
+}
+.anno-box.warn{background:var(--red-pale);color:var(--red);border-color:var(--red)}
+.anno-box.good{background:var(--g-pale);color:var(--g-dk);border-color:var(--g-mid)}
+.anno-box.neutral{background:var(--cream-mid);color:var(--text-soft);border-color:var(--border)}
+
+/* ── Key Concepts ────────────────────────────────────────────────── */
+.concepts-body{overflow:hidden;max-height:900px;transition:max-height .3s ease}
+.concepts-body.collapsed{max-height:0;margin-bottom:-.55rem}
+.concepts-item{font-size:.74rem;color:var(--text-soft);line-height:1.5;
+  margin-bottom:.45rem;padding-left:.9rem;position:relative}
+.concepts-item:last-child{margin-bottom:0}
+.concepts-item::before{content:'●';color:#2e7d32;position:absolute;left:0;top:0}
+.concepts-item strong{color:#2e7d32;font-weight:600}
+
+/* ── Plot label, panel titles ────────────────────────────────────── */
+.plot-label{font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--text-muted);text-align:center;margin-bottom:.5rem}
+.panel-title{font-size:.78rem;font-weight:700;text-align:center;margin-bottom:.2rem}
+.panel-sub{font-size:.63rem;color:var(--text-muted);text-align:center;
+  margin-bottom:.4rem;font-style:italic}
+
+/* ── Legend ──────────────────────────────────────────────────────── */
+.legend{display:flex;gap:.75rem;flex-wrap:wrap;font-size:.72rem;
+  color:var(--text-soft);margin-top:.5rem;align-items:center;justify-content:center}
+.legend-sq{width:12px;height:12px;border-radius:2px;display:inline-block;
+  vertical-align:middle;margin-right:.25rem;flex-shrink:0}
+.legend-line{width:22px;height:2.5px;display:inline-block;vertical-align:middle;
+  margin-right:.25rem;border-radius:2px;flex-shrink:0}
+
+/* ── Tab panels ──────────────────────────────────────────────────── */
+.tab-panel{display:none}
+.tab-panel.active{display:flex;flex-direction:column;gap:.75rem}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* ── Tab 1: Teacher vs Student ────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────── */
+.ts-panels{
+  display:grid;
+  grid-template-columns:1fr 190px 1fr;
+  gap:.75rem;align-items:start;
+}
+@media(max-width:760px){.ts-panels{grid-template-columns:1fr}}
+
+/* Network architecture SVG — portrait ratio for node layers */
+.net-svg{
+  width:100%;aspect-ratio:3/4;max-height:280px;display:block;
+  border-radius:6px;background:#FDFAF5;border:1px solid var(--border-lt);
+}
+.net-svg.teacher-net{border-color:var(--teacher);border-width:1.5px}
+.net-svg.student-net{border-color:var(--student);border-width:1.5px}
+
+/* Probability bar chart below network */
+.prob-svg{
+  width:100%;min-height:80px;display:block;
+  border-radius:5px;background:#FDFAF5;border:1px solid var(--border-lt);
+  margin-top:.4rem;
+}
+
+/* Network identity badge */
+.net-badge{
+  display:inline-block;padding:.1rem .55rem;border-radius:4px;
+  font-size:.65rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+  margin-bottom:.3rem;
+}
+.net-badge.teacher{background:var(--teacher-pale);color:var(--teacher)}
+.net-badge.student{background:var(--student-pale);color:var(--student)}
+
+/* ── Soft labels center column ────────────────────────────────────── */
+.soft-panel{
+  display:flex;flex-direction:column;gap:.45rem;
+  background:var(--tau-pale);border:1.5px solid var(--tau-color);
+  border-radius:8px;padding:.65rem .6rem;
+}
+.soft-panel-hdr{
+  font-size:.64rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--tau-color);text-align:center;
+}
+.soft-legend{display:flex;gap:.5rem;justify-content:center;margin-bottom:.15rem;font-size:.62rem}
+.sl-dot{width:8px;height:8px;border-radius:50%;display:inline-block;vertical-align:middle;margin-right:.2rem}
+
+.soft-row{display:flex;align-items:center;gap:.3rem;font-size:.63rem}
+.soft-cls{font-family:'IBM Plex Mono',monospace;color:var(--text-soft);
+  min-width:22px;text-align:right;flex-shrink:0}
+.soft-bars{flex:1;display:flex;flex-direction:column;gap:2px}
+.soft-bar-track{width:100%;height:7px;background:rgba(255,255,255,.55);
+  border-radius:3px;position:relative;overflow:hidden}
+.soft-bar-fill{position:absolute;top:0;left:0;height:100%;border-radius:3px;opacity:.82}
+.soft-bar-fill.hard{background:var(--red)}
+.soft-bar-fill.soft{background:var(--tau-color)}
+.soft-val{font-family:'IBM Plex Mono',monospace;font-size:.6rem;
+  color:var(--text-muted);min-width:28px;text-align:right;flex-shrink:0}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* ── Tab 2: Distillation Training ────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────── */
+#svg-loss-curves{
+  width:100%;min-height:220px;display:block;
+  border-radius:6px;background:#FDFAF5;border:1px solid var(--border-lt);
+}
+
+.epoch-counter{
+  display:flex;justify-content:center;align-items:center;gap:.45rem;
+  font-family:'IBM Plex Mono',monospace;font-size:.8rem;font-weight:600;
+  color:var(--g-dk);margin-top:.4rem;
+}
+.epoch-num{
+  background:var(--g-mid);color:white;border-radius:4px;
+  padding:.1rem .45rem;font-size:.78rem;
+}
+
+.dt-panels{
+  display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-top:.35rem;
+}
+@media(max-width:580px){.dt-panels{grid-template-columns:1fr}}
+
+.dt-svg{
+  width:100%;min-height:90px;display:block;
+  border-radius:5px;background:#FDFAF5;border:1px solid var(--border-lt);
+}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* ── Tab 3: Compression Results ──────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────── */
+.cmp-panels-3{
+  display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem;
+}
+@media(max-width:640px){.cmp-panels-3{grid-template-columns:1fr}}
+
+.method-badge-kd{
+  display:inline-block;padding:.1rem .55rem;border-radius:4px;
+  font-size:.65rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+  margin-bottom:.35rem;
+}
+.method-badge-kd.teacher{background:var(--teacher-pale);color:var(--teacher)}
+.method-badge-kd.scratch{background:var(--student-pale);color:var(--student)}
+.method-badge-kd.distilled{background:var(--distilled-pale);color:var(--distilled)}
+
+.metric-row{
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:.7rem;padding:.22rem 0;border-bottom:1px solid var(--border-lt);
+}
+.metric-row:last-child{border-bottom:none}
+.mr-lbl{color:var(--text-muted);font-family:'IBM Plex Mono',monospace;font-size:.68rem}
+.mr-val{font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--g-dk);font-size:.7rem}
+
+/* Accuracy bar */
+.acc-track{
+  width:100%;height:8px;background:var(--cream-dk);border-radius:4px;
+  margin-top:.25rem;margin-bottom:.5rem;overflow:hidden;
+}
+.acc-fill{height:100%;border-radius:4px}
+.acc-fill.teacher{background:var(--teacher);width:0%}
+.acc-fill.scratch{background:var(--student);width:0%}
+.acc-fill.distilled{background:var(--distilled);width:0%}
+
+/* Inference speed dots */
+.speed-label{font-size:.65rem;color:var(--text-muted);margin-bottom:.2rem;margin-top:.15rem}
+.speed-dots{display:flex;gap:4px}
+.speed-dot{width:11px;height:11px;border-radius:50%;background:var(--cream-dk)}
+.speed-dot.on{background:var(--g-mid)}
+
+/* Scatter plot */
+#svg-scatter{
+  width:100%;min-height:200px;display:block;
+  border-radius:6px;background:#FDFAF5;border:1px solid var(--border-lt);
+  margin-top:.4rem;
+}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* ── Right panel ─────────────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────── */
+.stat-row{
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:.7rem;padding:.22rem 0;border-bottom:1px solid var(--border-lt);
+}
+.stat-row:last-child{border-bottom:none}
+.sr-lbl{color:var(--text-muted);font-family:'IBM Plex Mono',monospace}
+.sr-val{font-weight:600;font-family:'IBM Plex Mono',monospace;color:var(--g-dk)}
+
+/* Compact prob bars */
+.prob-row{
+  display:flex;align-items:center;gap:.3rem;padding:.14rem 0;font-size:.63rem;
+}
+.pr-lbl{font-family:'IBM Plex Mono',monospace;color:var(--text-soft);min-width:18px;flex-shrink:0}
+.pr-track{flex:1;height:7px;border-radius:3px;background:var(--cream-dk);overflow:hidden}
+.pr-fill{height:100%;border-radius:3px}
+.pr-fill.teacher-fill{background:var(--teacher)}
+.pr-fill.student-fill{background:var(--student)}
+.pr-val{font-family:'IBM Plex Mono',monospace;font-size:.61rem;
+  min-width:30px;text-align:right;color:var(--text-muted)}
+
+/* KL divergence */
+.kl-box{
+  text-align:center;padding:.45rem .3rem;border-radius:6px;
+  border:1px solid var(--border-lt);background:var(--cream);margin-top:.25rem;
+}
+.kl-val{display:block;font-family:'IBM Plex Mono',monospace;font-size:1rem;
+  font-weight:700;line-height:1.2;color:var(--g-dk)}
+.kl-lbl{font-size:.6rem;color:var(--text-muted);margin-top:.08rem}
+
+/* Temperature display */
+.tau-display{
+  display:flex;align-items:center;justify-content:center;gap:.55rem;
+  padding:.4rem .5rem;margin-top:.3rem;
+  background:var(--tau-pale);border:1px solid var(--tau-color);border-radius:6px;
+}
+.tau-val{font-family:'IBM Plex Mono',monospace;font-size:1.1rem;font-weight:700;color:var(--tau-color)}
+.tau-lbl{font-size:.62rem;color:var(--text-muted);line-height:1.3}
+
+/* Speed row for playback */
+.speed-row{display:flex;align-items:center;gap:.45rem;margin-top:.35rem}
+</style>
+</head>
+<body>
+
+<div class="cr-top">© 2026 Greg T. Chism · <a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a></div>
+
+<div class="wrap">
+
+<header>
+  <div class="hdr">
+    <div>
+      <h1>Knowledge Distillation — Interactive Explorer</h1>
+      <p class="subtitle">Watch a small student network learn from a large teacher's soft predictions — see how temperature scaling transfers richer knowledge than hard labels alone</p>
+    </div>
+  </div>
+  <hr class="hdr-rule">
+</header>
+
+<!-- Tab bar -->
+<div class="tab-bar" id="tab-bar">
+  <button class="active" data-tab="teacher-student">Teacher vs Student</button>
+  <button data-tab="training">Distillation Training</button>
+  <button data-tab="results">Compression Results</button>
+</div>
+
+<!-- Main explorer -->
+<div class="explorer-grid">
+
+  <!-- ══ LEFT: Controls ══════════════════════════════════════════════ -->
+  <div class="left-col">
+
+    <!-- Teacher size -->
+    <div class="card">
+      <div class="card-title">Teacher Network</div>
+      <div class="param-lbl">Architecture</div>
+      <div class="sel-group" id="teacher-selector">
+        <button class="sel-btn t-active" data-teacher="small">Small (3)</button>
+        <button class="sel-btn" data-teacher="medium">Medium (6)</button>
+        <button class="sel-btn" data-teacher="large">Large (10)</button>
+      </div>
+      <div class="hint-txt">Number of hidden layers</div>
+    </div>
+
+    <!-- Student size -->
+    <div class="card">
+      <div class="card-title">Student Network</div>
+      <div class="param-lbl">Architecture</div>
+      <div class="sel-group" id="student-selector">
+        <button class="sel-btn s-active" data-student="tiny">Tiny (1)</button>
+        <button class="sel-btn" data-student="small">Small (2)</button>
+        <button class="sel-btn" data-student="medium">Medium (3)</button>
+      </div>
+      <div class="hint-txt">Number of hidden layers</div>
+    </div>
+
+    <!-- Distillation parameters -->
+    <div class="card">
+      <div class="card-title">Distillation Params</div>
+
+      <div class="param-lbl">Temperature τ</div>
+      <div class="srow">
+        <span class="slbl">τ</span>
+        <input type="range" id="sld-tau" min="1" max="10" step="0.5" value="3">
+        <span class="sval" id="val-tau">3.0</span>
+      </div>
+      <div class="hint-txt">Higher τ = softer probability distributions</div>
+
+      <div class="param-lbl" style="margin-top:.45rem">Loss weight α</div>
+      <div class="srow">
+        <span class="slbl">α</span>
+        <input type="range" id="sld-alpha" min="0" max="1" step="0.05" value="0.5">
+        <span class="sval" id="val-alpha">0.50</span>
+      </div>
+      <div class="hint-txt">α=0: hard labels only · α=1: soft labels only</div>
+    </div>
+
+    <!-- Playback controls -->
+    <div class="card">
+      <div class="card-title">Training</div>
+
+      <div class="ctrl-btns" style="margin-bottom:.45rem">
+        <button id="btn-play" class="pbtn primary" style="flex:1">⏵ Play</button>
+        <button id="btn-step" class="pbtn">→ Step</button>
+        <button id="btn-reset" class="pbtn">↺ Reset</button>
+      </div>
+
+      <div class="epoch-counter">
+        Epoch <span class="epoch-num" id="epoch-display">0</span> / <span id="epoch-total">100</span>
+      </div>
+
+      <div class="speed-row">
+        <span class="slbl" style="min-width:44px;font-size:.7rem">Speed</span>
+        <input type="range" id="sld-speed" min="1" max="5" step="1" value="3">
+        <span class="sval" id="val-speed">3×</span>
+      </div>
+    </div>
+
+    <!-- Annotation -->
+    <div class="card">
+      <div class="card-title">What's happening?</div>
+      <div class="anno-box neutral" id="anno-box">
+        Select teacher and student architectures, set the temperature τ and loss weight α, then press Play to watch the student learn from the teacher's soft predictions.
+      </div>
+    </div>
+
+    <!-- Key Concepts -->
+    <div class="card">
+      <div class="card-title" style="cursor:pointer;user-select:none" id="concepts-toggle">
+        Key Concepts <span id="concepts-arrow">▾</span>
+      </div>
+      <div class="concepts-body" id="concepts-body">
+        <div class="concepts-item"><strong>Knowledge distillation:</strong> transfer learning where a large pre-trained teacher network guides a smaller student network — the student learns not just the correct labels but the teacher's full probability distribution over all classes.</div>
+        <div class="concepts-item"><strong>Soft labels:</strong> instead of hard one-hot labels (100% class A, 0% everything else), the teacher provides soft probabilities over all classes — e.g., 70% cat, 20% dog, 10% fox. This reveals how the teacher "thinks" about similarity between classes.</div>
+        <div class="concepts-item"><strong>Temperature τ:</strong> divides logits before softmax — higher τ flattens the distribution, making soft labels softer and more informative. At τ=1, the teacher's output may be nearly one-hot; at τ=5 the probability spreads reveal inter-class similarities.</div>
+        <div class="concepts-item"><strong>Loss weight α:</strong> controls the trade-off between hard label loss (cross-entropy with true labels) and soft label loss (KL divergence with teacher's soft predictions). α=0.5 balances both; α→1 relies almost entirely on soft labels.</div>
+        <div class="concepts-item"><strong>Why distillation beats scratch:</strong> the teacher's soft labels encode dark knowledge — relationships between similar classes — that hard labels cannot capture. The student receives a richer training signal, converging to better accuracy with fewer parameters than the teacher.</div>
+      </div>
+    </div>
+
+  </div><!-- end left-col -->
+
+  <!-- ══ CENTER: Tab panels ══════════════════════════════════════════ -->
+  <div class="center-col">
+
+    <!-- ─ Tab 1: Teacher vs Student ──────────────────────────────────── -->
+    <div class="tab-panel active" id="panel-teacher-student">
+      <div class="card">
+        <div class="plot-label" id="ts-label">Teacher vs Student — Small Teacher (3 layers) · Tiny Student (1 layer)</div>
+
+        <div class="ts-panels">
+
+          <!-- Teacher network -->
+          <div>
+            <div style="text-align:center;margin-bottom:.3rem">
+              <span class="net-badge teacher">Teacher</span>
+            </div>
+            <div class="panel-sub">3 hidden layers · ~120k params</div>
+            <svg id="svg-teacher-net" class="net-svg teacher-net">
+              <rect width="100%" height="100%" fill="#FDFAF5"/>
+              <text x="50%" y="43%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="12">
+                Teacher network
+              </text>
+              <text x="50%" y="57%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="10">
+                D3 node diagram
+              </text>
+            </svg>
+            <div class="panel-sub" style="margin-top:.35rem">Output class probabilities</div>
+            <svg id="svg-teacher-probs" class="prob-svg">
+              <rect width="100%" height="80" fill="#FDFAF5"/>
+              <text x="50%" y="40" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.2)" font-family="Outfit,sans-serif" font-size="9">
+                Teacher output probs
+              </text>
+            </svg>
+          </div>
+
+          <!-- Soft labels center panel -->
+          <div class="soft-panel">
+            <div class="soft-panel-hdr">Soft Labels (τ = <span id="tau-display-ts">3.0</span>)</div>
+            <div class="soft-legend">
+              <span><span class="sl-dot" style="background:var(--red)"></span>Hard (1-hot)</span>
+              <span><span class="sl-dot" style="background:var(--tau-color)"></span>Soft (τ)</span>
+            </div>
+
+            <!-- Placeholder soft-label rows for 5 classes -->
+            <div class="soft-row">
+              <span class="soft-cls">C0</span>
+              <div class="soft-bars">
+                <div class="soft-bar-track">
+                  <div class="soft-bar-fill hard" style="width:100%"></div>
+                </div>
+                <div class="soft-bar-track">
+                  <div class="soft-bar-fill soft" style="width:62%"></div>
+                </div>
+              </div>
+              <span class="soft-val">0.62</span>
+            </div>
+            <div class="soft-row">
+              <span class="soft-cls">C1</span>
+              <div class="soft-bars">
+                <div class="soft-bar-track">
+                  <div class="soft-bar-fill hard" style="width:0%"></div>
+                </div>
+                <div class="soft-bar-track">
+                  <div class="soft-bar-fill soft" style="width:18%"></div>
+                </div>
+              </div>
+              <span class="soft-val">0.18</span>
+            </div>
+            <div class="soft-row">
+              <span class="soft-cls">C2</span>
+              <div class="soft-bars">
+                <div class="soft-bar-track">
+                  <div class="soft-bar-fill hard" style="width:0%"></div>
+                </div>
+                <div class="soft-bar-track">
+                  <div class="soft-bar-fill soft" style="width:12%"></div>
+                </div>
+              </div>
+              <span class="soft-val">0.12</span>
+            </div>
+            <div class="soft-row">
+              <span class="soft-cls">C3</span>
+              <div class="soft-bars">
+                <div class="soft-bar-track">
+                  <div class="soft-bar-fill hard" style="width:0%"></div>
+                </div>
+                <div class="soft-bar-track">
+                  <div class="soft-bar-fill soft" style="width:5%"></div>
+                </div>
+              </div>
+              <span class="soft-val">0.05</span>
+            </div>
+            <div class="soft-row">
+              <span class="soft-cls">C4</span>
+              <div class="soft-bars">
+                <div class="soft-bar-track">
+                  <div class="soft-bar-fill hard" style="width:0%"></div>
+                </div>
+                <div class="soft-bar-track">
+                  <div class="soft-bar-fill soft" style="width:3%"></div>
+                </div>
+              </div>
+              <span class="soft-val">0.03</span>
+            </div>
+
+            <div style="font-size:.59rem;color:var(--tau-color);text-align:center;margin-top:.2rem;font-style:italic">
+              Soft labels reveal class similarity — dark knowledge
+            </div>
+          </div>
+
+          <!-- Student network -->
+          <div>
+            <div style="text-align:center;margin-bottom:.3rem">
+              <span class="net-badge student">Student</span>
+            </div>
+            <div class="panel-sub">1 hidden layer · ~8k params</div>
+            <svg id="svg-student-net" class="net-svg student-net">
+              <rect width="100%" height="100%" fill="#FDFAF5"/>
+              <text x="50%" y="43%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="12">
+                Student network
+              </text>
+              <text x="50%" y="57%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="10">
+                D3 node diagram
+              </text>
+            </svg>
+            <div class="panel-sub" style="margin-top:.35rem">Output class probabilities</div>
+            <svg id="svg-student-probs" class="prob-svg">
+              <rect width="100%" height="80" fill="#FDFAF5"/>
+              <text x="50%" y="40" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.2)" font-family="Outfit,sans-serif" font-size="9">
+                Student output probs
+              </text>
+            </svg>
+          </div>
+
+        </div><!-- end ts-panels -->
+
+        <div class="anno-box neutral" id="ts-anno" style="margin-top:.65rem;font-size:.75rem">
+          The soft labels panel shows how temperature τ transforms the teacher's one-hot predictions into smooth probability distributions — exposing how similar the teacher finds each class to be.
+        </div>
+      </div>
+    </div><!-- end panel-teacher-student -->
+
+    <!-- ─ Tab 2: Distillation Training ──────────────────────────────── -->
+    <div class="tab-panel" id="panel-training">
+      <div class="card">
+        <div class="plot-label">Distillation Training — Loss curves over epochs</div>
+
+        <svg id="svg-loss-curves">
+          <rect width="100%" height="220" fill="#FDFAF5"/>
+          <text x="50%" y="96" text-anchor="middle" dominant-baseline="middle"
+                fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="13">
+            Loss curves over training epochs
+          </text>
+          <text x="50%" y="116" text-anchor="middle" dominant-baseline="middle"
+                fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="10">
+            hard label loss · soft label loss · combined loss
+          </text>
+          <text x="50%" y="134" text-anchor="middle" dominant-baseline="middle"
+                fill="rgba(0,0,0,.10)" font-family="Outfit,sans-serif" font-size="9">
+            rendered by D3
+          </text>
+        </svg>
+
+        <div class="legend">
+          <span><span class="legend-line" style="background:var(--hard-loss)"></span>Hard label loss</span>
+          <span><span class="legend-line" style="background:var(--soft-loss)"></span>Soft label loss (KL div)</span>
+          <span><span class="legend-line" style="background:var(--combined-loss)"></span>Combined loss (α weighted)</span>
+        </div>
+
+        <div class="epoch-counter" style="margin-top:.5rem">
+          Epoch <span class="epoch-num" id="epoch-display-2">0</span> / <span id="epoch-total-2">100</span>
+        </div>
+
+        <!-- Teacher vs student prob comparison at current epoch -->
+        <div class="dt-panels">
+          <div>
+            <div class="panel-sub" style="margin-top:.4rem;margin-bottom:.3rem">Teacher soft probs (τ-scaled)</div>
+            <svg id="svg-dt-teacher-probs" class="dt-svg">
+              <rect width="100%" height="90" fill="#FDFAF5"/>
+              <text x="50%" y="45" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.2)" font-family="Outfit,sans-serif" font-size="9">
+                Teacher target distribution
+              </text>
+            </svg>
+          </div>
+          <div>
+            <div class="panel-sub" style="margin-top:.4rem;margin-bottom:.3rem">Student probs at current epoch</div>
+            <svg id="svg-dt-student-probs" class="dt-svg">
+              <rect width="100%" height="90" fill="#FDFAF5"/>
+              <text x="50%" y="45" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.2)" font-family="Outfit,sans-serif" font-size="9">
+                Student learned distribution
+              </text>
+            </svg>
+          </div>
+        </div>
+
+        <div class="anno-box neutral" id="training-anno" style="margin-top:.55rem;font-size:.75rem">
+          During distillation, the student minimizes a weighted combination of two losses: cross-entropy with true labels (hard loss) and KL divergence from the teacher's soft predictions (soft loss). Watch both converge as training progresses.
+        </div>
+      </div>
+    </div><!-- end panel-training -->
+
+    <!-- ─ Tab 3: Compression Results ─────────────────────────────────── -->
+    <div class="tab-panel" id="panel-results">
+      <div class="card">
+        <div class="plot-label">Compression Results — Teacher · Student from Scratch · Student Distilled</div>
+
+        <div class="cmp-panels-3">
+
+          <!-- Teacher -->
+          <div class="card" style="border-color:var(--teacher);padding:.7rem .85rem">
+            <div style="text-align:center">
+              <span class="method-badge-kd teacher">Teacher</span>
+            </div>
+            <div class="metric-row">
+              <span class="mr-lbl">Params</span>
+              <span class="mr-val" id="cmp-teacher-params">~120k</span>
+            </div>
+            <div class="metric-row">
+              <span class="mr-lbl">Accuracy</span>
+              <span class="mr-val" id="cmp-teacher-acc">—</span>
+            </div>
+            <div class="acc-track">
+              <div class="acc-fill teacher" id="acc-fill-teacher" style="width:92%"></div>
+            </div>
+            <div class="metric-row" style="margin-top:-.2rem">
+              <span class="mr-lbl">Layers</span>
+              <span class="mr-val" id="cmp-teacher-layers">3</span>
+            </div>
+            <div class="speed-label">Inference speed</div>
+            <div class="speed-dots">
+              <div class="speed-dot"></div>
+              <div class="speed-dot"></div>
+              <div class="speed-dot"></div>
+              <div class="speed-dot on"></div>
+              <div class="speed-dot on"></div>
+            </div>
+          </div>
+
+          <!-- Student (scratch) -->
+          <div class="card" style="border-color:var(--student);padding:.7rem .85rem">
+            <div style="text-align:center">
+              <span class="method-badge-kd scratch">Scratch</span>
+            </div>
+            <div class="metric-row">
+              <span class="mr-lbl">Params</span>
+              <span class="mr-val" id="cmp-scratch-params">~8k</span>
+            </div>
+            <div class="metric-row">
+              <span class="mr-lbl">Accuracy</span>
+              <span class="mr-val" id="cmp-scratch-acc">—</span>
+            </div>
+            <div class="acc-track">
+              <div class="acc-fill scratch" id="acc-fill-scratch" style="width:72%"></div>
+            </div>
+            <div class="metric-row" style="margin-top:-.2rem">
+              <span class="mr-lbl">Layers</span>
+              <span class="mr-val" id="cmp-scratch-layers">1</span>
+            </div>
+            <div class="speed-label">Inference speed</div>
+            <div class="speed-dots">
+              <div class="speed-dot on"></div>
+              <div class="speed-dot on"></div>
+              <div class="speed-dot on"></div>
+              <div class="speed-dot on"></div>
+              <div class="speed-dot on"></div>
+            </div>
+          </div>
+
+          <!-- Student (distilled) -->
+          <div class="card" style="border-color:var(--distilled);padding:.7rem .85rem">
+            <div style="text-align:center">
+              <span class="method-badge-kd distilled">Distilled</span>
+            </div>
+            <div class="metric-row">
+              <span class="mr-lbl">Params</span>
+              <span class="mr-val" id="cmp-distilled-params">~8k</span>
+            </div>
+            <div class="metric-row">
+              <span class="mr-lbl">Accuracy</span>
+              <span class="mr-val" id="cmp-distilled-acc">—</span>
+            </div>
+            <div class="acc-track">
+              <div class="acc-fill distilled" id="acc-fill-distilled" style="width:86%"></div>
+            </div>
+            <div class="metric-row" style="margin-top:-.2rem">
+              <span class="mr-lbl">Layers</span>
+              <span class="mr-val" id="cmp-distilled-layers">1</span>
+            </div>
+            <div class="speed-label">Inference speed</div>
+            <div class="speed-dots">
+              <div class="speed-dot on"></div>
+              <div class="speed-dot on"></div>
+              <div class="speed-dot on"></div>
+              <div class="speed-dot on"></div>
+              <div class="speed-dot on"></div>
+            </div>
+          </div>
+
+        </div><!-- end cmp-panels-3 -->
+
+        <!-- Accuracy vs model size scatter -->
+        <div class="plot-label" style="margin-top:.85rem;margin-bottom:.35rem">Accuracy vs Model Size — distillation advantage</div>
+        <svg id="svg-scatter">
+          <rect width="100%" height="200" fill="#FDFAF5"/>
+          <text x="50%" y="88" text-anchor="middle" dominant-baseline="middle"
+                fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="13">
+            Accuracy vs Parameter Count
+          </text>
+          <text x="50%" y="108" text-anchor="middle" dominant-baseline="middle"
+                fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="10">
+            teacher · scratch student · distilled student
+          </text>
+          <text x="50%" y="126" text-anchor="middle" dominant-baseline="middle"
+                fill="rgba(0,0,0,.10)" font-family="Outfit,sans-serif" font-size="9">
+            rendered by D3
+          </text>
+        </svg>
+
+        <div class="legend" style="margin-top:.45rem">
+          <span><span class="legend-sq" style="background:var(--teacher)"></span>Teacher</span>
+          <span><span class="legend-sq" style="background:var(--student)"></span>Student (scratch)</span>
+          <span><span class="legend-sq" style="background:var(--distilled)"></span>Student (distilled)</span>
+        </div>
+
+        <div class="anno-box neutral" id="results-anno" style="margin-top:.55rem;font-size:.75rem">
+          The distilled student achieves accuracy close to the large teacher while keeping the student's small parameter count and fast inference speed — the core promise of knowledge distillation.
+        </div>
+      </div>
+    </div><!-- end panel-results -->
+
+  </div><!-- end center-col -->
+
+  <!-- ══ RIGHT: Live stats ════════════════════════════════════════════ -->
+  <div class="right-col">
+
+    <!-- Input & prediction -->
+    <div class="card">
+      <div class="card-title">Prediction</div>
+      <div class="stat-row">
+        <span class="sr-lbl">True class</span>
+        <span class="sr-val" id="rp-true">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="sr-lbl">Teacher →</span>
+        <span class="sr-val" id="rp-teacher-pred">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="sr-lbl">Student →</span>
+        <span class="sr-val" id="rp-student-pred">—</span>
+      </div>
+    </div>
+
+    <!-- Teacher output probabilities -->
+    <div class="card">
+      <div class="card-title">Teacher Probs</div>
+      <div id="teacher-prob-bars">
+        <div class="prob-row"><span class="pr-lbl">C0</span><div class="pr-track"><div class="pr-fill teacher-fill" style="width:0%"></div></div><span class="pr-val">—</span></div>
+        <div class="prob-row"><span class="pr-lbl">C1</span><div class="pr-track"><div class="pr-fill teacher-fill" style="width:0%"></div></div><span class="pr-val">—</span></div>
+        <div class="prob-row"><span class="pr-lbl">C2</span><div class="pr-track"><div class="pr-fill teacher-fill" style="width:0%"></div></div><span class="pr-val">—</span></div>
+        <div class="prob-row"><span class="pr-lbl">C3</span><div class="pr-track"><div class="pr-fill teacher-fill" style="width:0%"></div></div><span class="pr-val">—</span></div>
+        <div class="prob-row"><span class="pr-lbl">C4</span><div class="pr-track"><div class="pr-fill teacher-fill" style="width:0%"></div></div><span class="pr-val">—</span></div>
+      </div>
+    </div>
+
+    <!-- Student output probabilities -->
+    <div class="card">
+      <div class="card-title">Student Probs</div>
+      <div id="student-prob-bars">
+        <div class="prob-row"><span class="pr-lbl">C0</span><div class="pr-track"><div class="pr-fill student-fill" style="width:0%"></div></div><span class="pr-val">—</span></div>
+        <div class="prob-row"><span class="pr-lbl">C1</span><div class="pr-track"><div class="pr-fill student-fill" style="width:0%"></div></div><span class="pr-val">—</span></div>
+        <div class="prob-row"><span class="pr-lbl">C2</span><div class="pr-track"><div class="pr-fill student-fill" style="width:0%"></div></div><span class="pr-val">—</span></div>
+        <div class="prob-row"><span class="pr-lbl">C3</span><div class="pr-track"><div class="pr-fill student-fill" style="width:0%"></div></div><span class="pr-val">—</span></div>
+        <div class="prob-row"><span class="pr-lbl">C4</span><div class="pr-track"><div class="pr-fill student-fill" style="width:0%"></div></div><span class="pr-val">—</span></div>
+      </div>
+    </div>
+
+    <!-- KL divergence -->
+    <div class="card">
+      <div class="card-title">KL Divergence</div>
+      <div class="kl-box">
+        <span class="kl-val" id="kl-val" style="color:var(--text-muted)">—</span>
+        <div class="kl-lbl">KL(teacher ∥ student)</div>
+      </div>
+      <div style="font-size:.63rem;color:var(--text-muted);margin-top:.35rem;line-height:1.5;font-style:italic">
+        Lower = student distribution closer to teacher. Goal: KL → 0.
+      </div>
+    </div>
+
+    <!-- Temperature display -->
+    <div class="card">
+      <div class="card-title">Temperature τ</div>
+      <div class="tau-display">
+        <span class="tau-val" id="tau-rp">3.0</span>
+        <div class="tau-lbl">current τ<br>scaling logits</div>
+      </div>
+      <div style="font-size:.63rem;color:var(--text-muted);margin-top:.35rem;line-height:1.5;font-style:italic">
+        At τ=1: near hard-label softmax. At τ→∞: uniform soft distribution.
+      </div>
+    </div>
+
+  </div><!-- end right-col -->
+
+</div><!-- end .explorer-grid -->
+
+</div><!-- end .wrap -->
+
+<footer id="course-nav-footer" style="margin-top:1.5rem;padding:0.75rem 0 0 1rem;border-top:1px solid #E0DAC0;font-size:0.8rem;color:#78786A;text-align:left;">
+  <a href="../" style="color:#2e7d32;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">&larr; All course visualizations</a>
+</footer>
+<script>
+if (window.self !== window.top) { var f = document.getElementById('course-nav-footer'); if (f) { f.style.display = 'none'; } }
+</script>
+
+</body>
+</html>
