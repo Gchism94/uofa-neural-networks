@@ -861,7 +861,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   <div class="right-col">
 
     <!-- Input & prediction -->
-    <div class="card">
+    <div class="card" id="rp-card-prediction">
       <div class="card-title">Prediction</div>
       <div class="stat-row">
         <span class="sr-lbl">True class</span>
@@ -878,7 +878,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     </div>
 
     <!-- Teacher output probabilities -->
-    <div class="card">
+    <div class="card" id="rp-card-teacher-probs">
       <div class="card-title">Teacher Probs</div>
       <div id="teacher-prob-bars">
         <div class="prob-row"><span class="pr-lbl">C0</span><div class="pr-track"><div class="pr-fill teacher-fill" style="width:0%"></div></div><span class="pr-val">—</span></div>
@@ -890,7 +890,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     </div>
 
     <!-- Student output probabilities -->
-    <div class="card">
+    <div class="card" id="rp-card-student-probs">
       <div class="card-title">Student Probs</div>
       <div id="student-prob-bars">
         <div class="prob-row"><span class="pr-lbl">C0</span><div class="pr-track"><div class="pr-fill student-fill" style="width:0%"></div></div><span class="pr-val">—</span></div>
@@ -902,7 +902,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     </div>
 
     <!-- KL divergence -->
-    <div class="card">
+    <div class="card" id="rp-card-kl">
       <div class="card-title">KL Divergence</div>
       <div class="kl-box">
         <span class="kl-val" id="kl-val" style="color:var(--text-muted)">—</span>
@@ -914,7 +914,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     </div>
 
     <!-- Temperature display -->
-    <div class="card">
+    <div class="card" id="rp-card-tau">
       <div class="card-title">Temperature τ</div>
       <div class="tau-display">
         <span class="tau-val" id="tau-rp">3.0</span>
@@ -922,6 +922,23 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
       </div>
       <div style="font-size:.63rem;color:var(--text-muted);margin-top:.35rem;line-height:1.5;font-style:italic">
         At τ=1: near hard-label softmax. At τ→∞: uniform soft distribution.
+      </div>
+    </div>
+
+    <!-- Distillation summary — Tab 3 only -->
+    <div class="card" id="rp-card-summary" style="display:none">
+      <div class="card-title">Distillation Summary</div>
+      <div class="stat-row">
+        <span class="sr-lbl" style="color:var(--teacher)">Teacher</span>
+        <span class="sr-val" id="rp-sum-teacher">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="sr-lbl" style="color:var(--student)">Scratch</span>
+        <span class="sr-val" id="rp-sum-scratch">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="sr-lbl" style="color:var(--distilled)">Distilled</span>
+        <span class="sr-val" id="rp-sum-distilled">—</span>
       </div>
     </div>
 
@@ -1459,6 +1476,10 @@ function renderComparisonCards(){
   if(af) af.style.width=tAcc+'%';
   if(bf) bf.style.width=scAcc+'%';
   if(cf) cf.style.width=dAcc+'%';
+  // Right-panel summary (Tab 3)
+  setEl('rp-sum-teacher', tAcc+'% · '+TEACHER_PARAM_COUNT[teacherSize]);
+  setEl('rp-sum-scratch',  scAcc+'% · '+STUDENT_PARAM_COUNT[studentSize]);
+  setEl('rp-sum-distilled',dAcc+'% · '+STUDENT_PARAM_COUNT[studentSize]);
 }
 
 // ── D3 scatter plot (Tab 3) ─────────────────────────────────────────
@@ -1672,12 +1693,29 @@ document.getElementById('concepts-toggle').addEventListener('click',function(){
 
 // ── Tab-aware control visibility ─────────────────────────────────────
 function syncControls(){
+  var isT1=activeTab==='teacher-student';
+  var isT2=activeTab==='training';
+  var isT3=activeTab==='results';
+
+  // Left panel
   var csEl=document.getElementById('card-class-selector');
   var pbEl=document.getElementById('card-playback');
   var dpEl=document.getElementById('card-dist-params');
-  if(csEl) csEl.style.display=activeTab==='teacher-student'?'':'none';
-  if(pbEl) pbEl.style.display=activeTab==='training'?'':'none';
-  if(dpEl) dpEl.style.display=activeTab==='results'?'none':'';
+  if(csEl) csEl.style.display=isT1?'':'none';
+  if(pbEl) pbEl.style.display=isT2?'':'none';
+  if(dpEl) dpEl.style.display=isT3?'none':'';
+
+  // Right panel
+  // Tab 1: all five cards visible, summary hidden
+  // Tab 2: hide prediction/probs, show kl/tau, summary hidden
+  // Tab 3: hide all five, show summary only
+  var show=function(id,vis){var e=document.getElementById(id);if(e)e.style.display=vis?'':'none';};
+  show('rp-card-prediction',  isT1);
+  show('rp-card-teacher-probs',isT1);
+  show('rp-card-student-probs',isT1);
+  show('rp-card-kl',          isT1||isT2);
+  show('rp-card-tau',         isT1||isT2);
+  show('rp-card-summary',     isT3);
 }
 
 function syncClassButtons(){
