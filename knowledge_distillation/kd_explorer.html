@@ -425,7 +425,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     </div>
 
     <!-- Distillation parameters -->
-    <div class="card">
+    <div class="card" id="card-dist-params">
       <div class="card-title">Distillation Params</div>
 
       <div class="param-lbl">Temperature τ</div>
@@ -1674,8 +1674,10 @@ document.getElementById('concepts-toggle').addEventListener('click',function(){
 function syncControls(){
   var csEl=document.getElementById('card-class-selector');
   var pbEl=document.getElementById('card-playback');
+  var dpEl=document.getElementById('card-dist-params');
   if(csEl) csEl.style.display=activeTab==='teacher-student'?'':'none';
   if(pbEl) pbEl.style.display=activeTab==='training'?'':'none';
+  if(dpEl) dpEl.style.display=activeTab==='results'?'none':'';
 }
 
 function syncClassButtons(){
