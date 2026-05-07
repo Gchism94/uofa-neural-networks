@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<!-- Copyright © 2026 Greg T. Chism. University of Arizona, College of Information Science.
+     INFO 557: Neural Networks. MIT License. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The AI Landscape — An Interactive Map | INFO 557: Neural Networks</title>
+<meta name="description" content="Explore how artificial intelligence, machine learning, and neural networks relate — see where INFO 557 fits within the broader AI landscape.">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="The AI Landscape — An Interactive Map">
+<meta property="og:description" content="Explore how artificial intelligence, machine learning, and neural networks relate — see where INFO 557 fits within the broader AI landscape.">
+<meta property="og:image" content="https://gchism94.github.io/uofa-neural-networks/ai_landscape/ai_landscape-preview.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="600">
+<meta property="og:url" content="https://gchism94.github.io/uofa-neural-networks/ai_landscape/ai_landscape.html">
+<meta property="fb:app_id" content="2385695445236853">
+
+<!-- Twitter/X card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="The AI Landscape — An Interactive Map">
+<meta name="twitter:description" content="Explore how artificial intelligence, machine learning, and neural networks relate — see where INFO 557 fits within the broader AI landscape.">
+<meta name="twitter:image" content="https://gchism94.github.io/uofa-neural-networks/ai_landscape/ai_landscape-preview.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+
+<style>
+/* ── Design tokens ─────────────────────────────────────────────── */
+:root{
+  --cream:#FAF7F0;--cream-mid:#F0EBE0;--cream-dk:#E2D9C5;
+  --g-dk:#1C3A0E;--g-mid:#2D5A1B;--g-lt:#4A8C2F;--g-pale:#C8E6A8;
+  --orange:#E8630A;--blue:#1A56A0;--blue-pale:#D0E4F8;
+  --text:#1A1A1A;--text-muted:#888;--text-soft:#555;
+  --border:#C8BE9A;--border-lt:#DDD6BE;--shadow:rgba(44,90,27,.10);
+  /* AI landscape colors */
+  --c-root:#1C3A0E;
+  --c-covered:#2e7d32;
+  --c-ml:#4A8C2F;
+  --c-context:#888;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:'Outfit',sans-serif;background:var(--cream);color:var(--text);
+  padding:1.25rem 1rem 2rem;min-height:100vh;line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:.85rem}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+.hdr h1{font-size:clamp(1.2rem,2.1vw,1.55rem);font-weight:700;color:var(--g-dk);
+  letter-spacing:-.02em;line-height:1.2}
+.hdr p.subtitle{font-size:.86rem;color:var(--text-muted);margin-top:.18rem}
+.hdr-rule{border:none;border-top:2.5px solid var(--g-dk);margin-top:.55rem}
+
+/* ── Fixed copyright ─────────────────────────────────────────────── */
+.cr-top{
+  position:fixed;top:.75rem;right:1rem;z-index:1000;
+  font-size:.72rem;color:var(--text-muted);text-align:right;
+  background:rgba(250,247,240,.92);padding:.2rem 1.5rem .2rem .5rem;
+  border-radius:5px;backdrop-filter:blur(4px);
+  border:1px solid var(--border-lt);white-space:nowrap;min-width:max-content;
+}
+.cr-top a{color:var(--orange);text-decoration:none}
+.cr-top a:hover{text-decoration:underline}
+
+/* ── Main layout ─────────────────────────────────────────────────── */
+.landscape-layout{
+  display:flex;gap:1rem;align-items:flex-start;
+}
+.tree-container{
+  flex:1;min-width:0;
+  background:white;border:1px solid var(--border);
+  border-radius:8px;overflow:hidden;box-shadow:0 2px 8px var(--shadow);
+}
+#svg-tree{width:100%;display:block;cursor:default}
+
+/* ── Detail panel ────────────────────────────────────────────────── */
+.detail-panel{
+  width:280px;flex-shrink:0;
+  background:white;border:1px solid var(--border);border-radius:8px;
+  padding:1rem;min-height:420px;max-height:680px;overflow-y:auto;
+  box-shadow:0 2px 8px var(--shadow);
+}
+.dp-default{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:380px;gap:.75rem;text-align:center;
+}
+.dp-default-icon{font-size:2.5rem;opacity:.35}
+.dp-default-text{font-size:.82rem;color:var(--text-muted);line-height:1.6;max-width:220px}
+
+.dp-name{font-size:1rem;font-weight:700;color:var(--g-dk);margin-bottom:.4rem;line-height:1.25}
+.dp-badge{
+  display:inline-block;padding:.15rem .55rem;border-radius:4px;
+  font-size:.65rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  margin-bottom:.55rem;
+}
+.dp-badge.covered{background:var(--g-pale);color:var(--g-mid)}
+.dp-badge.partial{background:#FBF0C8;color:#8a6000}
+.dp-badge.context{background:var(--cream-mid);color:var(--text-muted)}
+.dp-desc{font-size:.78rem;color:var(--text-soft);line-height:1.6;margin-bottom:.6rem}
+.dp-examples-label{
+  font-size:.64rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--text-muted);margin-bottom:.3rem;
+}
+.dp-examples{margin:0;padding:0;list-style:none}
+.dp-examples li{
+  font-size:.75rem;color:var(--text-soft);padding:.18rem 0;
+  padding-left:.8rem;position:relative;line-height:1.45;
+}
+.dp-examples li::before{content:'▸';color:var(--g-lt);position:absolute;left:0;font-size:.65rem;top:.22rem}
+.dp-link{
+  display:inline-block;margin-top:.65rem;font-size:.78rem;font-weight:600;
+  color:var(--g-mid);text-decoration:none;padding:.3rem .7rem;
+  border:1.5px solid var(--g-mid);border-radius:5px;transition:all .12s;
+}
+.dp-link:hover{background:var(--g-pale)}
+.dp-scope-note{
+  display:inline-block;margin-top:.65rem;font-size:.75rem;
+  color:var(--text-muted);font-style:italic;
+}
+
+/* ── Tooltip ─────────────────────────────────────────────────────── */
+.tooltip{
+  position:fixed;pointer-events:none;z-index:500;
+  background:var(--g-dk);color:white;border-radius:5px;
+  padding:.3rem .7rem;font-size:.75rem;font-family:'Outfit',sans-serif;
+  white-space:nowrap;opacity:0;transition:opacity .15s;
+  box-shadow:0 2px 8px rgba(0,0,0,.25);
+}
+
+/* ── SVG node styles ─────────────────────────────────────────────── */
+.node-circle{transition:r .2s, filter .2s}
+.node-circle:hover{filter:brightness(1.15)}
+.link-path{fill:none;transition:opacity .2s}
+
+/* ── Legend ──────────────────────────────────────────────────────── */
+.ai-legend{
+  display:flex;gap:1.25rem;flex-wrap:wrap;align-items:center;
+  background:white;border:1px solid var(--border);border-radius:8px;
+  padding:.65rem 1rem;box-shadow:0 2px 8px var(--shadow);
+  font-size:.75rem;color:var(--text-soft);
+}
+.leg-item{display:flex;align-items:center;gap:.4rem}
+.leg-dot{
+  width:12px;height:12px;border-radius:50%;flex-shrink:0;
+  border:1.5px solid rgba(255,255,255,.8);box-shadow:0 0 0 1px rgba(0,0,0,.12);
+}
+
+@media(max-width:860px){
+  .landscape-layout{flex-direction:column}
+  .detail-panel{width:100%;max-height:none}
+}
+</style>
+</head>
+<body>
+
+<div class="cr-top">© 2026 Greg T. Chism · <a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a></div>
+
+<div class="wrap">
+
+<header>
+  <div class="hdr">
+    <h1>The AI Landscape — An Interactive Map</h1>
+    <p class="subtitle">Explore how artificial intelligence, machine learning, and neural networks relate — click any node to learn more and see where INFO 557 fits</p>
+  </div>
+  <hr class="hdr-rule">
+</header>
+
+<div class="landscape-layout">
+
+  <!-- D3 tree -->
+  <div class="tree-container">
+    <svg id="svg-tree" viewBox="0 0 860 860"></svg>
+  </div>
+
+  <!-- Detail panel -->
+  <div class="detail-panel" id="detail-panel">
+    <div class="dp-default" id="dp-default">
+      <div class="dp-default-icon">🗺️</div>
+      <p class="dp-default-text">Click any node to learn about that field of AI and see how it connects to INFO 557</p>
+    </div>
+    <div id="dp-content" style="display:none"></div>
+  </div>
+
+</div>
+
+<!-- Legend -->
+<div class="ai-legend">
+  <span style="font-size:.72rem;font-weight:600;color:var(--g-dk);letter-spacing:.05em;text-transform:uppercase">Legend:</span>
+  <span class="leg-item"><span class="leg-dot" style="background:var(--c-covered)"></span>Covered in INFO 557</span>
+  <span class="leg-item"><span class="leg-dot" style="background:var(--c-ml)"></span>Machine Learning branch — contains course content</span>
+  <span class="leg-item"><span class="leg-dot" style="background:var(--c-context)"></span>AI context — beyond course scope</span>
+  <span class="leg-item"><span class="leg-dot" style="background:var(--c-root);width:16px;height:16px"></span>Root: Artificial Intelligence</span>
+</div>
+
+</div><!-- end .wrap -->
+
+<div id="tooltip" class="tooltip"></div>
+
+<footer id="course-nav-footer" style="margin-top:1.5rem;padding:0.75rem 0 0 1rem;border-top:1px solid #E0DAC0;font-size:0.8rem;color:#78786A;text-align:left;">
+  <a href="../" style="color:#2e7d32;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">&larr; All course visualizations</a>
+</footer>
+<script>
+if (window.self !== window.top) { var f = document.getElementById('course-nav-footer'); if (f) { f.style.display = 'none'; } }
+</script>
+
+<script>
+(function(){
+'use strict';
+
+// ── Tree data ───────────────────────────────────────────────────────
+var TREE = {
+  name:'Artificial Intelligence', id:'ai',
+  children:[
+    { name:'Rule-Based Systems', id:'rule-based',
+      children:[
+        {name:'Expert Systems',     id:'expert-systems'},
+        {name:'Logic Programming',  id:'logic-prog'},
+        {name:'Knowledge Graphs',   id:'knowledge-graphs'}
+      ]
+    },
+    { name:'Search & Optimization', id:'search-opt',
+      children:[
+        {name:'Heuristic Search',         id:'heuristic'},
+        {name:'Evolutionary Algorithms',  id:'evolutionary'},
+        {name:'Constraint Satisfaction',  id:'constraint'}
+      ]
+    },
+    { name:'Machine Learning', id:'ml', ml:true,
+      children:[
+        { name:'Supervised Learning', id:'supervised', ml:true,
+          children:[
+            { name:'Classical Methods', id:'classical',
+              children:[
+                {name:'Linear Models',            id:'linear'},
+                {name:'Decision Trees',           id:'decision-trees'},
+                {name:'Support Vector Machines',  id:'svm'}
+              ]
+            },
+            { name:'Neural Networks', id:'neural-nets', covered:true, focus:true,
+              children:[
+                {name:'Feedforward Networks',    id:'feedforward',   covered:true},
+                {name:'Convolutional Networks',  id:'conv-nets',     covered:true},
+                {name:'Recurrent Networks',      id:'recurrent',     covered:true},
+                {name:'Transformers',            id:'transformers'},
+                {name:'Graph Networks',          id:'graph-nets',    partial:true}
+              ]
+            }
+          ]
+        },
+        { name:'Unsupervised Learning', id:'unsupervised', ml:true,
+          children:[
+            {name:'Clustering',               id:'clustering'},
+            {name:'Dimensionality Reduction', id:'dim-reduction'},
+            {name:'Generative Models',        id:'generative'}
+          ]
+        },
+        { name:'Reinforcement Learning', id:'rl', ml:true,
+          children:[
+            {name:'Model-Free RL',   id:'model-free-rl'},
+            {name:'Model-Based RL',  id:'model-based-rl'},
+            {name:'Multi-Agent RL',  id:'multi-agent-rl'}
+          ]
+        }
+      ]
+    },
+    { name:'Robotics & Planning', id:'robotics',
+      children:[
+        {name:'Motion Planning',  id:'motion-planning'},
+        {name:'Perception',       id:'perception'},
+        {name:'Control Systems',  id:'control'}
+      ]
+    }
+  ]
+};
+
+// ── Node metadata ───────────────────────────────────────────────────
+var META = {
+  'ai':              {desc:'The broad field of creating machines that can perform tasks requiring human-like intelligence. Encompasses reasoning, learning, perception, and action.',
+                      ex:['Siri and virtual assistants','AlphaGo game playing','Self-driving vehicles'], link:null},
+  'rule-based':      {desc:'AI that encodes human knowledge as explicit if-then rules. Dominated early AI research in the 1970s–80s before machine learning took over.',
+                      ex:['MYCIN medical diagnosis system','DENDRAL chemistry analysis','Tax preparation software'], link:null},
+  'expert-systems':  {desc:'Computer programs that encode the knowledge of human experts as rules. Can explain their reasoning but require laborious manual knowledge engineering.',
+                      ex:['Early IBM medical diagnostics','Loan approval systems','Chemical compound analysis'], link:null},
+  'logic-prog':      {desc:'Using formal logic to express facts and rules, with automated reasoning to answer queries. Basis of languages like Prolog.',
+                      ex:['Prolog language','Natural language parsing','Automated theorem provers'], link:null},
+  'knowledge-graphs':{desc:'Structured databases representing knowledge as entities and relationships. Enable semantic reasoning over interconnected facts.',
+                      ex:['Google Knowledge Graph','Wikidata','DBpedia'], link:null},
+  'search-opt':      {desc:'Finding optimal or near-optimal solutions through systematic exploration of possibility spaces. Foundational to both classical and modern AI.',
+                      ex:['Google Maps routing','Chess game playing','Engineering design'], link:null},
+  'heuristic':       {desc:"Search algorithms guided by domain-specific heuristics. A* uses an estimated remaining cost to focus exploration on promising paths.",
+                      ex:['Navigation apps','Puzzle solving (15-puzzle)','Pathfinding in video games'], link:null},
+  'evolutionary':    {desc:'Optimization inspired by biological evolution — populations of solutions evolve through selection, crossover, and mutation over generations.',
+                      ex:['Engineering design optimization','Neural architecture search','Scheduling problems'], link:null},
+  'constraint':      {desc:'Finding variable assignments that satisfy all given constraints simultaneously. Highly effective for configuration and scheduling problems.',
+                      ex:['Sudoku solving','University timetabling','Circuit board design'], link:null},
+  'ml':              {desc:'Systems that learn patterns from data rather than following explicit rules. The dominant paradigm in modern AI — almost all recent advances stem from ML.',
+                      ex:['Netflix recommendations','Fraud detection','Language translation'], link:null},
+  'supervised':      {desc:'Learning from labeled examples — given input-output pairs, learn a mapping from inputs to outputs that generalizes to new examples.',
+                      ex:['Email spam classification','House price prediction','Medical image diagnosis'], link:null},
+  'classical':       {desc:'Traditional ML algorithms — interpretable, efficient, and mathematically well-understood, but limited in representation power compared to neural networks.',
+                      ex:['Logistic regression for credit risk','Random forests for medical diagnosis','SVMs for text classification'], link:null},
+  'linear':          {desc:'Models that predict by computing weighted sums of input features. Fast, interpretable, and the foundation for understanding more complex methods.',
+                      ex:['Sales forecasting','Disease risk scoring','Stock price regression'], link:null},
+  'decision-trees':  {desc:'Tree-structured models that make predictions by following if-then rules on features. Highly interpretable and the basis for random forests and boosting.',
+                      ex:['Medical decision support','Credit scoring','Customer churn prediction'], link:null},
+  'svm':             {desc:'Classification algorithm that finds the maximum-margin boundary between classes. Effective in high dimensions and with small datasets.',
+                      ex:['Handwriting recognition','Bioinformatics sequence classification','Text categorization'], link:null},
+  'neural-nets':     {desc:'Computational models loosely inspired by biological neurons. Learn hierarchical representations through layers of transformations. The focus of INFO 557.',
+                      ex:['ImageNet image recognition','GPT language models','AlphaFold protein folding'], link:'../activation_functions/af_explorer.html'},
+  'feedforward':     {desc:'The simplest neural network — information flows in one direction from input to output through stacked layers. Covered in Weeks 1–5 of INFO 557.',
+                      ex:['Digit recognition (MNIST)','Spam detection','Customer churn prediction'], link:'../backpropagation/bp_explorer.html'},
+  'conv-nets':       {desc:'Neural networks specialized for grid-structured data like images. Use shared convolutional filters to detect local patterns with translation invariance. Weeks 10–11.',
+                      ex:['Image classification (ResNet, VGG)','Object detection','Medical image analysis (X-ray, MRI)'], link:'../convolution/conv_explorer.html'},
+  'recurrent':       {desc:'Neural networks with feedback connections that maintain hidden state over time. Designed for sequential data where order matters. Week 12.',
+                      ex:['Speech recognition','Text generation','Financial time series forecasting'], link:'../recurrent_neural_networks/rnn_explorer.html'},
+  'transformers':    {desc:'Attention-based architecture that processes sequences in parallel rather than step by step. Revolutionized NLP and vision. Builds directly on INFO 557 foundations.',
+                      ex:['ChatGPT and GPT-4','DALL-E image generation','Google Translate'], link:null},
+  'graph-nets':      {desc:'Neural networks that operate on graph-structured data — nodes, edges, and their relationships. Applied in chemistry, social networks, and more. Week 11 extension.',
+                      ex:['Molecular property prediction (drug discovery)','Social network analysis','Traffic flow forecasting'], link:null},
+  'unsupervised':    {desc:'Learning patterns from unlabeled data — finding structure, clusters, or representations without explicit supervision.',
+                      ex:['Customer segmentation','Anomaly detection in networks','Topic modeling in text'], link:null},
+  'clustering':      {desc:'Grouping data points into clusters based on similarity. Fundamental to exploratory data analysis and pattern discovery in unlabeled datasets.',
+                      ex:['Market customer segmentation','Document organization','Gene expression analysis'], link:null},
+  'dim-reduction':   {desc:'Compressing high-dimensional data into fewer dimensions while preserving essential structure. Enables visualization and more efficient downstream processing.',
+                      ex:['PCA for gene expression analysis','t-SNE for high-dimensional visualization','Autoencoders for image compression'], link:null},
+  'generative':      {desc:'Models that learn the underlying data distribution and can generate new samples. Power modern creative AI tools.',
+                      ex:['Stable Diffusion image generation','Midjourney art creation','VAE-based molecule generation'], link:null},
+  'rl':              {desc:'Learning through interaction — an agent takes actions in an environment and receives rewards, learning a policy to maximize cumulative reward.',
+                      ex:['AlphaGo and AlphaZero','Robotics manipulation','Recommendation engine optimization'], link:null},
+  'model-free-rl':   {desc:'RL algorithms that learn directly from experience without building an internal model of the environment. More general but often data-hungry.',
+                      ex:['Q-learning for Atari games','Policy gradient for robotics','RLHF for LLM fine-tuning'], link:null},
+  'model-based-rl':  {desc:'RL algorithms that explicitly learn a model of the environment and use it for planning. More sample-efficient but harder to scale.',
+                      ex:['AlphaZero (chess, Go, shogi)','MuZero','World models for robot manipulation'], link:null},
+  'multi-agent-rl':  {desc:'Multiple agents learning to interact — may cooperate, compete, or both. Critical for modeling complex multi-player systems.',
+                      ex:['Traffic light coordination','StarCraft II multi-agent play','Financial market simulation'], link:null},
+  'robotics':        {desc:'Combining AI methods to create physical agents that sense, reason, and act in the real world. Bridges the gap between digital intelligence and physical action.',
+                      ex:['Boston Dynamics Atlas robot','Surgical assistance robots','Mars Perseverance rover'], link:null},
+  'motion-planning': {desc:'Computing collision-free paths for robots to move from start to goal through complex environments. Fundamental to autonomous physical movement.',
+                      ex:['Industrial robot arm control','Autonomous vehicle path planning','Surgical robot navigation'], link:null},
+  'perception':      {desc:'Enabling robots to understand their environment through sensors — cameras, lidar, microphones. The interface between the physical and digital worlds.',
+                      ex:['Lidar for autonomous vehicles','Voice recognition for assistants','Tactile sensing for manipulation'], link:null},
+  'control':         {desc:'Mathematical methods for making systems behave as desired — increasingly combined with AI for adaptive, real-time control of complex systems.',
+                      ex:['Drone flight stabilization','Autonomous vehicle steering','Prosthetic limb motor control'], link:null}
+};
+
+// ── Color and size helpers ──────────────────────────────────────────
+function nodeColor(d){
+  var n=d.data;
+  if(n.id==='ai') return '#1C3A0E';
+  if(n.covered||n.focus||n.partial) return '#2e7d32';
+  if(n.ml) return '#4A8C2F';
+  return '#888888';
+}
+function nodeR(d){
+  if(d.data.id==='ai') return 18;
+  if(d.data.focus) return 11;
+  if(d.data.covered) return 9;
+  if(d.depth===1) return 10;
+  if(d.depth===2) return 8;
+  if(d.depth===3) return 7;
+  return 5.5;
+}
+function nodeFontSize(d){
+  if(d.data.id==='ai') return 13;
+  if(d.depth===1) return 10.5;
+  if(d.depth===2) return 9.5;
+  if(d.depth===3) return 8.5;
+  return 7.5;
+}
+
+// ── D3 setup ────────────────────────────────────────────────────────
+var W=860, H=860, cx=W/2, cy=H/2, RADIUS=330;
+var root = d3.hierarchy(TREE);
+d3.tree()
+  .size([2*Math.PI, RADIUS])
+  .separation(function(a,b){ return (a.parent===b.parent?1:2)/a.depth; })(root);
+
+var svg = d3.select('#svg-tree');
+var g = svg.append('g').attr('transform','translate('+cx+','+cy+')');
+
+// ── Defs: glow filter ───────────────────────────────────────────────
+var defs = svg.append('defs');
+var glowFilter = defs.append('filter').attr('id','glow')
+  .attr('x','-50%').attr('y','-50%').attr('width','200%').attr('height','200%');
+glowFilter.append('feGaussianBlur').attr('in','SourceGraphic').attr('stdDeviation','4').attr('result','blur');
+var fm = glowFilter.append('feMerge');
+fm.append('feMergeNode').attr('in','blur');
+fm.append('feMergeNode').attr('in','SourceGraphic');
+
+// Subtle glow for covered nodes
+var softGlow = defs.append('filter').attr('id','soft-glow')
+  .attr('x','-40%').attr('y','-40%').attr('width','180%').attr('height','180%');
+softGlow.append('feGaussianBlur').attr('in','SourceGraphic').attr('stdDeviation','2.5').attr('result','b2');
+var fm2 = softGlow.append('feMerge');
+fm2.append('feMergeNode').attr('in','b2');
+fm2.append('feMergeNode').attr('in','SourceGraphic');
+
+// ── Links ───────────────────────────────────────────────────────────
+g.append('g').attr('class','links')
+  .selectAll('path')
+  .data(root.links())
+  .join('path')
+  .attr('class','link-path')
+  .attr('stroke', function(d){ return nodeColor(d.target); })
+  .attr('stroke-opacity', 0)
+  .attr('stroke-width', function(d){ return d.target.data.id==='neural-nets'?2:1.5; })
+  .attr('d', d3.linkRadial().angle(function(d){return d.x;}).radius(function(d){return d.y;}))
+  .transition().delay(function(d){ return d.target.depth * 350 + 100; })
+  .duration(500)
+  .attr('stroke-opacity', 0.45);
+
+// ── Nodes ───────────────────────────────────────────────────────────
+var nodes = g.append('g').attr('class','nodes')
+  .selectAll('g')
+  .data(root.descendants())
+  .join('g')
+  .attr('transform', function(d){
+    return 'rotate('+(d.x*180/Math.PI-90)+') translate('+d.y+',0)';
+  })
+  .style('cursor','pointer')
+  .attr('opacity', 0);
+
+// Outer glow ring for Neural Networks node
+nodes.filter(function(d){ return d.data.id==='neural-nets'; })
+  .insert('circle','circle')
+  .attr('r', 17)
+  .attr('fill','#2e7d32')
+  .attr('opacity',0.22)
+  .attr('filter','url(#glow)');
+
+// Node circles
+nodes.append('circle')
+  .attr('class','node-circle')
+  .attr('r', nodeR)
+  .attr('fill', nodeColor)
+  .attr('stroke','rgba(255,255,255,0.7)')
+  .attr('stroke-width', 1.5)
+  .attr('filter', function(d){
+    if(d.data.id==='neural-nets') return 'url(#glow)';
+    if(d.data.covered) return 'url(#soft-glow)';
+    return null;
+  });
+
+// Labels
+nodes.append('text')
+  .attr('dy','0.31em')
+  .attr('x', function(d){
+    if(d.depth===0) return 0;
+    return d.x<Math.PI ? nodeR(d)+5 : -(nodeR(d)+5);
+  })
+  .attr('text-anchor', function(d){
+    if(d.depth===0) return 'middle';
+    return d.x<Math.PI ? 'start' : 'end';
+  })
+  .attr('transform', function(d){
+    return (d.depth>0 && d.x>=Math.PI) ? 'rotate(180)' : null;
+  })
+  .attr('font-size', nodeFontSize)
+  .attr('font-weight', function(d){ return d.data.covered||d.data.focus?'600':d.depth<=1?'500':'400'; })
+  .attr('fill', function(d){
+    if(d.data.id==='ai') return '#fff';
+    if(d.data.covered||d.data.focus||d.data.partial) return '#1C3A0E';
+    if(d.data.ml) return '#1C3A0E';
+    return '#333';
+  })
+  .attr('paint-order','stroke')
+  .attr('stroke','rgba(255,255,255,0.85)')
+  .attr('stroke-width', 3)
+  .text(function(d){ return d.data.name; });
+
+// Entrance animation — staggered by depth
+nodes.transition()
+  .delay(function(d){ return d.depth * 350; })
+  .duration(500)
+  .attr('opacity', 1);
+
+// ── Tooltip ─────────────────────────────────────────────────────────
+var tooltip = d3.select('#tooltip');
+
+nodes
+  .on('mouseover', function(event, d){
+    tooltip.text(d.data.name)
+      .style('opacity',1)
+      .style('left',(event.clientX+14)+'px')
+      .style('top',(event.clientY-10)+'px');
+    d3.select(this).select('.node-circle').attr('stroke','white').attr('stroke-width',2.5);
+  })
+  .on('mousemove', function(event){
+    tooltip.style('left',(event.clientX+14)+'px').style('top',(event.clientY-10)+'px');
+  })
+  .on('mouseout', function(event, d){
+    tooltip.style('opacity',0);
+    d3.select(this).select('.node-circle')
+      .attr('stroke','rgba(255,255,255,0.7)').attr('stroke-width',1.5);
+  })
+  .on('click', function(event, d){
+    event.stopPropagation();
+    updatePanel(d.data);
+    // Highlight selected node
+    svg.selectAll('.node-circle').attr('stroke','rgba(255,255,255,0.7)').attr('stroke-width',1.5);
+    d3.select(this).select('.node-circle').attr('stroke','white').attr('stroke-width',3);
+  });
+
+// Reset on SVG click
+svg.on('click', function(){
+  svg.selectAll('.node-circle').attr('stroke','rgba(255,255,255,0.7)').attr('stroke-width',1.5);
+  document.getElementById('dp-default').style.display='flex';
+  document.getElementById('dp-content').style.display='none';
+});
+
+// ── Detail panel ────────────────────────────────────────────────────
+function updatePanel(node){
+  var m = META[node.id] || {desc:'Description coming soon.',ex:[],link:null};
+  var isCovered = !!node.covered;
+  var isPartial  = !!node.partial;
+  var isFocus    = !!node.focus;
+  var isRoot     = node.id==='ai';
+
+  var badgeHtml = '';
+  if(isFocus||isCovered){
+    badgeHtml = '<span class="dp-badge covered">Covered in INFO 557</span>';
+  } else if(isPartial){
+    badgeHtml = '<span class="dp-badge partial">Week 11 Extension</span>';
+  } else if(node.id==='transformers'){
+    badgeHtml = '<span class="dp-badge context">Builds on INFO 557 foundations</span>';
+  } else if(!isRoot){
+    badgeHtml = '<span class="dp-badge context">AI context — beyond course scope</span>';
+  }
+
+  var exHtml = m.ex.map(function(e){ return '<li>'+e+'</li>'; }).join('');
+
+  var footerHtml = '';
+  if((isFocus||isCovered) && m.link){
+    footerHtml = '<a class="dp-link" href="'+m.link+'">→ See visualization</a>';
+  } else if(isPartial){
+    footerHtml = '<span class="dp-scope-note">No dedicated visualization — covered as part of Convolutional Networks.</span>';
+  } else if(node.id==='transformers'){
+    footerHtml = '<a class="dp-link" href="../transformers/transformer_explorer.html" style="color:#888;border-color:#ccc">→ Transformer Explorer (supplemental)</a>';
+  } else if(!isRoot && !isFocus && !isCovered){
+    footerHtml = '<span class="dp-scope-note">Beyond the main scope of INFO 557.</span>';
+  }
+
+  document.getElementById('dp-content').innerHTML =
+    '<div class="dp-name">'+node.name+'</div>'+
+    badgeHtml+
+    '<p class="dp-desc">'+m.desc+'</p>'+
+    '<div class="dp-examples-label">Real-world examples</div>'+
+    '<ul class="dp-examples">'+exHtml+'</ul>'+
+    footerHtml;
+
+  document.getElementById('dp-default').style.display='none';
+  document.getElementById('dp-content').style.display='block';
+}
+
+// Pre-highlight the Neural Networks node and show its panel on load
+setTimeout(function(){
+  var nnNode = root.descendants().find(function(d){ return d.data.id==='neural-nets'; });
+  if(nnNode) updatePanel(nnNode.data);
+}, 1800);
+
+})();
+</script>
+
+</body>
+</html>
