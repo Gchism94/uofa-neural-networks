@@ -445,8 +445,23 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
       <div class="hint-txt">α=0: hard labels only · α=1: soft labels only</div>
     </div>
 
-    <!-- Playback controls -->
-    <div class="card">
+    <!-- Input class selector — Tab 1 only -->
+    <div class="card" id="card-class-selector">
+      <div class="card-title">Input Class</div>
+      <div class="sel-group" id="class-input-selector">
+        <button class="sel-btn active" data-cls-btn="0">🐱 Cat</button>
+        <button class="sel-btn" data-cls-btn="1">🐶 Dog</button>
+        <button class="sel-btn" data-cls-btn="2">🐦 Bird</button>
+        <button class="sel-btn" data-cls-btn="3">🐟 Fish</button>
+        <button class="sel-btn" data-cls-btn="4">🚗 Car</button>
+      </div>
+      <div style="margin-top:.45rem">
+        <button id="btn-next-class" class="pbtn" style="width:100%;font-size:.8rem">Next Class →</button>
+      </div>
+    </div>
+
+    <!-- Playback controls — Tab 2 only -->
+    <div class="card" id="card-playback" style="display:none">
       <div class="card-title">Training</div>
 
       <div class="ctrl-btns" style="margin-bottom:.45rem">
@@ -1569,6 +1584,7 @@ document.getElementById('tab-bar').addEventListener('click',function(e){
   document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('active');});
   document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
   activeTab=btn.dataset.tab;
+  syncControls();
   if(activeTab==='teacher-student') updateAll();
   else if(activeTab==='training') updateTraining(currentEpoch);
   else if(activeTab==='results') updateResults();
@@ -1654,7 +1670,35 @@ document.getElementById('concepts-toggle').addEventListener('click',function(){
   arrow.textContent=body.classList.contains('collapsed')?'▸':'▾';
 });
 
+// ── Tab-aware control visibility ─────────────────────────────────────
+function syncControls(){
+  var csEl=document.getElementById('card-class-selector');
+  var pbEl=document.getElementById('card-playback');
+  if(csEl) csEl.style.display=activeTab==='teacher-student'?'':'none';
+  if(pbEl) pbEl.style.display=activeTab==='training'?'':'none';
+}
+
+function syncClassButtons(){
+  document.querySelectorAll('#class-input-selector .sel-btn').forEach(function(b){
+    b.classList.toggle('active',+b.dataset.clsBtn===currentClass);
+  });
+}
+
+document.getElementById('class-input-selector').addEventListener('click',function(e){
+  var btn=e.target.closest('.sel-btn'); if(!btn) return;
+  currentClass=+btn.dataset.clsBtn;
+  syncClassButtons();
+  updateAll();
+});
+
+document.getElementById('btn-next-class').addEventListener('click',function(){
+  currentClass=(currentClass+1)%CLASSES.length;
+  syncClassButtons();
+  updateAll();
+});
+
 // ── Boot ───────────────────────────────────────────────────────────
+syncControls();
 updateAll();
 updateTraining(0);
 
