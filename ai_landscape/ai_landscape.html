@@ -34,14 +34,9 @@
 :root{
   --cream:#FAF7F0;--cream-mid:#F0EBE0;--cream-dk:#E2D9C5;
   --g-dk:#1C3A0E;--g-mid:#2D5A1B;--g-lt:#4A8C2F;--g-pale:#C8E6A8;
-  --orange:#E8630A;--blue:#1A56A0;--blue-pale:#D0E4F8;
+  --orange:#E8630A;
   --text:#1A1A1A;--text-muted:#888;--text-soft:#555;
   --border:#C8BE9A;--border-lt:#DDD6BE;--shadow:rgba(44,90,27,.10);
-  /* AI landscape colors */
-  --c-root:#1C3A0E;
-  --c-covered:#2e7d32;
-  --c-ml:#4A8C2F;
-  --c-context:#888;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{
@@ -52,9 +47,11 @@ body{
 .wrap{max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:.85rem}
 
 /* ── Header ─────────────────────────────────────────────────────── */
-.hdr h1{font-size:clamp(1.2rem,2.1vw,1.55rem);font-weight:700;color:var(--g-dk);
-  letter-spacing:-.02em;line-height:1.2}
-.hdr p.subtitle{font-size:.86rem;color:var(--text-muted);margin-top:.18rem}
+.hdr h1{
+  font-size:clamp(1.2rem,2.1vw,1.55rem);font-weight:700;color:var(--g-dk);
+  letter-spacing:-.02em;line-height:1.2;
+}
+.hdr p.subtitle{font-size:.86rem;color:var(--text-muted);margin-top:.2rem}
 .hdr-rule{border:none;border-top:2.5px solid var(--g-dk);margin-top:.55rem}
 
 /* ── Fixed copyright ─────────────────────────────────────────────── */
@@ -69,31 +66,51 @@ body{
 .cr-top a:hover{text-decoration:underline}
 
 /* ── Main layout ─────────────────────────────────────────────────── */
-.landscape-layout{
-  display:flex;gap:1rem;align-items:flex-start;
+.landscape-layout{display:flex;gap:1rem;align-items:flex-start}
+
+/* ── Tree side ───────────────────────────────────────────────────── */
+.tree-outer{flex:1;min-width:0;display:flex;flex-direction:column;gap:.4rem}
+
+.zoom-controls{display:flex;gap:.35rem;align-items:center}
+.zoom-btn{
+  font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:600;
+  padding:.28rem .75rem;border-radius:5px;cursor:pointer;
+  border:1.5px solid var(--border);background:white;color:var(--g-dk);
+  transition:all .12s;line-height:1;
 }
+.zoom-btn:hover{background:var(--g-pale);border-color:var(--g-lt)}
+.zoom-hint{font-size:.68rem;color:var(--text-muted);margin-left:.3rem;font-style:italic}
+
 .tree-container{
-  flex:1;min-width:0;
-  background:white;border:1px solid var(--border);
-  border-radius:8px;overflow:hidden;box-shadow:0 2px 8px var(--shadow);
+  background:white;border:1px solid var(--border);border-radius:8px;
+  overflow:hidden;height:700px;box-shadow:0 2px 8px var(--shadow);
+  position:relative;
 }
-#svg-tree{width:100%;display:block;cursor:default}
+#svg-tree{
+  width:100%;height:100%;display:block;
+  cursor:grab;user-select:none;
+}
+#svg-tree:active{cursor:grabbing}
 
 /* ── Detail panel ────────────────────────────────────────────────── */
 .detail-panel{
-  width:280px;flex-shrink:0;
+  width:300px;flex-shrink:0;
   background:white;border:1px solid var(--border);border-radius:8px;
-  padding:1rem;min-height:420px;max-height:680px;overflow-y:auto;
+  padding:1rem;min-height:480px;max-height:700px;overflow-y:auto;
   box-shadow:0 2px 8px var(--shadow);
 }
 .dp-default{
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  min-height:380px;gap:.75rem;text-align:center;
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:center;min-height:420px;gap:.85rem;
+  text-align:center;
 }
-.dp-default-icon{font-size:2.5rem;opacity:.35}
-.dp-default-text{font-size:.82rem;color:var(--text-muted);line-height:1.6;max-width:220px}
+.dp-default-icon{font-size:2.8rem;opacity:.3}
+.dp-default-text{font-size:.82rem;color:var(--text-muted);line-height:1.65;max-width:220px}
 
-.dp-name{font-size:1rem;font-weight:700;color:var(--g-dk);margin-bottom:.4rem;line-height:1.25}
+.dp-name{
+  font-size:1rem;font-weight:700;color:var(--g-dk);
+  margin-bottom:.4rem;line-height:1.3;
+}
 .dp-badge{
   display:inline-block;padding:.15rem .55rem;border-radius:4px;
   font-size:.65rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
@@ -112,7 +129,10 @@ body{
   font-size:.75rem;color:var(--text-soft);padding:.18rem 0;
   padding-left:.8rem;position:relative;line-height:1.45;
 }
-.dp-examples li::before{content:'▸';color:var(--g-lt);position:absolute;left:0;font-size:.65rem;top:.22rem}
+.dp-examples li::before{
+  content:'▸';color:var(--g-lt);position:absolute;left:0;
+  font-size:.65rem;top:.22rem;
+}
 .dp-link{
   display:inline-block;margin-top:.65rem;font-size:.78rem;font-weight:600;
   color:var(--g-mid);text-decoration:none;padding:.3rem .7rem;
@@ -128,15 +148,10 @@ body{
 .tooltip{
   position:fixed;pointer-events:none;z-index:500;
   background:var(--g-dk);color:white;border-radius:5px;
-  padding:.3rem .7rem;font-size:.75rem;font-family:'Outfit',sans-serif;
-  white-space:nowrap;opacity:0;transition:opacity .15s;
-  box-shadow:0 2px 8px rgba(0,0,0,.25);
+  padding:.3rem .75rem;font-size:.75rem;font-family:'Outfit',sans-serif;
+  white-space:nowrap;opacity:0;transition:opacity .12s;
+  box-shadow:0 2px 8px rgba(0,0,0,.3);
 }
-
-/* ── SVG node styles ─────────────────────────────────────────────── */
-.node-circle{transition:r .2s, filter .2s}
-.node-circle:hover{filter:brightness(1.15)}
-.link-path{fill:none;transition:opacity .2s}
 
 /* ── Legend ──────────────────────────────────────────────────────── */
 .ai-legend{
@@ -145,15 +160,21 @@ body{
   padding:.65rem 1rem;box-shadow:0 2px 8px var(--shadow);
   font-size:.75rem;color:var(--text-soft);
 }
+.leg-label{
+  font-size:.72rem;font-weight:600;color:var(--g-dk);
+  letter-spacing:.05em;text-transform:uppercase;
+}
 .leg-item{display:flex;align-items:center;gap:.4rem}
 .leg-dot{
-  width:12px;height:12px;border-radius:50%;flex-shrink:0;
-  border:1.5px solid rgba(255,255,255,.8);box-shadow:0 0 0 1px rgba(0,0,0,.12);
+  flex-shrink:0;border-radius:50%;
+  border:1.5px solid rgba(255,255,255,.85);
+  box-shadow:0 0 0 1px rgba(0,0,0,.12);
 }
 
 @media(max-width:860px){
   .landscape-layout{flex-direction:column}
   .detail-panel{width:100%;max-height:none}
+  .tree-container{height:560px}
 }
 </style>
 </head>
@@ -173,9 +194,18 @@ body{
 
 <div class="landscape-layout">
 
-  <!-- D3 tree -->
-  <div class="tree-container">
-    <svg id="svg-tree" viewBox="0 0 860 860"></svg>
+  <div class="tree-outer">
+    <!-- Zoom controls -->
+    <div class="zoom-controls">
+      <button class="zoom-btn" id="btn-zoom-in">＋ Zoom in</button>
+      <button class="zoom-btn" id="btn-zoom-out">－ Zoom out</button>
+      <button class="zoom-btn" id="btn-zoom-reset">↺ Reset view</button>
+      <span class="zoom-hint">scroll or pinch to zoom · drag to pan</span>
+    </div>
+    <!-- Tree SVG -->
+    <div class="tree-container">
+      <svg id="svg-tree"></svg>
+    </div>
   </div>
 
   <!-- Detail panel -->
@@ -187,15 +217,27 @@ body{
     <div id="dp-content" style="display:none"></div>
   </div>
 
-</div>
+</div><!-- end landscape-layout -->
 
 <!-- Legend -->
 <div class="ai-legend">
-  <span style="font-size:.72rem;font-weight:600;color:var(--g-dk);letter-spacing:.05em;text-transform:uppercase">Legend:</span>
-  <span class="leg-item"><span class="leg-dot" style="background:var(--c-covered)"></span>Covered in INFO 557</span>
-  <span class="leg-item"><span class="leg-dot" style="background:var(--c-ml)"></span>Machine Learning branch — contains course content</span>
-  <span class="leg-item"><span class="leg-dot" style="background:var(--c-context)"></span>AI context — beyond course scope</span>
-  <span class="leg-item"><span class="leg-dot" style="background:var(--c-root);width:16px;height:16px"></span>Root: Artificial Intelligence</span>
+  <span class="leg-label">Legend:</span>
+  <span class="leg-item">
+    <span class="leg-dot" style="width:14px;height:14px;background:#2e7d32"></span>
+    Covered in INFO 557
+  </span>
+  <span class="leg-item">
+    <span class="leg-dot" style="width:14px;height:14px;background:#4A8C2F"></span>
+    Machine Learning branch
+  </span>
+  <span class="leg-item">
+    <span class="leg-dot" style="width:12px;height:12px;background:#AAA"></span>
+    AI context — beyond course scope
+  </span>
+  <span class="leg-item">
+    <span class="leg-dot" style="width:18px;height:18px;background:#1C3A0E"></span>
+    Root: Artificial Intelligence
+  </span>
 </div>
 
 </div><!-- end .wrap -->
@@ -213,7 +255,7 @@ if (window.self !== window.top) { var f = document.getElementById('course-nav-fo
 (function(){
 'use strict';
 
-// ── Tree data ───────────────────────────────────────────────────────
+// ── Tree data (unchanged) ───────────────────────────────────────────
 var TREE = {
   name:'Artificial Intelligence', id:'ai',
   children:[
@@ -279,7 +321,7 @@ var TREE = {
   ]
 };
 
-// ── Node metadata ───────────────────────────────────────────────────
+// ── Node metadata (unchanged) ───────────────────────────────────────
 var META = {
   'ai':              {desc:'The broad field of creating machines that can perform tasks requiring human-like intelligence. Encompasses reasoning, learning, perception, and action.',
                       ex:['Siri and virtual assistants','AlphaGo game playing','Self-driving vehicles'], link:null},
@@ -349,172 +391,199 @@ var META = {
                       ex:['Drone flight stabilization','Autonomous vehicle steering','Prosthetic limb motor control'], link:null}
 };
 
-// ── Color and size helpers ──────────────────────────────────────────
+// ── Helpers ─────────────────────────────────────────────────────────
+function trunc(s, n){ return s.length>n ? s.slice(0,n-1)+'…' : s; }
+
 function nodeColor(d){
   var n=d.data;
   if(n.id==='ai') return '#1C3A0E';
-  if(n.covered||n.focus||n.partial) return '#2e7d32';
+  if(n.covered||n.focus) return '#2e7d32';
+  if(n.partial) return '#2e7d32';
   if(n.ml) return '#4A8C2F';
-  return '#888888';
+  return '#AAAAAA';
 }
 function nodeR(d){
   if(d.data.id==='ai') return 18;
-  if(d.data.focus) return 11;
-  if(d.data.covered) return 9;
+  if(d.data.focus) return 10;
+  if(d.data.covered) return 10;
+  if(d.data.partial) return 8;
   if(d.depth===1) return 10;
   if(d.depth===2) return 8;
   if(d.depth===3) return 7;
-  return 5.5;
+  return 6;
 }
-function nodeFontSize(d){
-  if(d.data.id==='ai') return 13;
-  if(d.depth===1) return 10.5;
-  if(d.depth===2) return 9.5;
-  if(d.depth===3) return 8.5;
-  return 7.5;
+function labelColor(d){
+  var n=d.data;
+  if(n.id==='ai') return '#1C3A0E';
+  if(n.covered||n.focus||n.partial) return '#2e7d32';
+  if(n.ml) return '#3A6B18';
+  return '#444';
+}
+function labelWeight(d){
+  return (d.data.covered||d.data.focus||d.data.ml||d.depth<=1) ? '600' : '400';
 }
 
-// ── D3 setup ────────────────────────────────────────────────────────
-var W=860, H=860, cx=W/2, cy=H/2, RADIUS=330;
+// ── Build hierarchy and layout ──────────────────────────────────────
+var DX=30, DY=188;
 var root = d3.hierarchy(TREE);
-d3.tree()
-  .size([2*Math.PI, RADIUS])
-  .separation(function(a,b){ return (a.parent===b.parent?1:2)/a.depth; })(root);
+d3.tree().nodeSize([DX, DY])(root);
 
+// Vertical extent
+var xMin=Infinity, xMax=-Infinity;
+root.each(function(d){ xMin=Math.min(xMin,d.x); xMax=Math.max(xMax,d.x); });
+
+// ── SVG + zoom ──────────────────────────────────────────────────────
 var svg = d3.select('#svg-tree');
-var g = svg.append('g').attr('transform','translate('+cx+','+cy+')');
+var g = svg.append('g').attr('class','tree-g');
 
-// ── Defs: glow filter ───────────────────────────────────────────────
+var zoom = d3.zoom()
+  .scaleExtent([0.1, 4])
+  .on('zoom', function(event){ g.attr('transform', event.transform); });
+svg.call(zoom).on('dblclick.zoom', null);
+
+function fitTree(){
+  var el = svg.node();
+  var W = el.clientWidth||800, H = el.clientHeight||700;
+  var treeH = xMax - xMin;
+  var treeW = root.height * DY;
+  // Scale to fit with margins for labels (left: root label, right: leaf labels ~160px)
+  var scale = Math.min(W / (treeW + 80 + 200), H / (treeH + 60)) * 0.9;
+  var tx = 80 * scale;                               // left margin for root label
+  var ty = H/2 - (xMin + treeH/2) * scale;          // center vertically
+  svg.call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale));
+}
+
+// ── Defs ─────────────────────────────────────────────────────────────
 var defs = svg.append('defs');
-var glowFilter = defs.append('filter').attr('id','glow')
-  .attr('x','-50%').attr('y','-50%').attr('width','200%').attr('height','200%');
-glowFilter.append('feGaussianBlur').attr('in','SourceGraphic').attr('stdDeviation','4').attr('result','blur');
-var fm = glowFilter.append('feMerge');
+// Glow filter for INFO 557 nodes
+var glowF = defs.append('filter').attr('id','nn-glow')
+  .attr('x','-40%').attr('y','-40%').attr('width','180%').attr('height','180%');
+glowF.append('feGaussianBlur').attr('in','SourceGraphic').attr('stdDeviation','2.8').attr('result','blur');
+var fm = glowF.append('feMerge');
 fm.append('feMergeNode').attr('in','blur');
 fm.append('feMergeNode').attr('in','SourceGraphic');
 
-// Subtle glow for covered nodes
-var softGlow = defs.append('filter').attr('id','soft-glow')
-  .attr('x','-40%').attr('y','-40%').attr('width','180%').attr('height','180%');
-softGlow.append('feGaussianBlur').attr('in','SourceGraphic').attr('stdDeviation','2.5').attr('result','b2');
-var fm2 = softGlow.append('feMerge');
-fm2.append('feMergeNode').attr('in','b2');
-fm2.append('feMergeNode').attr('in','SourceGraphic');
-
-// ── Links ───────────────────────────────────────────────────────────
+// ── Links ────────────────────────────────────────────────────────────
 g.append('g').attr('class','links')
   .selectAll('path')
   .data(root.links())
   .join('path')
-  .attr('class','link-path')
+  .attr('fill','none')
   .attr('stroke', function(d){ return nodeColor(d.target); })
-  .attr('stroke-opacity', 0)
-  .attr('stroke-width', function(d){ return d.target.data.id==='neural-nets'?2:1.5; })
-  .attr('d', d3.linkRadial().angle(function(d){return d.x;}).radius(function(d){return d.y;}))
-  .transition().delay(function(d){ return d.target.depth * 350 + 100; })
-  .duration(500)
-  .attr('stroke-opacity', 0.45);
+  .attr('stroke-opacity', 0.38)
+  .attr('stroke-width', function(d){
+    return d.target.data.focus ? 2.5 : d.target.data.covered ? 2 : 1.5;
+  })
+  .attr('d', d3.linkHorizontal()
+    .x(function(d){ return d.y; })
+    .y(function(d){ return d.x; }))
+  .attr('opacity', 0)
+  .transition().delay(function(d){ return d.target.depth*150+80; }).duration(350)
+  .attr('opacity', 1);
 
-// ── Nodes ───────────────────────────────────────────────────────────
-var nodes = g.append('g').attr('class','nodes')
+// ── Nodes ────────────────────────────────────────────────────────────
+var nodeGs = g.append('g').attr('class','nodes')
   .selectAll('g')
   .data(root.descendants())
   .join('g')
-  .attr('transform', function(d){
-    return 'rotate('+(d.x*180/Math.PI-90)+') translate('+d.y+',0)';
-  })
+  .attr('class','node')
+  .attr('transform', function(d){ return 'translate('+d.y+','+d.x+')'; })
   .style('cursor','pointer')
   .attr('opacity', 0);
 
-// Outer glow ring for Neural Networks node
-nodes.filter(function(d){ return d.data.id==='neural-nets'; })
-  .insert('circle','circle')
-  .attr('r', 17)
+// Outer glow ring for Neural Networks focus node
+nodeGs.filter(function(d){ return d.data.id==='neural-nets'; })
+  .append('circle')
+  .attr('r', 16)
   .attr('fill','#2e7d32')
-  .attr('opacity',0.22)
-  .attr('filter','url(#glow)');
+  .attr('opacity', 0.18);
 
-// Node circles
-nodes.append('circle')
+// Main circles
+nodeGs.append('circle')
   .attr('class','node-circle')
   .attr('r', nodeR)
   .attr('fill', nodeColor)
-  .attr('stroke','rgba(255,255,255,0.7)')
-  .attr('stroke-width', 1.5)
+  .attr('stroke','white')
+  .attr('stroke-width', 2)
   .attr('filter', function(d){
-    if(d.data.id==='neural-nets') return 'url(#glow)';
-    if(d.data.covered) return 'url(#soft-glow)';
-    return null;
+    return (d.data.covered||d.data.focus||d.data.partial) ? 'url(#nn-glow)' : null;
   });
 
-// Labels
-nodes.append('text')
-  .attr('dy','0.31em')
-  .attr('x', function(d){
-    if(d.depth===0) return 0;
-    return d.x<Math.PI ? nodeR(d)+5 : -(nodeR(d)+5);
-  })
-  .attr('text-anchor', function(d){
-    if(d.depth===0) return 'middle';
-    return d.x<Math.PI ? 'start' : 'end';
-  })
-  .attr('transform', function(d){
-    return (d.depth>0 && d.x>=Math.PI) ? 'rotate(180)' : null;
-  })
-  .attr('font-size', nodeFontSize)
-  .attr('font-weight', function(d){ return d.data.covered||d.data.focus?'600':d.depth<=1?'500':'400'; })
-  .attr('fill', function(d){
-    if(d.data.id==='ai') return '#fff';
-    if(d.data.covered||d.data.focus||d.data.partial) return '#1C3A0E';
-    if(d.data.ml) return '#1C3A0E';
-    return '#333';
-  })
-  .attr('paint-order','stroke')
-  .attr('stroke','rgba(255,255,255,0.85)')
-  .attr('stroke-width', 3)
-  .text(function(d){ return d.data.name; });
+// Labels — always horizontal, right of node
+nodeGs.append('text')
+  .attr('x', function(d){ return nodeR(d)+8; })
+  .attr('dy','0.35em')
+  .attr('font-family',"'IBM Plex Mono',monospace")
+  .attr('font-size', 11)
+  .attr('font-weight', labelWeight)
+  .attr('fill', labelColor)
+  .text(function(d){ return trunc(d.data.name, 22); });
 
 // Entrance animation — staggered by depth
-nodes.transition()
-  .delay(function(d){ return d.depth * 350; })
-  .duration(500)
+nodeGs.transition()
+  .delay(function(d){ return d.depth*150; })
+  .duration(380)
   .attr('opacity', 1);
 
-// ── Tooltip ─────────────────────────────────────────────────────────
+// ── Tooltip ──────────────────────────────────────────────────────────
 var tooltip = d3.select('#tooltip');
+var selectedId = null;
 
-nodes
+nodeGs
   .on('mouseover', function(event, d){
     tooltip.text(d.data.name)
       .style('opacity',1)
       .style('left',(event.clientX+14)+'px')
       .style('top',(event.clientY-10)+'px');
-    d3.select(this).select('.node-circle').attr('stroke','white').attr('stroke-width',2.5);
+    if(d.data.id !== selectedId){
+      d3.select(this).select('.node-circle')
+        .transition().duration(120).attr('r', nodeR(d)*1.3);
+    }
   })
   .on('mousemove', function(event){
     tooltip.style('left',(event.clientX+14)+'px').style('top',(event.clientY-10)+'px');
   })
   .on('mouseout', function(event, d){
-    tooltip.style('opacity',0);
-    d3.select(this).select('.node-circle')
-      .attr('stroke','rgba(255,255,255,0.7)').attr('stroke-width',1.5);
+    tooltip.style('opacity', 0);
+    if(d.data.id !== selectedId){
+      d3.select(this).select('.node-circle')
+        .transition().duration(120).attr('r', nodeR(d));
+    }
   })
   .on('click', function(event, d){
     event.stopPropagation();
+    // Clear previous selection ring
+    g.selectAll('.sel-ring').remove();
+    // Add green ring to clicked node
+    d3.select(this).insert('circle','circle')
+      .attr('class','sel-ring')
+      .attr('r', nodeR(d)+5)
+      .attr('fill','none')
+      .attr('stroke','#2e7d32')
+      .attr('stroke-width', 2.5)
+      .attr('pointer-events','none');
+    selectedId = d.data.id;
     updatePanel(d.data);
-    // Highlight selected node
-    svg.selectAll('.node-circle').attr('stroke','rgba(255,255,255,0.7)').attr('stroke-width',1.5);
-    d3.select(this).select('.node-circle').attr('stroke','white').attr('stroke-width',3);
   });
 
-// Reset on SVG click
+// Click background → deselect
 svg.on('click', function(){
-  svg.selectAll('.node-circle').attr('stroke','rgba(255,255,255,0.7)').attr('stroke-width',1.5);
-  document.getElementById('dp-default').style.display='flex';
-  document.getElementById('dp-content').style.display='none';
+  g.selectAll('.sel-ring').remove();
+  selectedId = null;
+  document.getElementById('dp-default').style.display = 'flex';
+  document.getElementById('dp-content').style.display = 'none';
 });
 
-// ── Detail panel ────────────────────────────────────────────────────
+// ── Zoom buttons ─────────────────────────────────────────────────────
+document.getElementById('btn-zoom-in').addEventListener('click', function(){
+  svg.transition().duration(300).call(zoom.scaleBy, 1.45);
+});
+document.getElementById('btn-zoom-out').addEventListener('click', function(){
+  svg.transition().duration(300).call(zoom.scaleBy, 0.69);
+});
+document.getElementById('btn-zoom-reset').addEventListener('click', fitTree);
+
+// ── Detail panel ─────────────────────────────────────────────────────
 function updatePanel(node){
   var m = META[node.id] || {desc:'Description coming soon.',ex:[],link:null};
   var isCovered = !!node.covered;
@@ -554,15 +623,21 @@ function updatePanel(node){
     '<ul class="dp-examples">'+exHtml+'</ul>'+
     footerHtml;
 
-  document.getElementById('dp-default').style.display='none';
-  document.getElementById('dp-content').style.display='block';
+  document.getElementById('dp-default').style.display = 'none';
+  document.getElementById('dp-content').style.display = 'block';
 }
 
-// Pre-highlight the Neural Networks node and show its panel on load
+// ── Boot ─────────────────────────────────────────────────────────────
+// Fit on load (after layout paint)
+requestAnimationFrame(function(){
+  requestAnimationFrame(fitTree);
+});
+
+// Pre-select Neural Networks after entrance animation
 setTimeout(function(){
-  var nnNode = root.descendants().find(function(d){ return d.data.id==='neural-nets'; });
-  if(nnNode) updatePanel(nnNode.data);
-}, 1800);
+  var nn = root.descendants().find(function(d){ return d.data.id==='neural-nets'; });
+  if(nn) updatePanel(nn.data);
+}, 1400);
 
 })();
 </script>

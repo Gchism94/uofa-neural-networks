@@ -159,6 +159,7 @@ Add a row to the appropriate table under `## Contents`:
 
 ### Neural Networks
 
+- `ai_landscape/ai_landscape.html`
 - `single_layer_perceptron/slp_explainer.html`
 - `radial_basis_function_nn/rbfnn_explorer.html`
 - `multi_layer_perceptron/mlp_explorer.html`
