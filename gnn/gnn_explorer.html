@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<!-- Copyright © 2026 Greg T. Chism. University of Arizona, College of Information Science.
+     INFO 557: Neural Networks. MIT License. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Graph Neural Networks — Interactive Explorer | INFO 557: Neural Networks</title>
+<meta name="description" content="Watch message passing propagate through graphs — see how GNNs learn node, edge, and graph-level representations through interactive visualizations.">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Graph Neural Networks — Interactive Explorer">
+<meta property="og:description" content="Watch message passing propagate through graphs — see how GNNs learn node, edge, and graph-level representations through interactive visualizations.">
+<meta property="og:image" content="https://gchism94.github.io/uofa-neural-networks/gnn/gnn_explorer-preview.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="600">
+<meta property="og:url" content="https://gchism94.github.io/uofa-neural-networks/gnn/gnn_explorer.html">
+<meta property="fb:app_id" content="2385695445236853">
+
+<!-- Twitter/X card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Graph Neural Networks — Interactive Explorer">
+<meta name="twitter:description" content="Watch message passing propagate through graphs — see how GNNs learn node, edge, and graph-level representations through interactive visualizations.">
+<meta name="twitter:image" content="https://gchism94.github.io/uofa-neural-networks/gnn/gnn_explorer-preview.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+
+<style>
+/* ── Design tokens ──────────────────────────────────────────────── */
+:root{
+  --cream:#FAF7F0;--cream-mid:#F0EBE0;--cream-dk:#E2D9C5;
+  --g-dk:#1C3A0E;--g-mid:#2D5A1B;--g-lt:#4A8C2F;--g-pale:#C8E6A8;
+  --orange:#E8630A;--orange-lt:#F08C50;--orange-dk:#C0500A;
+  --orange-pale:#FDE8D8;
+  --blue:#1A56A0;--blue-pale:#D0E4F8;
+  --red:#B0321D;--red-pale:#F8DDD8;
+  --purple:#7B3FC4;--purple-pale:#E8D8F8;
+  --yellow:#B08000;--yellow-pale:#FBF0C8;
+  --text:#1A1A1A;--text-muted:#888;--text-soft:#555;
+  --border:#C8BE9A;--border-lt:#DDD6BE;--shadow:rgba(44,90,27,.10);
+
+  /* GNN-specific palette */
+  --node-default:#4A8C2F;   /* resting node */
+  --node-active:#2D5A1B;    /* currently updating node */
+  --node-neighbor:#E8630A;  /* neighbors sending messages */
+  --node-updated:#1A56A0;   /* node after update */
+  --edge-default:#C8BE9A;   /* resting edge */
+  --edge-msg:#E8630A;       /* message-carrying edge */
+  --msg-arrow:#E8630A;      /* message flow arrow */
+  --community-a:#2D5A1B;    /* social community A */
+  --community-b:#1A56A0;    /* social community B */
+  --community-c:#7B3FC4;    /* social community C */
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:'Outfit',sans-serif;background:var(--cream);color:var(--text);
+  padding:1.25rem 1rem 2rem;min-height:100vh;line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:.85rem}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+.hdr{display:flex;justify-content:space-between;align-items:flex-start;
+  column-gap:1rem;row-gap:.35rem;flex-wrap:wrap}
+.hdr>div:first-child{flex:1 1 auto;min-width:0}
+.hdr h1{font-size:clamp(1.2rem,2.1vw,1.55rem);font-weight:700;color:var(--g-dk);
+  letter-spacing:-.02em;line-height:1.2}
+.hdr p.subtitle{font-size:.86rem;color:var(--text-muted);margin-top:.18rem}
+.hdr-rule{border:none;border-top:2.5px solid var(--g-dk);margin-top:.55rem}
+
+/* ── Fixed copyright ─────────────────────────────────────────────── */
+.cr-top{
+  position:fixed;top:.75rem;right:1rem;z-index:1000;
+  font-size:.72rem;color:var(--text-muted);text-align:right;
+  background:rgba(250,247,240,.92);padding:.2rem 1.5rem .2rem .5rem;
+  border-radius:5px;backdrop-filter:blur(4px);
+  border:1px solid var(--border-lt);white-space:nowrap;min-width:max-content;
+}
+.cr-top a{color:var(--orange);text-decoration:none}
+.cr-top a:hover{text-decoration:underline}
+
+/* ── Tab bar ─────────────────────────────────────────────────────── */
+.tab-bar{
+  display:flex;gap:.35rem;background:var(--cream-mid);
+  border:1px solid var(--border);border-radius:8px;
+  padding:.3rem;width:fit-content;
+}
+.tab-bar button{
+  font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:500;
+  padding:.3rem .9rem;border-radius:6px;cursor:pointer;
+  border:none;background:transparent;color:var(--text-soft);transition:all .15s;
+}
+.tab-bar button:hover{background:white;color:var(--g-dk)}
+.tab-bar button.active{background:white;color:var(--g-dk);font-weight:600;
+  box-shadow:0 1px 4px var(--shadow);}
+
+/* ── Explorer grid ───────────────────────────────────────────────── */
+.explorer-grid{
+  display:grid;
+  grid-template-columns:260px 1fr 210px;
+  gap:.85rem;align-items:start;
+}
+@media(max-width:980px){
+  .explorer-grid{grid-template-columns:260px 1fr}
+  .right-col{display:none}
+}
+@media(max-width:680px){.explorer-grid{grid-template-columns:1fr}}
+.left-col{display:flex;flex-direction:column;gap:.75rem}
+.center-col{display:flex;flex-direction:column;gap:.75rem}
+.right-col{display:flex;flex-direction:column;gap:.75rem}
+
+/* ── Cards ───────────────────────────────────────────────────────── */
+.card{background:white;border:1px solid var(--border);border-radius:8px;
+  padding:.85rem 1rem;box-shadow:0 2px 8px var(--shadow)}
+.card-title{font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--g-dk);margin-bottom:.55rem}
+
+/* ── Selectors ───────────────────────────────────────────────────── */
+.sel-group{display:flex;gap:.3rem;flex-wrap:wrap;margin-bottom:.45rem}
+.sel-btn{
+  font-family:'Outfit',sans-serif;font-size:.75rem;font-weight:500;
+  padding:.25rem .6rem;border-radius:5px;cursor:pointer;
+  border:1.5px solid var(--border-lt);background:var(--cream);color:var(--text-soft);
+  transition:all .12s;
+}
+.sel-btn:hover{background:var(--cream-mid)}
+.sel-btn.active{background:var(--g-mid);border-color:var(--g-mid);color:white}
+
+/* ── Toggle groups ───────────────────────────────────────────────── */
+.toggle-grp{
+  display:flex;gap:0;border-radius:6px;overflow:hidden;
+  border:1.5px solid var(--border);margin-bottom:.45rem;
+}
+.toggle-grp button{
+  font-family:'Outfit',sans-serif;font-size:.78rem;font-weight:500;
+  padding:.28rem 0;flex:1;border:none;cursor:pointer;
+  background:var(--cream);color:var(--text-soft);transition:all .12s;
+}
+.toggle-grp button.active{background:var(--g-mid);color:white}
+.toggle-grp button:not(.active):hover{background:var(--cream-mid)}
+
+/* ── Sliders ─────────────────────────────────────────────────────── */
+.srow{display:flex;align-items:center;gap:.45rem;margin-bottom:.2rem}
+.slbl{font-family:'IBM Plex Mono',monospace;font-size:.8rem;font-weight:500;
+  color:var(--g-dk);min-width:28px}
+input[type=range]{flex:1;appearance:none;-webkit-appearance:none;height:4px;
+  background:var(--cream-dk);border-radius:2px;cursor:pointer;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
+  border-radius:50%;background:var(--g-mid);border:2.5px solid white;
+  box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:pointer}
+.sval{font-family:'IBM Plex Mono',monospace;font-size:.76rem;
+  color:var(--text-muted);min-width:44px;text-align:right}
+.hint-txt{font-size:.7rem;color:var(--text-muted);font-style:italic;margin-top:.15rem}
+.param-lbl{font-size:.72rem;color:var(--text-soft);margin-bottom:.25rem;font-weight:500}
+
+/* ── Buttons ─────────────────────────────────────────────────────── */
+.ctrl-btns{display:flex;gap:.45rem;flex-wrap:wrap}
+.pbtn{
+  font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:600;
+  padding:.35rem .9rem;border-radius:6px;cursor:pointer;
+  border:1.5px solid var(--border);background:var(--cream);color:var(--g-dk);
+  transition:all .12s;
+}
+.pbtn:hover{background:var(--g-pale);border-color:var(--g-lt)}
+.pbtn.primary{background:var(--g-mid);border-color:var(--g-mid);color:white}
+.pbtn.primary:hover{background:var(--g-dk);border-color:var(--g-dk)}
+
+/* ── Annotation box ──────────────────────────────────────────────── */
+.anno-box{
+  border-radius:6px;padding:.55rem .75rem;font-size:.78rem;line-height:1.55;
+  background:var(--blue-pale);color:var(--blue);border-left:3px solid var(--blue);
+  min-height:3.2rem;
+}
+.anno-box.warn{background:var(--red-pale);color:var(--red);border-color:var(--red)}
+.anno-box.good{background:var(--g-pale);color:var(--g-dk);border-color:var(--g-mid)}
+.anno-box.neutral{background:var(--cream-mid);color:var(--text-soft);border-color:var(--border)}
+
+/* ── Key Concepts ────────────────────────────────────────────────── */
+.concepts-body{overflow:hidden;max-height:900px;transition:max-height .3s ease}
+.concepts-body.collapsed{max-height:0;margin-bottom:-.55rem}
+.concepts-item{font-size:.74rem;color:var(--text-soft);line-height:1.5;
+  margin-bottom:.45rem;padding-left:.9rem;position:relative}
+.concepts-item:last-child{margin-bottom:0}
+.concepts-item::before{content:'●';color:#2e7d32;position:absolute;left:0;top:0}
+.concepts-item strong{color:#2e7d32;font-weight:600}
+
+/* ── Plot label ──────────────────────────────────────────────────── */
+.plot-label{font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--text-muted);text-align:center;margin-bottom:.5rem}
+.panel-title{font-size:.78rem;font-weight:700;color:var(--g-dk);margin-bottom:.2rem;text-align:center}
+
+/* ── Legend ──────────────────────────────────────────────────────── */
+.legend{display:flex;gap:.75rem;flex-wrap:wrap;font-size:.72rem;
+  color:var(--text-soft);margin-top:.5rem;align-items:center}
+.legend-dot{width:10px;height:10px;border-radius:50%;display:inline-block;
+  vertical-align:middle;margin-right:.25rem;flex-shrink:0}
+.legend-sq{width:12px;height:12px;border-radius:2px;display:inline-block;
+  vertical-align:middle;margin-right:.25rem;flex-shrink:0}
+
+/* ── Tab panels ──────────────────────────────────────────────────── */
+.tab-panel{display:none}
+.tab-panel.active{display:flex;flex-direction:column;gap:.75rem}
+
+/* ── Step counter ────────────────────────────────────────────────── */
+.step-counter{
+  display:flex;justify-content:center;align-items:center;
+  gap:.4rem;font-family:'IBM Plex Mono',monospace;font-size:.8rem;
+  color:var(--g-dk);font-weight:600;margin-top:.3rem;
+}
+.step-num{
+  background:var(--g-mid);color:white;border-radius:4px;
+  padding:.1rem .45rem;font-size:.78rem;
+}
+.speed-row{display:flex;align-items:center;gap:.45rem;margin-top:.35rem}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* ── Tab 1: Message Passing ─────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────── */
+#svg-graph-mp{
+  width:100%;aspect-ratio:4/3;max-height:420px;display:block;
+  border-radius:6px;background:#FDFAF5;cursor:default;
+}
+
+/* Message passing phase indicator */
+.mp-phase{
+  display:flex;gap:.5rem;align-items:center;justify-content:center;
+  flex-wrap:wrap;margin-top:.4rem;
+}
+.mp-pill{
+  display:inline-flex;align-items:center;gap:.3rem;
+  padding:.18rem .6rem;border-radius:20px;font-size:.7rem;font-weight:600;
+  border:1.5px solid;transition:all .2s;
+}
+.mp-pill.inactive{border-color:var(--border-lt);color:var(--text-muted);background:var(--cream)}
+.mp-pill.active-phase{border-color:var(--g-mid);color:var(--g-mid);background:var(--g-pale)}
+.mp-pill.done-phase{border-color:var(--border);color:var(--text-soft);background:var(--cream-mid)}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* ── Tab 2: Graph Convolution ───────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────── */
+.gcn-panels{
+  display:grid;grid-template-columns:1fr 1fr;gap:.85rem;align-items:start;
+}
+@media(max-width:640px){.gcn-panels{grid-template-columns:1fr}}
+
+#svg-graph-gcn{
+  width:100%;aspect-ratio:1/1;max-height:300px;display:block;
+  border-radius:6px;background:#FDFAF5;
+}
+#svg-gcn-layers{
+  width:100%;aspect-ratio:1/1;max-height:300px;display:block;
+  border-radius:6px;background:#FDFAF5;
+}
+
+/* GCN formula panel */
+.formula-panel{
+  background:var(--cream-mid);border:1px solid var(--border-lt);
+  border-radius:6px;padding:.65rem .85rem;margin-top:.35rem;
+}
+.formula-label{font-size:.64rem;font-weight:600;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--text-muted);margin-bottom:.3rem}
+.formula-eq{
+  font-family:'IBM Plex Mono',monospace;font-size:.82rem;
+  color:var(--g-dk);line-height:1.8;overflow-x:auto;
+}
+.formula-term{font-weight:700}
+.formula-term.sig{color:var(--g-mid)}
+.formula-term.norm{color:var(--blue)}
+.formula-term.weight{color:var(--orange)}
+.formula-desc{font-size:.68rem;color:var(--text-soft);line-height:1.5;margin-top:.35rem}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* ── Tab 3: Applications ────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────── */
+.app-panels{
+  display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem;
+}
+@media(max-width:780px){.app-panels{grid-template-columns:1fr 1fr}}
+@media(max-width:540px){.app-panels{grid-template-columns:1fr}}
+
+.app-card{
+  background:white;border:1px solid var(--border-lt);border-radius:7px;
+  padding:.65rem .75rem;
+}
+.app-card-title{
+  font-size:.72rem;font-weight:700;color:var(--g-dk);margin-bottom:.15rem;
+}
+.app-card-sub{
+  font-size:.65rem;color:var(--text-muted);margin-bottom:.4rem;
+  font-style:italic;
+}
+.app-badge{
+  display:inline-block;padding:.1rem .45rem;border-radius:4px;
+  font-size:.62rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+  margin-bottom:.35rem;
+}
+.app-badge.node-cls{background:var(--g-pale);color:var(--g-mid)}
+.app-badge.graph-cls{background:var(--blue-pale);color:var(--blue)}
+.app-badge.link-pred{background:var(--purple-pale);color:var(--purple)}
+
+.app-svg{
+  width:100%;aspect-ratio:1/1;max-height:200px;display:block;
+  border-radius:5px;background:#FDFAF5;border:1px solid var(--border-lt);
+  margin-bottom:.4rem;
+}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* ── Right panel ─────────────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────── */
+.stat-row{
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:.7rem;padding:.22rem 0;border-bottom:1px solid var(--border-lt);
+}
+.stat-row:last-child{border-bottom:none}
+.sr-lbl{color:var(--text-muted);font-family:'IBM Plex Mono',monospace}
+.sr-val{font-weight:600;font-family:'IBM Plex Mono',monospace;color:var(--g-dk)}
+
+/* Feature vector mini bar */
+.feat-bars{display:flex;gap:2px;align-items:flex-end;height:28px;margin-top:.25rem}
+.feat-bar{
+  flex:1;border-radius:2px 2px 0 0;background:var(--g-mid);
+  transition:height .3s;min-height:2px;
+}
+
+/* Neighbor message list */
+.msg-list{margin-top:.2rem}
+.msg-item{
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:.68rem;padding:.18rem 0;border-bottom:1px solid var(--border-lt);
+}
+.msg-item:last-child{border-bottom:none}
+.msg-node{
+  display:inline-flex;align-items:center;gap:.3rem;
+}
+.msg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.msg-val{font-family:'IBM Plex Mono',monospace;font-weight:600;color:var(--g-dk)}
+
+/* Aggregation result box */
+.agg-box{
+  text-align:center;padding:.45rem;border-radius:5px;
+  border:1px solid var(--border-lt);background:var(--cream);margin-top:.25rem;
+}
+.agg-val{
+  display:block;font-family:'IBM Plex Mono',monospace;font-size:.95rem;
+  font-weight:700;line-height:1.2;color:var(--g-dk);
+}
+.agg-lbl{font-size:.6rem;color:var(--text-muted);margin-top:.08rem}
+</style>
+</head>
+<body>
+
+<div class="cr-top">© 2026 Greg T. Chism · <a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a></div>
+
+<div class="wrap">
+
+<header>
+  <div class="hdr">
+    <div>
+      <h1>Graph Neural Networks — Interactive Explorer</h1>
+      <p class="subtitle">Watch message passing propagate through graphs — see how GNNs learn node, edge, and graph-level representations</p>
+    </div>
+  </div>
+  <hr class="hdr-rule">
+</header>
+
+<!-- Tab bar -->
+<div class="tab-bar" id="tab-bar">
+  <button class="active" data-tab="msgpass">Message Passing</button>
+  <button data-tab="graphconv">Graph Convolution</button>
+  <button data-tab="applications">Applications</button>
+</div>
+
+<!-- Main explorer -->
+<div class="explorer-grid">
+
+  <!-- ══ LEFT: Controls ══════════════════════════════════════════════ -->
+  <div class="left-col">
+
+    <!-- Graph selector -->
+    <div class="card">
+      <div class="card-title">Graph</div>
+      <div class="param-lbl">Dataset</div>
+      <div class="sel-group" id="graph-selector">
+        <button class="sel-btn active" data-graph="karate">Karate Club</button>
+        <button class="sel-btn" data-graph="molecule">Molecule</button>
+        <button class="sel-btn" data-graph="custom">Custom</button>
+      </div>
+      <div class="hint-txt">Karate = social, Molecule = chemistry</div>
+    </div>
+
+    <!-- GCN layers -->
+    <div class="card">
+      <div class="card-title">Architecture</div>
+      <div class="param-lbl">GCN Layers</div>
+      <div class="toggle-grp" id="layers-selector">
+        <button class="active" data-layers="1">1</button>
+        <button data-layers="2">2</button>
+        <button data-layers="3">3</button>
+      </div>
+      <div class="param-lbl" style="margin-top:.45rem">Aggregation</div>
+      <div class="toggle-grp" id="agg-selector">
+        <button class="active" data-agg="mean">Mean</button>
+        <button data-agg="sum">Sum</button>
+        <button data-agg="max">Max</button>
+      </div>
+      <div class="hint-txt">How neighbor messages are combined</div>
+    </div>
+
+    <!-- Playback controls -->
+    <div class="card">
+      <div class="card-title">Playback</div>
+      <div class="ctrl-btns" style="margin-bottom:.45rem">
+        <button id="btn-play" class="pbtn primary" style="flex:1">⏵ Play</button>
+        <button id="btn-step" class="pbtn">→ Step</button>
+        <button id="btn-reset" class="pbtn">↺ Reset</button>
+      </div>
+      <div class="step-counter">
+        Round <span class="step-num" id="round-display">0</span> / <span id="round-total">3</span>
+      </div>
+      <div class="speed-row">
+        <span class="slbl" style="min-width:44px;font-size:.7rem">Speed</span>
+        <input type="range" id="sld-speed" min="1" max="5" step="1" value="3">
+        <span class="sval" id="val-speed">3×</span>
+      </div>
+    </div>
+
+    <!-- Annotation -->
+    <div class="card">
+      <div class="card-title">What's happening?</div>
+      <div class="anno-box neutral" id="anno-box">
+        Select a graph and press Play to watch message passing. Each round, every node collects messages from its neighbors and updates its own feature representation.
+      </div>
+    </div>
+
+    <!-- Key Concepts -->
+    <div class="card">
+      <div class="card-title" style="cursor:pointer;user-select:none" id="concepts-toggle">
+        Key Concepts <span id="concepts-arrow">▾</span>
+      </div>
+      <div class="concepts-body" id="concepts-body">
+        <div class="concepts-item"><strong>What is a graph?</strong> A set of nodes (entities) connected by edges (relationships). Graphs appear everywhere: molecules (atoms + bonds), social networks (people + friendships), citation networks (papers + references), and knowledge bases (concepts + relations).</div>
+        <div class="concepts-item"><strong>Message passing:</strong> the core GNN operation. In each layer, every node gathers feature vectors from its direct neighbors and passes them as "messages." The node then aggregates these messages and updates its own representation. After k layers, each node knows about its k-hop neighborhood.</div>
+        <div class="concepts-item"><strong>Aggregation:</strong> messages from all neighbors are combined using a permutation-invariant function — mean, sum, or max pooling — so the result doesn't depend on the arbitrary order in which neighbors are listed. This is what makes GNNs well-defined on graphs.</div>
+        <div class="concepts-item"><strong>Graph Convolution (GCN):</strong> extends convolution to irregular graphs. The GCN update rule is h_v^(l+1) = σ(Σ_{u∈N(v)} W·h_u^(l) / √(deg(v)·deg(u))). The normalization by degree prevents high-degree nodes from dominating and keeps gradients stable.</div>
+        <div class="concepts-item"><strong>Why graphs matter:</strong> molecules are naturally graphs — the same atom arrangement in different shapes has completely different chemical properties. GNNs achieve state-of-the-art in drug discovery, protein folding (AlphaFold uses graph attention), and traffic prediction (Google Maps) because they respect graph structure.</div>
+      </div>
+    </div>
+
+  </div><!-- end left-col -->
+
+  <!-- ══ CENTER: Tab panels ══════════════════════════════════════════ -->
+  <div class="center-col">
+
+    <!-- ─ Tab 1: Message Passing ─────────────────────────────────── -->
+    <div class="tab-panel active" id="panel-msgpass">
+      <div class="card">
+        <div class="plot-label" id="mp-label">Message Passing — Karate Club · Round 0 of 3</div>
+
+        <svg id="svg-graph-mp">
+          <rect width="100%" height="100%" fill="#FDFAF5"/>
+          <text x="50%" y="45%" text-anchor="middle" dominant-baseline="middle"
+                fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="14">
+            Graph visualization
+          </text>
+          <text x="50%" y="55%" text-anchor="middle" dominant-baseline="middle"
+                fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="11">
+            8 nodes · D3 rendered
+          </text>
+        </svg>
+
+        <!-- Message passing phase pills -->
+        <div class="mp-phase">
+          <span class="mp-pill inactive" id="pill-select">① Select node</span>
+          <span class="mp-pill inactive" id="pill-collect">② Collect messages</span>
+          <span class="mp-pill inactive" id="pill-agg">③ Aggregate</span>
+          <span class="mp-pill inactive" id="pill-update">④ Update</span>
+        </div>
+
+        <div class="legend" style="margin-top:.55rem;justify-content:center">
+          <span><span class="legend-dot" style="background:var(--node-default)"></span>Resting node</span>
+          <span><span class="legend-dot" style="background:var(--node-active)"></span>Active node</span>
+          <span><span class="legend-dot" style="background:var(--node-neighbor)"></span>Sending neighbor</span>
+          <span><span class="legend-dot" style="background:var(--node-updated)"></span>Updated node</span>
+        </div>
+
+        <div class="anno-box neutral" id="mp-anno" style="margin-top:.6rem;font-size:.75rem">
+          Press Play to start message passing. The highlighted node will collect messages from its neighbors (orange), aggregate them, and update its feature vector.
+        </div>
+      </div>
+    </div><!-- end panel-msgpass -->
+
+    <!-- ─ Tab 2: Graph Convolution ───────────────────────────────── -->
+    <div class="tab-panel" id="panel-graphconv">
+      <div class="card">
+        <div class="plot-label">Graph Convolution — Node Features Across Layers</div>
+
+        <div class="gcn-panels">
+
+          <!-- Left: graph with feature vectors inside nodes -->
+          <div>
+            <div class="panel-title">Input Graph + Node Features</div>
+            <svg id="svg-graph-gcn">
+              <rect width="100%" height="100%" fill="#FDFAF5"/>
+              <text x="50%" y="43%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="12">
+                Graph with feature bars
+              </text>
+              <text x="50%" y="57%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="9">
+                rendered by D3
+              </text>
+            </svg>
+          </div>
+
+          <!-- Right: layer-by-layer feature transformation -->
+          <div>
+            <div class="panel-title">Feature Transformation (Layer-by-Layer)</div>
+            <svg id="svg-gcn-layers">
+              <rect width="100%" height="100%" fill="#FDFAF5"/>
+              <text x="50%" y="38%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="12">
+                L0 → L1 → L2 → L3
+              </text>
+              <text x="50%" y="52%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="9">
+                feature embeddings per layer
+              </text>
+              <text x="50%" y="63%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.10)" font-family="Outfit,sans-serif" font-size="8">
+                rendered by D3
+              </text>
+            </svg>
+          </div>
+
+        </div><!-- end gcn-panels -->
+
+        <!-- GCN formula -->
+        <div class="formula-panel">
+          <div class="formula-label">GCN Update Rule (Kipf &amp; Welling, 2017)</div>
+          <div class="formula-eq">
+            h<sub>v</sub><sup>(l+1)</sup> = <span class="formula-term sig">σ</span>(
+            <span class="formula-term norm">D̃<sup>-½</sup>ÃD̃<sup>-½</sup></span>
+            <span class="formula-term">H<sup>(l)</sup></span>
+            <span class="formula-term weight">W<sup>(l)</sup></span>)
+          </div>
+          <div class="formula-desc">
+            Ã = A + I (adjacency + self-loops) &nbsp;·&nbsp;
+            D̃ = degree matrix of Ã &nbsp;·&nbsp;
+            <span class="formula-term weight" style="font-size:.68rem">W</span> = learnable weight matrix &nbsp;·&nbsp;
+            <span class="formula-term sig" style="font-size:.68rem">σ</span> = activation (ReLU)
+          </div>
+        </div>
+
+        <div class="anno-box neutral" id="gcn-anno" style="margin-top:.5rem;font-size:.75rem">
+          Each GCN layer performs one round of neighborhood aggregation. With 2 layers, each node sees its 2-hop neighborhood. The normalization by degree prevents high-degree nodes from dominating the aggregation.
+        </div>
+      </div>
+    </div><!-- end panel-graphconv -->
+
+    <!-- ─ Tab 3: Applications ────────────────────────────────────── -->
+    <div class="tab-panel" id="panel-applications">
+      <div class="card">
+        <div class="plot-label">GNN Applications — Three Core Tasks</div>
+
+        <div class="app-panels">
+
+          <!-- Social network — node classification -->
+          <div class="app-card">
+            <div class="app-badge node-cls">Node Classification</div>
+            <div class="app-card-title">Social Network</div>
+            <div class="app-card-sub">Predict community membership</div>
+            <svg id="svg-app-social" class="app-svg">
+              <rect width="100%" height="100%" fill="#FDFAF5"/>
+              <text x="50%" y="43%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="10">
+                Karate Club graph
+              </text>
+              <text x="50%" y="57%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="8">
+                color = community
+              </text>
+            </svg>
+            <div class="legend" style="flex-direction:column;gap:.2rem;margin-top:0">
+              <span><span class="legend-dot" style="background:var(--community-a)"></span>Community A</span>
+              <span><span class="legend-dot" style="background:var(--community-b)"></span>Community B</span>
+            </div>
+          </div>
+
+          <!-- Molecule — graph classification -->
+          <div class="app-card">
+            <div class="app-badge graph-cls">Graph Classification</div>
+            <div class="app-card-title">Molecule</div>
+            <div class="app-card-sub">Predict molecular property</div>
+            <svg id="svg-app-molecule" class="app-svg">
+              <rect width="100%" height="100%" fill="#FDFAF5"/>
+              <text x="50%" y="43%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="10">
+                Atom/bond graph
+              </text>
+              <text x="50%" y="57%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="8">
+                node = atom, edge = bond
+              </text>
+            </svg>
+            <div class="legend" style="flex-direction:column;gap:.2rem;margin-top:0">
+              <span><span class="legend-dot" style="background:#333;width:8px;height:8px"></span>Carbon (C)</span>
+              <span><span class="legend-dot" style="background:var(--blue);width:8px;height:8px"></span>Nitrogen (N)</span>
+              <span><span class="legend-dot" style="background:var(--red);width:8px;height:8px"></span>Oxygen (O)</span>
+            </div>
+          </div>
+
+          <!-- Citation network — link prediction -->
+          <div class="app-card">
+            <div class="app-badge link-pred">Link Prediction</div>
+            <div class="app-card-title">Citation Network</div>
+            <div class="app-card-sub">Predict new citations</div>
+            <svg id="svg-app-citation" class="app-svg">
+              <rect width="100%" height="100%" fill="#FDFAF5"/>
+              <text x="50%" y="43%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="10">
+                Paper citation graph
+              </text>
+              <text x="50%" y="57%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="8">
+                dashed = predicted links
+              </text>
+            </svg>
+            <div class="legend" style="flex-direction:column;gap:.2rem;margin-top:0">
+              <span><span class="legend-sq" style="background:var(--g-pale);border:1px solid var(--g-mid)"></span>Existing edge</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:.68rem;
+                           color:var(--purple)">- - - Predicted edge</span>
+            </div>
+          </div>
+
+        </div><!-- end app-panels -->
+
+        <div class="anno-box neutral" id="app-anno" style="margin-top:.6rem;font-size:.75rem">
+          GNNs solve three fundamental graph learning tasks: node-level (classify each node), edge-level (predict or score edges), and graph-level (classify or regress over the whole graph). Each builds on the same message-passing foundation.
+        </div>
+      </div>
+    </div><!-- end panel-applications -->
+
+  </div><!-- end center-col -->
+
+  <!-- ══ RIGHT: Live stats ════════════════════════════════════════════ -->
+  <div class="right-col">
+
+    <!-- Selected node info -->
+    <div class="card">
+      <div class="card-title">Selected Node</div>
+      <div class="stat-row">
+        <span class="sr-lbl">Node ID</span>
+        <span class="sr-val" id="rp-node-id">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="sr-lbl">Degree</span>
+        <span class="sr-val" id="rp-degree">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="sr-lbl">Layer</span>
+        <span class="sr-val" id="rp-layer">—</span>
+      </div>
+      <div style="margin-top:.35rem">
+        <div style="font-size:.64rem;color:var(--text-muted);margin-bottom:.2rem">Feature vector h_v</div>
+        <div class="feat-bars" id="feat-bars">
+          <div class="feat-bar" style="height:60%;background:var(--g-pale)"></div>
+          <div class="feat-bar" style="height:40%;background:var(--g-pale)"></div>
+          <div class="feat-bar" style="height:75%;background:var(--g-pale)"></div>
+          <div class="feat-bar" style="height:25%;background:var(--g-pale)"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Neighbor messages -->
+    <div class="card">
+      <div class="card-title">Incoming Messages</div>
+      <div class="msg-list" id="msg-list">
+        <div class="msg-item" style="opacity:.4">
+          <span class="msg-node">
+            <span class="msg-dot" style="background:var(--border)"></span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:.68rem">v?</span>
+          </span>
+          <span class="msg-val">—</span>
+        </div>
+        <div class="msg-item" style="opacity:.4">
+          <span class="msg-node">
+            <span class="msg-dot" style="background:var(--border)"></span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:.68rem">v?</span>
+          </span>
+          <span class="msg-val">—</span>
+        </div>
+        <div class="msg-item" style="opacity:.4">
+          <span class="msg-node">
+            <span class="msg-dot" style="background:var(--border)"></span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:.68rem">v?</span>
+          </span>
+          <span class="msg-val">—</span>
+        </div>
+      </div>
+      <div class="hint-txt" style="margin-top:.2rem">h_u for each neighbor u ∈ N(v)</div>
+    </div>
+
+    <!-- Aggregated message -->
+    <div class="card">
+      <div class="card-title">Aggregated Message</div>
+      <div class="agg-box">
+        <span class="agg-val" id="agg-val" style="color:var(--text-muted)">—</span>
+        <div class="agg-lbl" id="agg-lbl">MEAN of neighbor features</div>
+      </div>
+      <div style="font-size:.63rem;color:var(--text-muted);margin-top:.35rem;
+                  line-height:1.5;font-style:italic">
+        Combined neighbor signal before weight transform
+      </div>
+    </div>
+
+    <!-- Updated feature -->
+    <div class="card">
+      <div class="card-title">Updated Feature</div>
+      <div class="stat-row">
+        <span class="sr-lbl">h_v^(l+1)</span>
+        <span class="sr-val" id="rp-updated">—</span>
+      </div>
+      <div style="font-size:.63rem;color:var(--text-muted);margin-top:.3rem;
+                  line-height:1.5;font-style:italic">
+        σ(W · AGG({h_u : u ∈ N(v)}))
+      </div>
+    </div>
+
+  </div><!-- end right-col -->
+
+</div><!-- end .explorer-grid -->
+
+</div><!-- end .wrap -->
+
+<footer id="course-nav-footer" style="margin-top:1.5rem;padding:0.75rem 0 0 1rem;border-top:1px solid #E0DAC0;font-size:0.8rem;color:#78786A;text-align:left;">
+  <a href="../" style="color:#2e7d32;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">&larr; All course visualizations</a>
+</footer>
+<script>
+if (window.self !== window.top) { var f = document.getElementById('course-nav-footer'); if (f) { f.style.display = 'none'; } }
+</script>
+
+</body>
+</html>
