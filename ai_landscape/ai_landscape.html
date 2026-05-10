@@ -367,7 +367,7 @@ var META = {
   'recurrent':       {desc:'Neural networks with feedback connections that maintain hidden state over time. Designed for sequential data where order matters. Week 12.',
                       ex:['Speech recognition','Text generation','Financial time series forecasting'], link:'../recurrent_neural_networks/rnn_explorer.html'},
   'transformers':    {desc:'Attention-based architecture that revolutionized NLP and vision. Self-attention allows every position to attend to every other position — enabling parallelization and long-range dependencies. Covered in INFO 557.',
-                      ex:['ChatGPT and GPT-4','DALL-E image generation','Google Translate'], link:'coming-soon'},
+                      ex:['ChatGPT and GPT-4','DALL-E image generation','Google Translate'], link:'../transformers/transformer_explorer.html'},
   'graph-nets':      {desc:'Neural networks that operate on graph-structured data — nodes, edges, and their relationships. Applied in chemistry, social networks, and more. Week 11 extension.',
                       ex:['Molecular property prediction (drug discovery)','Social network analysis','Traffic flow forecasting'], link:null},
   'unsupervised':    {desc:'Learning patterns from unlabeled data — finding structure, clusters, or representations without explicit supervision.',
@@ -679,9 +679,7 @@ function updatePanel(node){
   var exHtml = m.ex.map(function(e){ return '<li>'+e+'</li>'; }).join('');
 
   var footerHtml = '';
-  if((isFocus||isCovered) && m.link === 'coming-soon'){
-    footerHtml = '<span class="dp-scope-note" style="color:var(--g-mid)">Coming soon — Transformer Explorer</span>';
-  } else if((isFocus||isCovered) && m.link){
+  if((isFocus||isCovered) && m.link){
     footerHtml = '<a class="dp-link" href="'+m.link+'">→ See visualization</a>';
   } else if(isPartial){
     footerHtml = '<span class="dp-scope-note">No dedicated visualization — covered as part of Convolutional Networks.</span>';
