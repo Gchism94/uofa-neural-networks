@@ -736,6 +736,510 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 
 </div><!-- end .wrap -->
 
+<script>
+(function(){'use strict';
+
+/* ── Graph definitions ─────────────────────────────────────────────── */
+var GRAPHS = {
+  karate:{
+    name:'Karate Club',
+    featNames:['degree/8','comm/4','central'],
+    makeNodes:function(){
+      return [
+        {id:0,label:'0',community:0},{id:1,label:'1',community:0},
+        {id:2,label:'2',community:0},{id:3,label:'3',community:0},
+        {id:4,label:'4',community:1},{id:5,label:'5',community:1},
+        {id:6,label:'6',community:1},{id:7,label:'7',community:1}
+      ];
+    },
+    edgeList:[[0,1],[0,2],[0,3],[1,2],[1,4],[2,5],[3,6],[4,5],[4,7],[5,6],[6,7]],
+    nodeColor:function(d){ return d.community===0?'#2D5A1B':'#1A56A0'; },
+    computeFeat:function(n,deg){ return [deg/8, n.community/4, Math.min(deg/4,1)]; }
+  },
+  molecule:{
+    name:'Molecule',
+    featNames:['atom/8','arom','bonds/4'],
+    makeNodes:function(){
+      return [
+        {id:0,label:'C',atomNum:6,aromatic:1,bonds:2},
+        {id:1,label:'C',atomNum:6,aromatic:1,bonds:2},
+        {id:2,label:'N',atomNum:7,aromatic:1,bonds:2},
+        {id:3,label:'C',atomNum:6,aromatic:1,bonds:3},
+        {id:4,label:'N',atomNum:7,aromatic:1,bonds:3},
+        {id:5,label:'C',atomNum:6,aromatic:1,bonds:2},
+        {id:6,label:'O',atomNum:8,aromatic:0,bonds:1},
+        {id:7,label:'C',atomNum:6,aromatic:0,bonds:1}
+      ];
+    },
+    edgeList:[[0,1],[1,2],[2,3],[3,4],[4,5],[5,0],[3,6],[4,7]],
+    nodeColor:function(d){
+      if(d.label==='N') return '#1A56A0';
+      if(d.label==='O') return '#B0321D';
+      return '#444';
+    },
+    computeFeat:function(n,deg){ return [n.atomNum/8, n.aromatic, Math.min(n.bonds/4,1)]; }
+  }
+};
+
+/* ── State ─────────────────────────────────────────────────────────── */
+var state = {
+  graphKey:'karate', aggFn:'mean', numLayers:1,
+  selectedNode:null, animating:false, roundNum:0,
+  adj:{}, currentFeats:{}, origFeats:{}, pendingFeats:{}
+};
+var animStep = {timer:null, nodeOrder:[], nodeIdx:0, phase:1};
+var graphData = null;
+
+/* ── Helpers ────────────────────────────────────────────────────────── */
+function getNode(nid){
+  return graphData && graphData.nodes.find(function(n){ return n.id===nid; });
+}
+function nodeColorFn(d){ return GRAPHS[state.graphKey].nodeColor(d); }
+function speedMs(){
+  return [1200,900,600,400,250][parseInt(document.getElementById('sld-speed').value)-1];
+}
+
+/* ── Aggregation math ───────────────────────────────────────────────── */
+function aggregateFeats(nid, feats){
+  feats = feats || state.currentFeats;
+  var neigh = state.adj[nid]||[];
+  var dim = feats[nid].length;
+  if(!neigh.length) return feats[nid].slice();
+  var result = new Array(dim).fill(state.aggFn==='max'?-Infinity:0);
+  neigh.forEach(function(nb){
+    feats[nb].forEach(function(v,i){
+      if(state.aggFn==='max') result[i]=Math.max(result[i],v);
+      else result[i]+=v;
+    });
+  });
+  if(state.aggFn==='mean') result=result.map(function(v){ return v/neigh.length; });
+  return result.map(function(v){ return Math.min(1,Math.max(0,v)); });
+}
+function computeUpdated(nid){
+  var agg=aggregateFeats(nid), self=state.currentFeats[nid];
+  return agg.map(function(v,i){ return Math.min(1,Math.max(0,0.5*self[i]+0.5*v)); });
+}
+
+/* ── Build force graph ──────────────────────────────────────────────── */
+function buildGraph(){
+  var svg=d3.select('#svg-graph-mp');
+  svg.selectAll('*').remove();
+  var el=document.getElementById('svg-graph-mp');
+  var W=Math.max(el.clientWidth||0,420), H=Math.max(el.clientHeight||0,300);
+
+  var gDef=GRAPHS[state.graphKey];
+  var rawNodes=gDef.makeNodes();
+
+  state.adj={};
+  rawNodes.forEach(function(n){ state.adj[n.id]=[]; });
+  gDef.edgeList.forEach(function(e){
+    state.adj[e[0]].push(e[1]);
+    state.adj[e[1]].push(e[0]);
+  });
+
+  state.currentFeats={}; state.origFeats={};
+  rawNodes.forEach(function(n){
+    var deg=state.adj[n.id].length;
+    var f=gDef.computeFeat(n,deg);
+    n.feat=f.slice(); n.degree=deg;
+    state.currentFeats[n.id]=f.slice();
+    state.origFeats[n.id]=f.slice();
+  });
+
+  var nodes=rawNodes.map(function(n){ return Object.assign({},n); });
+  var edges=gDef.edgeList.map(function(e){ return {source:e[0],target:e[1]}; });
+
+  var sim=d3.forceSimulation(nodes)
+    .force('link',d3.forceLink(edges).id(function(d){ return d.id; }).distance(88).strength(0.7))
+    .force('charge',d3.forceManyBody().strength(-340))
+    .force('center',d3.forceCenter(W/2,H/2))
+    .force('collision',d3.forceCollide(32))
+    .stop();
+  for(var t=0;t<300;t++) sim.tick();
+
+  var pad=34;
+  nodes.forEach(function(n){
+    n.x=Math.max(pad,Math.min(W-pad,n.x));
+    n.y=Math.max(pad,Math.min(H-pad,n.y));
+  });
+
+  graphData={nodes:nodes,edges:edges};
+
+  /* defs — arrowhead */
+  var defs=svg.append('defs');
+  defs.append('marker')
+    .attr('id','mp-arr').attr('viewBox','0 -4 8 8')
+    .attr('refX',8).attr('refY',0).attr('markerWidth',5).attr('markerHeight',5)
+    .attr('orient','auto')
+    .append('path').attr('d','M0,-4L8,0L0,4').attr('fill','var(--orange)');
+
+  var gMain=svg.append('g').attr('class','gnn-main');
+
+  /* edges */
+  gMain.append('g').attr('class','edge-layer')
+    .selectAll('line').data(edges).enter().append('line')
+    .attr('class','mp-edge')
+    .attr('x1',function(d){ return d.source.x; }).attr('y1',function(d){ return d.source.y; })
+    .attr('x2',function(d){ return d.target.x; }).attr('y2',function(d){ return d.target.y; })
+    .attr('stroke','var(--edge-default)').attr('stroke-width',2).attr('stroke-linecap','round');
+
+  /* arrow animation layer */
+  gMain.append('g').attr('class','arrow-layer');
+
+  /* nodes */
+  var nodeG=gMain.append('g').attr('class','node-layer')
+    .selectAll('g.nd').data(nodes).enter().append('g')
+    .attr('class','nd')
+    .attr('transform',function(d){ return 'translate('+d.x+','+d.y+')'; })
+    .style('cursor','pointer')
+    .on('click',function(event,d){ onNodeClick(d); });
+
+  nodeG.append('circle').attr('class','nd-glow')
+    .attr('r',27).attr('fill','none').attr('stroke','none')
+    .attr('stroke-width',5).attr('opacity',0);
+  nodeG.append('circle').attr('class','nd-circle')
+    .attr('r',20).attr('fill',nodeColorFn)
+    .attr('stroke','white').attr('stroke-width',2.5);
+  nodeG.append('text').attr('class','nd-label')
+    .attr('text-anchor','middle').attr('dominant-baseline','central')
+    .attr('fill','white').attr('font-family',"'IBM Plex Mono',monospace")
+    .attr('font-size',11).attr('font-weight',600).attr('pointer-events','none')
+    .text(function(d){ return d.label; });
+  nodeG.append('text').attr('class','nd-deg')
+    .attr('x',14).attr('y',-14).attr('text-anchor','middle')
+    .attr('fill','var(--text-muted)').attr('font-family',"'IBM Plex Mono',monospace")
+    .attr('font-size',8).attr('pointer-events','none')
+    .text(function(d){ return 'd='+d.degree; });
+}
+
+/* ── Visual helpers ─────────────────────────────────────────────────── */
+function resetNodeVisuals(){
+  d3.selectAll('.nd-circle').attr('fill',nodeColorFn);
+  d3.selectAll('.nd-glow').attr('opacity',0).attr('stroke','none');
+  d3.selectAll('.mp-edge').attr('stroke','var(--edge-default)').attr('stroke-width',2);
+  d3.select('.arrow-layer').selectAll('*').remove();
+}
+function glowNode(nid, color, strokeColor, strokeW){
+  d3.selectAll('.nd').filter(function(d){ return d.id===nid; })
+    .select('.nd-circle').attr('fill',color);
+  d3.selectAll('.nd').filter(function(d){ return d.id===nid; })
+    .select('.nd-glow').attr('opacity',.82).attr('stroke',strokeColor).attr('stroke-width',strokeW||6);
+}
+function highlightNeighbors(nid){
+  var neigh=state.adj[nid]||[];
+  neigh.forEach(function(nb){ glowNode(nb,'var(--node-neighbor)','var(--orange)',4); });
+  d3.selectAll('.mp-edge').attr('stroke',function(e){
+    return (e.source.id===nid||e.target.id===nid)?'var(--edge-msg)':'var(--edge-default)';
+  }).attr('stroke-width',function(e){
+    return (e.source.id===nid||e.target.id===nid)?2.5:2;
+  });
+}
+
+/* ── Arrow animation ─────────────────────────────────────────────────── */
+function animateArrows(nid, skip, callback){
+  var neigh=state.adj[nid]||[];
+  var arrowG=d3.select('.arrow-layer');
+  arrowG.selectAll('*').remove();
+  if(!neigh.length||skip){ if(callback) callback(); return; }
+
+  var aNd=getNode(nid), done=0;
+  neigh.forEach(function(nb){
+    var bNd=getNode(nb);
+    var dx=aNd.x-bNd.x, dy=aNd.y-bNd.y;
+    var dist=Math.sqrt(dx*dx+dy*dy)||1;
+    var sx=bNd.x+dx/dist*22, sy=bNd.y+dy/dist*22;
+    var ex=aNd.x-dx/dist*26, ey=aNd.y-dy/dist*26;
+    var len=Math.sqrt((ex-sx)*(ex-sx)+(ey-sy)*(ey-sy));
+
+    arrowG.append('line')
+      .attr('x1',sx).attr('y1',sy).attr('x2',ex).attr('y2',ey)
+      .attr('stroke','var(--orange)').attr('stroke-width',2.5)
+      .attr('stroke-dasharray',len+' '+len).attr('stroke-dashoffset',len)
+      .attr('marker-end','url(#mp-arr)').attr('opacity',.95)
+      .transition().duration(speedMs()*0.75).ease(d3.easeLinear)
+      .attr('stroke-dashoffset',0)
+      .on('end',function(){ if(++done>=neigh.length&&callback) callback(); });
+  });
+}
+
+/* ── Right panel ────────────────────────────────────────────────────── */
+function setAnno(cls,txt){
+  var el=document.getElementById('mp-anno');
+  el.className='anno-box '+cls; el.textContent=txt;
+}
+function setPills(phase){
+  ['pill-select','pill-collect','pill-agg','pill-update'].forEach(function(id,i){
+    var el=document.getElementById(id), pi=i+1;
+    el.className = phase<=0?'mp-pill inactive' : pi<phase?'mp-pill done-phase' : pi===phase?'mp-pill active-phase':'mp-pill inactive';
+  });
+}
+function renderFeatBars(cid, feats, color){
+  var c=document.getElementById(cid);
+  if(!feats){
+    c.innerHTML='<div class="feat-bar" style="height:50%;background:var(--g-pale)"></div><div class="feat-bar" style="height:35%;background:var(--g-pale)"></div><div class="feat-bar" style="height:65%;background:var(--g-pale)"></div>';
+    return;
+  }
+  var names=GRAPHS[state.graphKey].featNames;
+  c.innerHTML=feats.map(function(v,i){
+    return '<div class="feat-bar" title="'+names[i]+': '+v.toFixed(2)+'" style="height:'+Math.max(8,Math.round(v*100))+'%;background:'+color+'"></div>';
+  }).join('');
+}
+function updateRightPanel(nid){
+  var nd=nid!==null?getNode(nid):null;
+  document.getElementById('rp-node-id').textContent=nd?'v'+nd.id:'—';
+  document.getElementById('rp-degree').textContent=nd?nd.degree:'—';
+  document.getElementById('rp-layer').textContent='L'+state.roundNum;
+  renderFeatBars('feat-bars', nid!==null?state.currentFeats[nid]:null,'var(--g-mid)');
+
+  var msgList=document.getElementById('msg-list');
+  if(nid!==null){
+    var neigh=state.adj[nid]||[];
+    msgList.innerHTML=neigh.length ? neigh.map(function(nb){
+      var f=state.currentFeats[nb];
+      var fStr='['+f.map(function(v){ return v.toFixed(2); }).join(', ')+']';
+      var col=GRAPHS[state.graphKey].nodeColor(getNode(nb));
+      return '<div class="msg-item"><span class="msg-node"><span class="msg-dot" style="background:'+col+'"></span>'
+        +'<span style="font-family:\'IBM Plex Mono\',monospace;font-size:.68rem">v'+nb+'</span></span>'
+        +'<span class="msg-val" style="font-size:.62rem">'+fStr+'</span></div>';
+    }).join('') : '<div style="font-size:.7rem;color:var(--text-muted)">No neighbors</div>';
+
+    var agg=aggregateFeats(nid), upd=computeUpdated(nid);
+    document.getElementById('agg-val').textContent='['+agg.map(function(v){ return v.toFixed(2); }).join(', ')+']';
+    document.getElementById('agg-val').style.color='var(--g-dk)';
+    document.getElementById('agg-lbl').textContent=state.aggFn.toUpperCase()+' of '+neigh.length+' neighbor'+(neigh.length!==1?'s':'');
+    document.getElementById('rp-updated').textContent='['+upd.map(function(v){ return v.toFixed(2); }).join(', ')+']';
+  } else {
+    msgList.innerHTML='<div style="font-size:.7rem;color:var(--text-muted);padding:.2rem 0">Select a node to see messages</div>';
+    document.getElementById('agg-val').textContent='—';
+    document.getElementById('agg-val').style.color='var(--text-muted)';
+    document.getElementById('agg-lbl').textContent=state.aggFn.toUpperCase()+' of neighbor features';
+    document.getElementById('rp-updated').textContent='—';
+  }
+}
+function updateMpLabel(){
+  var gName=GRAPHS[state.graphKey].name;
+  document.getElementById('mp-label').textContent='Message Passing — '+gName+' · Round '+state.roundNum+' of '+state.numLayers;
+  document.getElementById('round-display').textContent=state.roundNum;
+  document.getElementById('round-total').textContent=state.numLayers;
+}
+
+/* ── Node click ─────────────────────────────────────────────────────── */
+function onNodeClick(d){
+  if(state.animating) return;
+  state.selectedNode=d.id;
+  resetNodeVisuals();
+  glowNode(d.id,'var(--node-active)','var(--g-lt)',6);
+  highlightNeighbors(d.id);
+  updateRightPanel(d.id);
+  var neigh=state.adj[d.id]||[];
+  setAnno('neutral','Node '+d.id+' selected — '+neigh.length+' neighbor'+(neigh.length!==1?'s':'')+': ['
+    +neigh.map(function(n){ return 'v'+n; }).join(', ')+']. Press → Step or ⏵ Play to begin message passing.');
+  setPills(0);
+}
+
+/* ── Animation phases ───────────────────────────────────────────────── */
+function doPhase1(nid){
+  setPills(1);
+  resetNodeVisuals();
+  glowNode(nid,'var(--node-active)','var(--g-lt)',6);
+  state.selectedNode=nid;
+  updateRightPanel(nid);
+  var neigh=state.adj[nid]||[];
+  setAnno('neutral','Node '+nid+' selected — collecting messages from '+neigh.length
+    +' neighbor'+(neigh.length!==1?'s':'')+': ['+neigh.map(function(n){ return 'v'+n; }).join(', ')+']');
+}
+function doPhase2(nid, skip, callback){
+  setPills(2);
+  highlightNeighbors(nid);
+  var neigh=state.adj[nid]||[];
+  setAnno('neutral','Node '+nid+' is collecting messages from '+neigh.length
+    +' neighbor'+(neigh.length!==1?'s':'')+': ['+neigh.map(function(n){ return 'v'+n; }).join(', ')+']');
+  animateArrows(nid, skip, callback);
+}
+function doPhase3(nid){
+  setPills(3);
+  d3.select('.arrow-layer').selectAll('*').remove();
+  var agg=aggregateFeats(nid), neigh=state.adj[nid]||[];
+  document.getElementById('agg-val').textContent='['+agg.map(function(v){ return v.toFixed(2); }).join(', ')+']';
+  document.getElementById('agg-val').style.color='var(--g-dk)';
+  document.getElementById('agg-lbl').textContent=state.aggFn.toUpperCase()+' of '+neigh.length+' neighbor'+(neigh.length!==1?'s':'');
+  setAnno('good',state.aggFn.charAt(0).toUpperCase()+state.aggFn.slice(1)+' aggregation combines '
+    +neigh.length+' neighbor message'+(neigh.length!==1?'s':'')+' into one vector: ['
+    +agg.map(function(v){ return v.toFixed(2); }).join(', ')+']');
+}
+function doPhase4(nid){
+  setPills(4);
+  var upd=computeUpdated(nid);
+  state.pendingFeats[nid]=upd;
+  glowNode(nid,'var(--node-updated)','var(--blue)',5);
+  renderFeatBars('feat-bars',upd,'var(--node-updated)');
+  document.getElementById('rp-updated').textContent='['+upd.map(function(v){ return v.toFixed(2); }).join(', ')+']';
+  setAnno('good',"Node "+nid+"'s features updated — it now encodes information from its 1-hop neighborhood. New h_v: ["
+    +upd.map(function(v){ return v.toFixed(2); }).join(', ')+']');
+}
+function finishRound(){
+  Object.keys(state.pendingFeats).forEach(function(id){
+    state.currentFeats[+id]=state.pendingFeats[+id].slice();
+  });
+  state.pendingFeats={};
+  state.roundNum++;
+  updateMpLabel();
+  setPills(0);
+  setTimeout(function(){
+    resetNodeVisuals();
+    updateRightPanel(null);
+  }, 700);
+  setAnno('good','Round '+state.roundNum+' complete — each node now has a representation that includes information from all its direct neighbors. Add more GCN layers to reach further.');
+  state.animating=false;
+  document.getElementById('btn-play').textContent='⏵ Play';
+  animStep.nodeOrder=[]; animStep.nodeIdx=0; animStep.phase=1;
+  state.selectedNode=null;
+}
+
+/* ── Play engine ────────────────────────────────────────────────────── */
+function initAnimStep(){
+  animStep.nodeOrder=graphData.nodes.map(function(n){ return n.id; });
+  animStep.nodeIdx=0; animStep.phase=1;
+  state.pendingFeats={};
+}
+function scheduleNext(){
+  if(!state.animating) return;
+  animStep.timer=setTimeout(runStep, speedMs());
+}
+function runStep(){
+  if(!state.animating) return;
+  if(animStep.nodeIdx>=animStep.nodeOrder.length){ finishRound(); return; }
+  var nid=animStep.nodeOrder[animStep.nodeIdx];
+  if(animStep.phase===1){
+    doPhase1(nid); animStep.phase=2; scheduleNext();
+  } else if(animStep.phase===2){
+    doPhase2(nid, false, function(){
+      if(!state.animating) return;
+      animStep.phase=3; scheduleNext();
+    });
+  } else if(animStep.phase===3){
+    doPhase3(nid); animStep.phase=4; scheduleNext();
+  } else {
+    doPhase4(nid); animStep.nodeIdx++; animStep.phase=1; scheduleNext();
+  }
+}
+function startPlay(){
+  if(state.animating) return;
+  state.animating=true;
+  document.getElementById('btn-play').textContent='⏸ Pause';
+  if(!animStep.nodeOrder.length) initAnimStep();
+  runStep();
+}
+function pausePlay(){
+  state.animating=false;
+  document.getElementById('btn-play').textContent='⏵ Play';
+  clearTimeout(animStep.timer);
+  d3.select('.arrow-layer').selectAll('*').remove();
+}
+function stepOnce(){
+  if(state.animating) return;
+  if(!animStep.nodeOrder.length) initAnimStep();
+  if(animStep.nodeIdx>=animStep.nodeOrder.length){ finishRound(); return; }
+  var nid=animStep.nodeOrder[animStep.nodeIdx];
+  if(animStep.phase===1){ doPhase1(nid); animStep.phase=2; }
+  else if(animStep.phase===2){ doPhase2(nid,true,null); animStep.phase=3; }
+  else if(animStep.phase===3){ doPhase3(nid); animStep.phase=4; }
+  else {
+    doPhase4(nid); animStep.nodeIdx++; animStep.phase=1;
+    if(animStep.nodeIdx>=animStep.nodeOrder.length) finishRound();
+  }
+}
+function resetAll(){
+  pausePlay();
+  animStep.nodeOrder=[]; animStep.nodeIdx=0; animStep.phase=1;
+  state.selectedNode=null; state.roundNum=0; state.pendingFeats={};
+  Object.keys(state.origFeats).forEach(function(id){
+    state.currentFeats[+id]=state.origFeats[+id].slice();
+  });
+  resetNodeVisuals();
+  setPills(0);
+  updateMpLabel();
+  updateRightPanel(null);
+  setAnno('neutral','Select a node or press ⏵ Play to watch message passing propagate through the graph.');
+}
+
+/* ── Control wiring ─────────────────────────────────────────────────── */
+document.getElementById('btn-play').addEventListener('click',function(){
+  state.animating ? pausePlay() : startPlay();
+});
+document.getElementById('btn-step').addEventListener('click', stepOnce);
+document.getElementById('btn-reset').addEventListener('click', resetAll);
+document.getElementById('sld-speed').addEventListener('input',function(){
+  document.getElementById('val-speed').textContent=this.value+'×';
+});
+
+document.querySelectorAll('#graph-selector .sel-btn').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    if(this.dataset.graph==='custom'){
+      setAnno('neutral','Custom graph editor coming in a future update. Try Karate Club or Molecule.');
+      return;
+    }
+    document.querySelectorAll('#graph-selector .sel-btn').forEach(function(b){ b.classList.remove('active'); });
+    this.classList.add('active');
+    state.graphKey=this.dataset.graph;
+    pausePlay();
+    initGraph();
+  });
+});
+
+document.querySelectorAll('#agg-selector button').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    document.querySelectorAll('#agg-selector button').forEach(function(b){ b.classList.remove('active'); });
+    this.classList.add('active');
+    state.aggFn=this.dataset.agg;
+    document.getElementById('agg-lbl').textContent=state.aggFn.toUpperCase()+' of neighbor features';
+    if(state.selectedNode!==null) updateRightPanel(state.selectedNode);
+  });
+});
+
+document.querySelectorAll('#layers-selector button').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    document.querySelectorAll('#layers-selector button').forEach(function(b){ b.classList.remove('active'); });
+    this.classList.add('active');
+    state.numLayers=parseInt(this.dataset.layers);
+    updateMpLabel();
+  });
+});
+
+document.querySelectorAll('#tab-bar button').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    document.querySelectorAll('#tab-bar button').forEach(function(b){ b.classList.remove('active'); });
+    this.classList.add('active');
+    var tab=this.dataset.tab;
+    document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('active'); });
+    document.getElementById('panel-'+tab).classList.add('active');
+  });
+});
+
+document.getElementById('concepts-toggle').addEventListener('click',function(){
+  var body=document.getElementById('concepts-body');
+  var arrow=document.getElementById('concepts-arrow');
+  body.classList.toggle('collapsed');
+  arrow.textContent=body.classList.contains('collapsed')?'▸':'▾';
+});
+
+/* ── Init ───────────────────────────────────────────────────────────── */
+function initGraph(){
+  buildGraph();
+  state.roundNum=0;
+  animStep.nodeOrder=[]; animStep.nodeIdx=0; animStep.phase=1;
+  state.selectedNode=null; state.pendingFeats={};
+  setPills(0);
+  updateMpLabel();
+  updateRightPanel(null);
+  setAnno('neutral','Select a node or press ⏵ Play to watch message passing propagate through the graph.');
+}
+
+initGraph();
+
+})();
+</script>
+
 <footer id="course-nav-footer" style="margin-top:1.5rem;padding:0.75rem 0 0 1rem;border-top:1px solid #E0DAC0;font-size:0.8rem;color:#78786A;text-align:left;">
   <a href="../" style="color:#2e7d32;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">&larr; All course visualizations</a>
 </footer>
