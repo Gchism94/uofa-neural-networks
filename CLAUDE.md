@@ -185,6 +185,7 @@ Add a row to the appropriate table under `## Contents`:
 - `lime/lime_explorer.html`
 - `gradient_attribution/ga_explorer.html`
 - `knowledge_distillation/kd_explorer.html`
+- `gnn/gnn_explorer.html`
 
 ---
 

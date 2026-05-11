@@ -1194,6 +1194,7 @@ document.querySelectorAll('#agg-selector button').forEach(function(btn){
     state.aggFn=this.dataset.agg;
     document.getElementById('agg-lbl').textContent=state.aggFn.toUpperCase()+' of neighbor features';
     if(state.selectedNode!==null) updateRightPanel(state.selectedNode);
+    if(document.querySelector('#tab-bar button.active').dataset.tab==='graphconv') renderGCNTab();
   });
 });
 
@@ -1203,6 +1204,7 @@ document.querySelectorAll('#layers-selector button').forEach(function(btn){
     this.classList.add('active');
     state.numLayers=parseInt(this.dataset.layers);
     updateMpLabel();
+    if(document.querySelector('#tab-bar button.active').dataset.tab==='graphconv') renderGCNTab();
   });
 });
 
@@ -1213,6 +1215,8 @@ document.querySelectorAll('#tab-bar button').forEach(function(btn){
     var tab=this.dataset.tab;
     document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('active'); });
     document.getElementById('panel-'+tab).classList.add('active');
+    if(tab==='graphconv') setTimeout(renderGCNTab, 0);
+    else if(tab==='applications') renderAppsTab();
   });
 });
 
@@ -1222,6 +1226,351 @@ document.getElementById('concepts-toggle').addEventListener('click',function(){
   body.classList.toggle('collapsed');
   arrow.textContent=body.classList.contains('collapsed')?'▸':'▾';
 });
+
+/* ── GCN layer computation ───────────────────────────────────────────── */
+function computeGCNLayers(){
+  var nids=Object.keys(state.origFeats).map(Number);
+  var layers=[{}];
+  nids.forEach(function(id){ layers[0][id]=state.origFeats[id].slice(); });
+  for(var l=0;l<state.numLayers;l++){
+    var prev=layers[l], next={};
+    nids.forEach(function(id){
+      var allNeigh=(state.adj[id]||[]).concat([id]); // self-loop
+      var dim=prev[id].length, result;
+      if(state.aggFn==='max'){
+        result=new Array(dim).fill(-Infinity);
+        allNeigh.forEach(function(nb){ prev[nb].forEach(function(v,i){ result[i]=Math.max(result[i],v); }); });
+      } else if(state.aggFn==='sum'){
+        result=new Array(dim).fill(0);
+        allNeigh.forEach(function(nb){ prev[nb].forEach(function(v,i){ result[i]+=v; }); });
+      } else {
+        result=new Array(dim).fill(0);
+        allNeigh.forEach(function(nb){ prev[nb].forEach(function(v,i){ result[i]+=v; }); });
+        result=result.map(function(v){ return v/allNeigh.length; });
+      }
+      next[id]=result.map(function(v){ return Math.min(1,Math.max(0,v)); });
+    });
+    layers.push(next);
+  }
+  return layers;
+}
+
+/* ── GCN left panel: graph + sparklines ─────────────────────────────── */
+function renderGCNGraph(layers){
+  var svg=d3.select('#svg-graph-gcn');
+  svg.selectAll('*').remove();
+  if(!graphData) return;
+  var el=document.getElementById('svg-graph-gcn');
+  var W=Math.max(el.clientWidth||0,220), H=Math.max(el.clientHeight||0,220);
+  var nodes=graphData.nodes, edges=graphData.edges;
+  var gDef=GRAPHS[state.graphKey];
+  var finalFeats=layers[layers.length-1];
+
+  // Scale force positions uniformly into this SVG
+  var xs=nodes.map(function(n){return n.x;}), ys=nodes.map(function(n){return n.y;});
+  var xmin=Math.min.apply(null,xs), xmax=Math.max.apply(null,xs);
+  var ymin=Math.min.apply(null,ys), ymax=Math.max.apply(null,ys);
+  var rng=Math.max(xmax-xmin,ymax-ymin,1);
+  var pad=46, sc=(Math.min(W,H)-2*pad)/rng;
+  var offX=W/2-(xmin+xmax)/2*sc, offY=H/2-(ymin+ymax)/2*sc;
+  var scX=function(x){return x*sc+offX;}, scY=function(y){return y*sc+offY;};
+
+  svg.append('text').attr('x',6).attr('y',14)
+    .attr('fill','var(--g-mid)').attr('font-family',"'IBM Plex Mono',monospace")
+    .attr('font-size',9).attr('font-weight',700)
+    .text('After L'+state.numLayers+' ('+state.aggFn+')');
+
+  edges.forEach(function(e){
+    svg.append('line')
+      .attr('x1',scX(e.source.x)).attr('y1',scY(e.source.y))
+      .attr('x2',scX(e.target.x)).attr('y2',scY(e.target.y))
+      .attr('stroke','var(--edge-default)').attr('stroke-width',1.5);
+  });
+
+  var nr=13;
+  nodes.forEach(function(nd){
+    var cx=scX(nd.x), cy=scY(nd.y);
+    var feats=finalFeats[nd.id];
+    // Sparklines above node
+    var bW=5, bGap=2, sparkH=12;
+    var totalBW=feats.length*(bW+bGap)-bGap;
+    var bStartX=cx-totalBW/2;
+    var bBaseY=Math.max(sparkH+3, cy-nr-4);
+
+    svg.append('rect')
+      .attr('x',bStartX-1).attr('y',bBaseY-sparkH-1)
+      .attr('width',totalBW+2).attr('height',sparkH+2)
+      .attr('fill','rgba(255,255,255,.8)').attr('rx',2);
+
+    feats.forEach(function(v,i){
+      var bH=Math.max(2,Math.round(v*sparkH));
+      svg.append('rect')
+        .attr('x',bStartX+i*(bW+bGap)).attr('y',bBaseY-bH)
+        .attr('width',bW).attr('height',bH)
+        .attr('fill',gDef.nodeColor(nd)).attr('rx',1).attr('opacity',.88);
+    });
+
+    svg.append('circle').attr('cx',cx).attr('cy',cy).attr('r',nr)
+      .attr('fill',gDef.nodeColor(nd)).attr('stroke','white').attr('stroke-width',2);
+    svg.append('text').attr('x',cx).attr('y',cy)
+      .attr('text-anchor','middle').attr('dominant-baseline','central')
+      .attr('fill','white').attr('font-family',"'IBM Plex Mono',monospace")
+      .attr('font-size',9).attr('font-weight',600).attr('pointer-events','none')
+      .text(nd.label);
+  });
+}
+
+/* ── GCN right panel: layer-by-layer feature table ──────────────────── */
+function renderGCNLayerView(layers){
+  var svg=d3.select('#svg-gcn-layers');
+  svg.selectAll('*').remove();
+  if(!graphData) return;
+  var el=document.getElementById('svg-gcn-layers');
+  var W=Math.max(el.clientWidth||0,220), H=Math.max(el.clientHeight||0,220);
+  var nodes=graphData.nodes;
+  var gDef=GRAPHS[state.graphKey];
+  var nL=layers.length, nN=nodes.length;
+
+  var mL=24, mT=22, mR=4, mB=4;
+  var colW=(W-mL-mR)/nL;
+  var rowH=(H-mT-mB)/nN;
+  var featDim=3;
+  var subRowH=rowH/featDim;
+
+  // Column headers with fade-in animation per layer
+  for(var l=0;l<nL;l++){
+    var colLabel=l===0?'L0 (in)':l===nL-1?'L'+l+' (out)':'L'+l;
+    var colG=svg.append('g').attr('class','gcn-col').attr('opacity', l===0?1:0);
+
+    colG.append('text')
+      .attr('x',mL+l*colW+colW/2).attr('y',mT/2+4)
+      .attr('text-anchor','middle').attr('dominant-baseline','central')
+      .attr('fill','var(--g-dk)').attr('font-family',"'IBM Plex Mono',monospace")
+      .attr('font-size',9).attr('font-weight',700).text(colLabel);
+
+    nodes.forEach(function(nd,ni){
+      var rowY=mT+ni*rowH;
+      var col=gDef.nodeColor(nd);
+      var feats=layers[l][nd.id];
+      var maxBarW=colW-5;
+
+      if(l===0&&ni%2===0){
+        svg.append('rect').attr('x',mL).attr('y',rowY)
+          .attr('width',W-mL-mR).attr('height',rowH)
+          .attr('fill','rgba(0,0,0,.025)');
+      }
+
+      feats.forEach(function(v,fi){
+        var subY=rowY+fi*subRowH+subRowH*.1;
+        var bH=Math.max(1.5,subRowH*.72);
+        var bW=Math.max(2,v*maxBarW);
+        colG.append('rect')
+          .attr('x',mL+l*colW+2).attr('y',subY)
+          .attr('width',bW).attr('height',bH)
+          .attr('fill',col).attr('opacity',.52+l*.12).attr('rx',.5);
+      });
+    });
+
+    if(l>0){
+      // Animate column fading in left-to-right
+      colG.transition().delay(l*320).duration(480).attr('opacity',1);
+    }
+  }
+
+  // Column separator lines
+  for(var l=1;l<nL;l++){
+    svg.append('line')
+      .attr('x1',mL+l*colW).attr('y1',mT)
+      .attr('x2',mL+l*colW).attr('y2',H-mB)
+      .attr('stroke','var(--border)').attr('stroke-width',.5)
+      .attr('stroke-dasharray','3 2');
+  }
+
+  // Node labels on left
+  nodes.forEach(function(nd,ni){
+    var rowY=mT+ni*rowH;
+    var col=gDef.nodeColor(nd);
+    svg.append('rect').attr('x',1).attr('y',rowY+rowH/2-6)
+      .attr('width',5).attr('height',12).attr('fill',col).attr('rx',1.5);
+    svg.append('text').attr('x',mL/2+2).attr('y',rowY+rowH/2)
+      .attr('text-anchor','middle').attr('dominant-baseline','central')
+      .attr('fill',col).attr('font-family',"'IBM Plex Mono',monospace")
+      .attr('font-size',8).attr('font-weight',700).text(nd.label);
+  });
+}
+
+/* ── GCN tab orchestrator ───────────────────────────────────────────── */
+function renderGCNTab(){
+  if(!graphData) return;
+  var layers=computeGCNLayers();
+  renderGCNGraph(layers);
+  renderGCNLayerView(layers);
+  var nid=state.selectedNode!==null?state.selectedNode:0;
+  var selfNeigh=(state.adj[nid]||[]).concat([nid]);
+  document.getElementById('gcn-anno').textContent=
+    state.aggFn.charAt(0).toUpperCase()+state.aggFn.slice(1)
+    +' aggregation (with self-loop) on node v'+nid+': N(v)∪{v} = {'
+    +selfNeigh.map(function(n){return 'v'+n;}).join(', ')
+    +'}. After '+state.numLayers+' GCN layer'+(state.numLayers!==1?'s':'')+', each node encodes its '
+    +state.numLayers+'-hop neighborhood. Bars above each node show feature vectors h_v^('+state.numLayers+').';
+}
+
+/* ── Applications tab panels ────────────────────────────────────────── */
+function renderSocialGraph(){
+  var svg=d3.select('#svg-app-social');
+  svg.selectAll('*').remove();
+  var el=document.getElementById('svg-app-social');
+  var W=el.clientWidth||160, H=el.clientHeight||160;
+
+  var nd=[
+    {id:0,x:.22,y:.22,c:0},{id:1,x:.4,y:.12,c:0},
+    {id:2,x:.18,y:.45,c:0},{id:3,x:.38,y:.42,c:0},
+    {id:4,x:.62,y:.58,c:1},{id:5,x:.8,y:.45,c:1},
+    {id:6,x:.58,y:.82,c:1},{id:7,x:.76,y:.78,c:1}
+  ].map(function(n){return{id:n.id,x:n.x*W,y:n.y*H,c:n.c};});
+
+  var edges=[[0,1],[0,2],[0,3],[1,2],[1,4],[2,5],[3,6],[4,5],[4,7],[5,6],[6,7]];
+
+  svg.append('ellipse').attr('cx',W*.28).attr('cy',H*.32).attr('rx',W*.2).attr('ry',H*.22)
+    .attr('fill','#2D5A1B').attr('opacity',.08);
+  svg.append('ellipse').attr('cx',W*.7).attr('cy',H*.65).attr('rx',W*.2).attr('ry',H*.2)
+    .attr('fill','#1A56A0').attr('opacity',.08);
+
+  edges.forEach(function(e){
+    var s=nd[e[0]], t=nd[e[1]];
+    var bridge=(e[0]===1&&e[1]===4)||(e[0]===2&&e[1]===5);
+    svg.append('line').attr('x1',s.x).attr('y1',s.y).attr('x2',t.x).attr('y2',t.y)
+      .attr('stroke',bridge?'var(--orange)':'var(--border)')
+      .attr('stroke-width',bridge?1.8:1.3)
+      .attr('stroke-dasharray',bridge?'3.5 2.5':'none').attr('opacity',bridge?.8:.6);
+  });
+
+  nd.forEach(function(n){
+    var col=n.c===0?'#2D5A1B':'#1A56A0';
+    svg.append('circle').attr('cx',n.x).attr('cy',n.y).attr('r',10)
+      .attr('fill',col).attr('stroke','white').attr('stroke-width',1.5);
+    svg.append('text').attr('x',n.x).attr('y',n.y)
+      .attr('text-anchor','middle').attr('dominant-baseline','central')
+      .attr('fill','white').attr('font-family',"'IBM Plex Mono',monospace")
+      .attr('font-size',7).attr('font-weight',600).text(n.id);
+  });
+
+  svg.append('text').attr('x',W*.2).attr('y',H*.07)
+    .attr('text-anchor','middle').attr('fill','#2D5A1B')
+    .attr('font-family',"'Outfit',sans-serif").attr('font-size',8).attr('font-weight',700).text('Comm A');
+  svg.append('text').attr('x',W*.78).attr('y',H*.93)
+    .attr('text-anchor','middle').attr('fill','#1A56A0')
+    .attr('font-family',"'Outfit',sans-serif").attr('font-size',8).attr('font-weight',700).text('Comm B');
+  svg.append('text').attr('x',W*.5).attr('y',H*.5)
+    .attr('text-anchor','middle').attr('fill','var(--orange)')
+    .attr('font-family',"'Outfit',sans-serif").attr('font-size',7).attr('font-style','italic')
+    .text('bridge edges →');
+}
+
+function renderMoleculeGraph(){
+  var svg=d3.select('#svg-app-molecule');
+  svg.selectAll('*').remove();
+  var el=document.getElementById('svg-app-molecule');
+  var W=el.clientWidth||160, H=el.clientHeight||160;
+  var cx=W/2, cy=H*.38, r=Math.min(W,H)*.23;
+
+  var defs=svg.append('defs');
+  defs.append('marker').attr('id','mol-arr').attr('viewBox','0 -4 8 8')
+    .attr('refX',8).attr('refY',0).attr('markerWidth',5).attr('markerHeight',5)
+    .attr('orient','auto')
+    .append('path').attr('d','M0,-4L8,0L0,4').attr('fill','var(--g-mid)');
+
+  // Hexagonal ring (6 atoms, rotated by π/6 so no atom sits at the very bottom)
+  var labels=['C','C','N','C','N','C'];
+  var ringNd=labels.map(function(lb,i){
+    var ang=(i/6)*2*Math.PI-Math.PI/2+Math.PI/6;
+    return {x:cx+r*Math.cos(ang), y:cy+r*Math.sin(ang), label:lb};
+  });
+
+  for(var i=0;i<6;i++){
+    svg.append('line').attr('x1',ringNd[i].x).attr('y1',ringNd[i].y)
+      .attr('x2',ringNd[(i+1)%6].x).attr('y2',ringNd[(i+1)%6].y)
+      .attr('stroke','#888').attr('stroke-width',1.5);
+  }
+
+  ringNd.forEach(function(nd){
+    var col=nd.label==='N'?'#1A56A0':'#444';
+    svg.append('circle').attr('cx',nd.x).attr('cy',nd.y).attr('r',10)
+      .attr('fill',col).attr('stroke','white').attr('stroke-width',1.5);
+    svg.append('text').attr('x',nd.x).attr('y',nd.y)
+      .attr('text-anchor','middle').attr('dominant-baseline','central')
+      .attr('fill','white').attr('font-family',"'IBM Plex Mono',monospace")
+      .attr('font-size',8).attr('font-weight',600).text(nd.label);
+  });
+
+  // Graph readout arrow
+  var arrowTopY=cy+r+12, boxY=H-28;
+  if(arrowTopY+8<boxY){
+    svg.append('line').attr('x1',cx).attr('y1',arrowTopY).attr('x2',cx).attr('y2',boxY)
+      .attr('stroke','var(--g-mid)').attr('stroke-width',1.5).attr('marker-end','url(#mol-arr)');
+    svg.append('text').attr('x',cx+6).attr('y',(arrowTopY+boxY)/2)
+      .attr('dominant-baseline','central').attr('fill','var(--text-muted)')
+      .attr('font-family',"'Outfit',sans-serif").attr('font-size',7).attr('font-style','italic')
+      .text('READOUT');
+  }
+  svg.append('rect').attr('x',cx-44).attr('y',boxY).attr('width',88).attr('height',22)
+    .attr('fill','var(--g-pale)').attr('stroke','var(--g-mid)').attr('stroke-width',1).attr('rx',3);
+  svg.append('text').attr('x',cx).attr('y',boxY+11)
+    .attr('text-anchor','middle').attr('dominant-baseline','central')
+    .attr('fill','var(--g-dk)').attr('font-family',"'IBM Plex Mono',monospace")
+    .attr('font-size',7.5).attr('font-weight',600).text('Drug-like: 78%');
+}
+
+function renderCitationGraph(){
+  var svg=d3.select('#svg-app-citation');
+  svg.selectAll('*').remove();
+  var el=document.getElementById('svg-app-citation');
+  var W=el.clientWidth||160, H=el.clientHeight||160;
+
+  var nd=[
+    {id:0,x:.22,y:.18},{id:1,x:.58,y:.2},{id:2,x:.18,y:.52},
+    {id:3,x:.52,y:.52},{id:4,x:.35,y:.78},{id:5,x:.76,y:.68}
+  ].map(function(n){return{id:n.id,x:n.x*W,y:n.y*H};});
+
+  var existing=[[0,1],[0,2],[1,3],[2,4],[3,4]];
+  var predicted=[[2,3],[1,5],[4,5]];
+  var scores=['0.92','0.84','0.71'];
+
+  existing.forEach(function(e){
+    svg.append('line').attr('x1',nd[e[0]].x).attr('y1',nd[e[0]].y)
+      .attr('x2',nd[e[1]].x).attr('y2',nd[e[1]].y)
+      .attr('stroke','var(--border)').attr('stroke-width',1.5);
+  });
+
+  predicted.forEach(function(e,i){
+    var s=nd[e[0]], t=nd[e[1]];
+    svg.append('line').attr('x1',s.x).attr('y1',s.y).attr('x2',t.x).attr('y2',t.y)
+      .attr('stroke','var(--purple)').attr('stroke-width',1.5)
+      .attr('stroke-dasharray','4 3').attr('opacity',.8);
+    svg.append('text').attr('x',(s.x+t.x)/2+6).attr('y',(s.y+t.y)/2-5)
+      .attr('text-anchor','middle').attr('fill','var(--purple)')
+      .attr('font-family',"'IBM Plex Mono',monospace").attr('font-size',6.5).attr('font-weight',700)
+      .text(scores[i]);
+  });
+
+  nd.forEach(function(n,i){
+    var col=i<3?'var(--g-mid)':'var(--g-lt)';
+    svg.append('circle').attr('cx',n.x).attr('cy',n.y).attr('r',10)
+      .attr('fill',col).attr('stroke','white').attr('stroke-width',1.5);
+    svg.append('text').attr('x',n.x).attr('y',n.y)
+      .attr('text-anchor','middle').attr('dominant-baseline','central')
+      .attr('fill','white').attr('font-family',"'IBM Plex Mono',monospace")
+      .attr('font-size',8).attr('font-weight',600).text('P'+n.id);
+  });
+}
+
+function renderAppsTab(){
+  setTimeout(function(){
+    renderSocialGraph();
+    renderMoleculeGraph();
+    renderCitationGraph();
+  }, 30);
+}
 
 /* ── Init ───────────────────────────────────────────────────────────── */
 function initGraph(){
