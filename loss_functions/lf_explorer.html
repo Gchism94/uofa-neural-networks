@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<!-- Copyright © 2026 Greg T. Chism. University of Arizona, College of Information Science.
+     INFO 557: Neural Networks. MIT License. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loss Functions — Interactive Explorer | INFO 557: Neural Networks</title>
+<meta name="description" content="See how MSE, MAE, Cross-Entropy, and Hinge loss respond to predictions — and why choosing the right loss function matters for your problem.">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Loss Functions — Interactive Explorer">
+<meta property="og:description" content="See how MSE, MAE, Cross-Entropy, and Hinge loss respond to predictions — and why choosing the right loss function matters for your problem.">
+<meta property="og:image" content="https://gchism94.github.io/uofa-neural-networks/loss_functions/lf_explorer-preview.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="600">
+<meta property="og:url" content="https://gchism94.github.io/uofa-neural-networks/loss_functions/lf_explorer.html">
+<meta property="fb:app_id" content="2385695445236853">
+
+<!-- Twitter/X card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Loss Functions — Interactive Explorer">
+<meta name="twitter:description" content="See how MSE, MAE, Cross-Entropy, and Hinge loss respond to predictions — and why choosing the right loss function matters for your problem.">
+<meta name="twitter:image" content="https://gchism94.github.io/uofa-neural-networks/loss_functions/lf_explorer-preview.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+
+<style>
+/* ── Design tokens ──────────────────────────────────────────────── */
+:root{
+  --cream:#FAF7F0;--cream-mid:#F0EBE0;--cream-dk:#E2D9C5;
+  --g-dk:#1C3A0E;--g-mid:#2D5A1B;--g-lt:#4A8C2F;--g-pale:#C8E6A8;
+  --orange:#E8630A;--orange-lt:#F08C50;--orange-dk:#C0500A;
+  --orange-pale:#FDE8D8;
+  --blue:#1A56A0;--blue-pale:#D0E4F8;
+  --red:#B0321D;--red-pale:#F8DDD8;
+  --purple:#7B3FC4;--purple-pale:#E8D8F8;
+  --yellow:#B08000;--yellow-pale:#FBF0C8;
+  --text:#1A1A1A;--text-muted:#888;--text-soft:#555;
+  --border:#C8BE9A;--border-lt:#DDD6BE;--shadow:rgba(44,90,27,.10);
+
+  /* Loss-function colour palette */
+  --loss-mse:#1A56A0;      /* MSE — blue */
+  --loss-mae:#2D5A1B;      /* MAE — green */
+  --loss-ce:#E8630A;       /* Cross-Entropy — orange */
+  --loss-hinge:#7B3FC4;    /* Hinge — purple */
+  --loss-huber:#B08000;    /* Huber — yellow/gold */
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:'Outfit',sans-serif;background:var(--cream);color:var(--text);
+  padding:1.25rem 1rem 2rem;min-height:100vh;line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:.85rem}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+.hdr{display:flex;justify-content:space-between;align-items:flex-start;
+  column-gap:1rem;row-gap:.35rem;flex-wrap:wrap}
+.hdr>div:first-child{flex:1 1 auto;min-width:0}
+.hdr h1{font-size:clamp(1.2rem,2.1vw,1.55rem);font-weight:700;color:var(--g-dk);
+  letter-spacing:-.02em;line-height:1.2}
+.hdr p.subtitle{font-size:.86rem;color:var(--text-muted);margin-top:.18rem}
+.hdr-rule{border:none;border-top:2.5px solid var(--g-dk);margin-top:.55rem}
+
+/* ── Fixed copyright ─────────────────────────────────────────────── */
+.cr-top{
+  position:fixed;top:.75rem;right:1rem;z-index:1000;
+  font-size:.72rem;color:var(--text-muted);text-align:right;
+  background:rgba(250,247,240,.92);padding:.2rem 1.5rem .2rem .5rem;
+  border-radius:5px;backdrop-filter:blur(4px);
+  border:1px solid var(--border-lt);white-space:nowrap;min-width:max-content;
+}
+.cr-top a{color:var(--orange);text-decoration:none}
+.cr-top a:hover{text-decoration:underline}
+
+/* ── Tab bar ─────────────────────────────────────────────────────── */
+.tab-bar{
+  display:flex;gap:.35rem;background:var(--cream-mid);
+  border:1px solid var(--border);border-radius:8px;
+  padding:.3rem;width:fit-content;
+}
+.tab-bar button{
+  font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:500;
+  padding:.3rem .9rem;border-radius:6px;cursor:pointer;
+  border:none;background:transparent;color:var(--text-soft);transition:all .15s;
+}
+.tab-bar button:hover{background:white;color:var(--g-dk)}
+.tab-bar button.active{background:white;color:var(--g-dk);font-weight:600;
+  box-shadow:0 1px 4px var(--shadow);}
+
+/* ── Explorer grid ───────────────────────────────────────────────── */
+.explorer-grid{
+  display:grid;
+  grid-template-columns:260px 1fr 210px;
+  gap:.85rem;align-items:start;
+}
+@media(max-width:980px){
+  .explorer-grid{grid-template-columns:260px 1fr}
+  .right-col{display:none}
+}
+@media(max-width:680px){.explorer-grid{grid-template-columns:1fr}}
+.left-col{display:flex;flex-direction:column;gap:.75rem}
+.center-col{display:flex;flex-direction:column;gap:.75rem}
+.right-col{display:flex;flex-direction:column;gap:.75rem}
+
+/* ── Cards ───────────────────────────────────────────────────────── */
+.card{background:white;border:1px solid var(--border);border-radius:8px;
+  padding:.85rem 1rem;box-shadow:0 2px 8px var(--shadow)}
+.card-title{font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--g-dk);margin-bottom:.55rem}
+
+/* ── Selectors ───────────────────────────────────────────────────── */
+.sel-group{display:flex;gap:.3rem;flex-wrap:wrap;margin-bottom:.45rem}
+.sel-btn{
+  font-family:'Outfit',sans-serif;font-size:.75rem;font-weight:500;
+  padding:.25rem .6rem;border-radius:5px;cursor:pointer;
+  border:1.5px solid var(--border-lt);background:var(--cream);color:var(--text-soft);
+  transition:all .12s;
+}
+.sel-btn:hover{background:var(--cream-mid)}
+.sel-btn.active{background:var(--g-mid);border-color:var(--g-mid);color:white}
+
+/* colour-coded loss selectors */
+.sel-btn.loss-mse.active{background:var(--loss-mse);border-color:var(--loss-mse)}
+.sel-btn.loss-mae.active{background:var(--loss-mae);border-color:var(--loss-mae)}
+.sel-btn.loss-ce.active{background:var(--loss-ce);border-color:var(--loss-ce)}
+.sel-btn.loss-hinge.active{background:var(--loss-hinge);border-color:var(--loss-hinge)}
+.sel-btn.loss-huber.active{background:var(--loss-huber);border-color:var(--loss-huber)}
+
+/* ── Toggle groups ───────────────────────────────────────────────── */
+.toggle-grp{
+  display:flex;gap:0;border-radius:6px;overflow:hidden;
+  border:1.5px solid var(--border);margin-bottom:.45rem;
+}
+.toggle-grp button{
+  font-family:'Outfit',sans-serif;font-size:.78rem;font-weight:500;
+  padding:.28rem 0;flex:1;border:none;cursor:pointer;
+  background:var(--cream);color:var(--text-soft);transition:all .12s;
+}
+.toggle-grp button.active{background:var(--g-mid);color:white}
+.toggle-grp button:not(.active):hover{background:var(--cream-mid)}
+
+/* ── Sliders ─────────────────────────────────────────────────────── */
+.srow{display:flex;align-items:center;gap:.45rem;margin-bottom:.2rem}
+.slbl{font-family:'IBM Plex Mono',monospace;font-size:.8rem;font-weight:500;
+  color:var(--g-dk);min-width:28px}
+input[type=range]{flex:1;appearance:none;-webkit-appearance:none;height:4px;
+  background:var(--cream-dk);border-radius:2px;cursor:pointer;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
+  border-radius:50%;background:var(--g-mid);border:2.5px solid white;
+  box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:pointer}
+.sval{font-family:'IBM Plex Mono',monospace;font-size:.76rem;
+  color:var(--text-muted);min-width:44px;text-align:right}
+.hint-txt{font-size:.7rem;color:var(--text-muted);font-style:italic;margin-top:.15rem}
+.param-lbl{font-size:.72rem;color:var(--text-soft);margin-bottom:.25rem;font-weight:500}
+
+/* ── Buttons ─────────────────────────────────────────────────────── */
+.ctrl-btns{display:flex;gap:.45rem;flex-wrap:wrap}
+.pbtn{
+  font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:600;
+  padding:.35rem .9rem;border-radius:6px;cursor:pointer;
+  border:1.5px solid var(--border);background:var(--cream);color:var(--g-dk);
+  transition:all .12s;
+}
+.pbtn:hover{background:var(--g-pale);border-color:var(--g-lt)}
+.pbtn.primary{background:var(--g-mid);border-color:var(--g-mid);color:white}
+.pbtn.primary:hover{background:var(--g-dk);border-color:var(--g-dk)}
+
+/* ── Annotation box ──────────────────────────────────────────────── */
+.anno-box{
+  border-radius:6px;padding:.55rem .75rem;font-size:.78rem;line-height:1.55;
+  background:var(--blue-pale);color:var(--blue);border-left:3px solid var(--blue);
+  min-height:3.2rem;
+}
+.anno-box.warn{background:var(--red-pale);color:var(--red);border-color:var(--red)}
+.anno-box.good{background:var(--g-pale);color:var(--g-dk);border-color:var(--g-mid)}
+.anno-box.neutral{background:var(--cream-mid);color:var(--text-soft);border-color:var(--border)}
+
+/* ── Key Concepts ────────────────────────────────────────────────── */
+.concepts-body{overflow:hidden;max-height:900px;transition:max-height .3s ease}
+.concepts-body.collapsed{max-height:0;margin-bottom:-.55rem}
+.concepts-item{font-size:.74rem;color:var(--text-soft);line-height:1.5;
+  margin-bottom:.45rem;padding-left:.9rem;position:relative}
+.concepts-item:last-child{margin-bottom:0}
+.concepts-item::before{content:'●';color:#2e7d32;position:absolute;left:0;top:0}
+.concepts-item strong{color:#2e7d32;font-weight:600}
+
+/* ── Plot label / panel title ───────────────────────────────────── */
+.plot-label{font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--text-muted);text-align:center;margin-bottom:.5rem}
+.panel-title{font-size:.78rem;font-weight:700;color:var(--g-dk);margin-bottom:.2rem;text-align:center}
+
+/* ── Legend ──────────────────────────────────────────────────────── */
+.legend{display:flex;gap:.75rem;flex-wrap:wrap;font-size:.72rem;
+  color:var(--text-soft);margin-top:.5rem;align-items:center}
+.legend-dot{width:10px;height:10px;border-radius:50%;display:inline-block;
+  vertical-align:middle;margin-right:.25rem;flex-shrink:0}
+.legend-sq{width:12px;height:8px;border-radius:2px;display:inline-block;
+  vertical-align:middle;margin-right:.25rem;flex-shrink:0}
+.legend-line{width:18px;height:3px;display:inline-block;
+  vertical-align:middle;margin-right:.25rem;flex-shrink:0;border-radius:2px}
+.legend-dash{width:18px;height:0;display:inline-block;
+  vertical-align:middle;margin-right:.25rem;flex-shrink:0;
+  border-top:2px dashed currentColor}
+
+/* ── Tab panels ──────────────────────────────────────────────────── */
+.tab-panel{display:none}
+.tab-panel.active{display:flex;flex-direction:column;gap:.75rem}
+
+/* ── Speed row ───────────────────────────────────────────────────── */
+.speed-row{display:flex;align-items:center;gap:.45rem;margin-top:.35rem}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* ── Tab 1: Loss Landscape ──────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────── */
+.landscape-panels{
+  display:grid;grid-template-columns:1fr 1fr;gap:.85rem;align-items:start;
+}
+@media(max-width:640px){.landscape-panels{grid-template-columns:1fr}}
+
+#svg-loss-main{
+  width:100%;aspect-ratio:4/3;max-height:360px;display:block;
+  border-radius:6px;background:#FDFAF5;
+}
+#svg-loss-mini-grid{
+  width:100%;aspect-ratio:1/1;max-height:360px;display:block;
+  border-radius:6px;background:#FDFAF5;
+}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* ── Tab 2: Optimization Effect ────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────── */
+#svg-optim-scatter{
+  width:100%;aspect-ratio:16/9;max-height:320px;display:block;
+  border-radius:6px;background:#FDFAF5;
+}
+#svg-grad-magnitude{
+  width:100%;aspect-ratio:16/5;max-height:140px;display:block;
+  border-radius:6px;background:#FDFAF5;margin-top:.5rem;
+}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* ── Tab 3: When to Use Which ───────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────── */
+.scenario-panels{
+  display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem;
+}
+@media(max-width:860px){.scenario-panels{grid-template-columns:1fr 1fr}}
+@media(max-width:540px){.scenario-panels{grid-template-columns:1fr}}
+
+.scenario-card{
+  background:white;border:1px solid var(--border-lt);border-radius:7px;
+  padding:.65rem .75rem;
+}
+.scenario-card-title{
+  font-size:.72rem;font-weight:700;color:var(--g-dk);margin-bottom:.1rem;
+}
+.scenario-card-sub{
+  font-size:.64rem;color:var(--text-muted);margin-bottom:.4rem;font-style:italic;
+}
+.scenario-badge{
+  display:inline-block;padding:.1rem .45rem;border-radius:4px;
+  font-size:.62rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+  margin-bottom:.35rem;
+}
+.scenario-badge.regression{background:var(--blue-pale);color:var(--blue)}
+.scenario-badge.binary-cls{background:var(--g-pale);color:var(--g-mid)}
+.scenario-badge.multi-cls{background:var(--orange-pale);color:var(--orange-dk)}
+
+.scenario-svg{
+  width:100%;aspect-ratio:1/1;max-height:180px;display:block;
+  border-radius:5px;background:#FDFAF5;border:1px solid var(--border-lt);
+  margin-bottom:.4rem;
+}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* ── Right panel ─────────────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────── */
+.stat-row{
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:.7rem;padding:.22rem 0;border-bottom:1px solid var(--border-lt);
+}
+.stat-row:last-child{border-bottom:none}
+.sr-lbl{color:var(--text-muted);font-family:'IBM Plex Mono',monospace}
+.sr-val{font-weight:600;font-family:'IBM Plex Mono',monospace;color:var(--g-dk)}
+
+/* Big loss display */
+.loss-display{
+  text-align:center;padding:.5rem .25rem .25rem;
+}
+.loss-big{
+  display:block;font-family:'IBM Plex Mono',monospace;font-size:1.6rem;
+  font-weight:700;line-height:1.1;color:var(--g-dk);
+}
+.loss-big-lbl{font-size:.6rem;color:var(--text-muted);margin-top:.15rem;
+  letter-spacing:.06em;text-transform:uppercase}
+
+/* Formula display */
+.formula-panel{
+  background:var(--cream-mid);border:1px solid var(--border-lt);
+  border-radius:6px;padding:.6rem .75rem;margin-top:.25rem;
+}
+.formula-label{font-size:.64rem;font-weight:600;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--text-muted);margin-bottom:.3rem}
+.formula-eq{
+  font-family:'IBM Plex Mono',monospace;font-size:.82rem;
+  color:var(--g-dk);line-height:1.8;overflow-x:auto;
+}
+
+/* Comparison table */
+.cmp-table{width:100%;border-collapse:collapse;font-size:.7rem;margin-top:.25rem}
+.cmp-table th{
+  font-family:'IBM Plex Mono',monospace;font-size:.62rem;font-weight:600;
+  color:var(--text-muted);text-align:left;padding:.18rem .3rem;
+  border-bottom:1.5px solid var(--border);
+}
+.cmp-table td{
+  font-family:'IBM Plex Mono',monospace;padding:.22rem .3rem;
+  border-bottom:1px solid var(--border-lt);
+}
+.cmp-table tr:last-child td{border-bottom:none}
+.cmp-table td.cmp-name{color:var(--text-soft);font-weight:500}
+.cmp-table td.cmp-val{color:var(--g-dk);font-weight:600;text-align:right}
+.cmp-table tr.active-loss td{background:var(--cream-mid)}
+.cmp-table tr.active-loss td.cmp-name{color:var(--g-dk)}
+
+/* Gradient badge */
+.grad-box{
+  text-align:center;padding:.4rem;border-radius:5px;
+  border:1px solid var(--border-lt);background:var(--cream);margin-top:.25rem;
+}
+.grad-val{
+  display:block;font-family:'IBM Plex Mono',monospace;font-size:.95rem;
+  font-weight:700;line-height:1.2;color:var(--g-dk);
+}
+.grad-lbl{font-size:.6rem;color:var(--text-muted);margin-top:.08rem}
+</style>
+</head>
+<body>
+
+<div class="cr-top">© 2026 Greg T. Chism · <a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a></div>
+
+<div class="wrap">
+
+<header>
+  <div class="hdr">
+    <div>
+      <h1>Loss Functions — Interactive Explorer</h1>
+      <p class="subtitle">See how MSE, MAE, Cross-Entropy, and Hinge loss respond to predictions — and why choosing the right loss function matters for your problem</p>
+    </div>
+  </div>
+  <hr class="hdr-rule">
+</header>
+
+<!-- Tab bar -->
+<div class="tab-bar" id="tab-bar">
+  <button class="active" data-tab="landscape">Loss Landscape</button>
+  <button data-tab="optimization">Optimization Effect</button>
+  <button data-tab="whentouse">When to Use Which</button>
+</div>
+
+<!-- Main explorer -->
+<div class="explorer-grid">
+
+  <!-- ══ LEFT: Controls ══════════════════════════════════════════════ -->
+  <div class="left-col">
+
+    <!-- Loss function selector -->
+    <div class="card">
+      <div class="card-title">Loss Function</div>
+      <div class="sel-group" id="loss-selector">
+        <button class="sel-btn loss-mse active" data-loss="mse">MSE</button>
+        <button class="sel-btn loss-mae"  data-loss="mae">MAE</button>
+        <button class="sel-btn loss-ce"   data-loss="ce">Cross-Entropy</button>
+        <button class="sel-btn loss-hinge" data-loss="hinge">Hinge</button>
+        <button class="sel-btn loss-huber" data-loss="huber">Huber</button>
+      </div>
+      <div class="hint-txt" id="loss-hint">MSE = (ŷ − y)² — penalizes large errors quadratically</div>
+    </div>
+
+    <!-- True label -->
+    <div class="card">
+      <div class="card-title">True Label y</div>
+
+      <div class="param-lbl">Task type</div>
+      <div class="toggle-grp" id="task-selector">
+        <button class="active" data-task="regression">Regression</button>
+        <button data-task="classification">Classification</button>
+      </div>
+
+      <!-- Regression: continuous label slider -->
+      <div id="true-label-regression">
+        <div class="param-lbl">True value</div>
+        <div class="srow">
+          <span class="slbl">y</span>
+          <input type="range" id="sld-true-label" min="0" max="1" step="0.01" value="0.5">
+          <span class="sval" id="val-true-label">0.50</span>
+        </div>
+      </div>
+
+      <!-- Classification: class toggle (hidden when regression active) -->
+      <div id="true-label-classification" style="display:none">
+        <div class="param-lbl">True class</div>
+        <div class="toggle-grp" id="class-selector">
+          <button class="active" data-class="0">Class 0</button>
+          <button data-class="1">Class 1</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Prediction slider -->
+    <div class="card">
+      <div class="card-title">Prediction ŷ</div>
+      <div class="srow">
+        <span class="slbl">ŷ</span>
+        <input type="range" id="sld-pred" min="-0.5" max="1.5" step="0.01" value="0.5">
+        <span class="sval" id="val-pred">0.50</span>
+      </div>
+      <div class="hint-txt">Drag to move predicted value and watch loss update</div>
+    </div>
+
+    <!-- Outlier slider -->
+    <div class="card">
+      <div class="card-title">Outliers</div>
+      <div class="srow">
+        <span class="slbl" style="font-size:.72rem">n</span>
+        <input type="range" id="sld-outliers" min="0" max="5" step="1" value="0">
+        <span class="sval" id="val-outliers">0</span>
+      </div>
+      <div class="hint-txt">Add outliers to show robustness differences between MSE and MAE</div>
+    </div>
+
+    <!-- Playback controls -->
+    <div class="card" id="card-playback">
+      <div class="card-title">Playback</div>
+      <div class="ctrl-btns" style="margin-bottom:.45rem">
+        <button id="btn-play" class="pbtn primary" style="flex:1">⏵ Play</button>
+        <button id="btn-step" class="pbtn">→ Step</button>
+        <button id="btn-reset" class="pbtn">↺ Reset</button>
+      </div>
+      <div class="speed-row">
+        <span class="slbl" style="min-width:44px;font-size:.7rem">Speed</span>
+        <input type="range" id="sld-speed" min="1" max="5" step="1" value="3">
+        <span class="sval" id="val-speed">3×</span>
+      </div>
+    </div>
+
+    <!-- Annotation -->
+    <div class="card">
+      <div class="card-title">What's happening?</div>
+      <div class="anno-box neutral" id="anno-box">
+        Select a loss function and drag the prediction slider to see how each loss responds. Try adding outliers to compare MSE vs MAE robustness.
+      </div>
+    </div>
+
+    <!-- Key Concepts — collapsible, open by default -->
+    <div class="card">
+      <div class="card-title" style="cursor:pointer;user-select:none" id="concepts-toggle">
+        Key Concepts <span id="concepts-arrow">▾</span>
+      </div>
+      <div class="concepts-body" id="concepts-body">
+        <div class="concepts-item"><strong>What is a loss function?</strong> A loss function measures how far a model's prediction is from the true answer. Training minimises this score — so the choice of loss function directly shapes what the model learns to optimise.</div>
+        <div class="concepts-item"><strong>Why MSE penalises outliers more than MAE:</strong> MSE squares the error, so a prediction that is 10× further from the truth contributes 100× as much loss. MAE uses the absolute error, so that same outlier contributes only 10× as much — making MAE far more robust to extreme values.</div>
+        <div class="concepts-item"><strong>Why cross-entropy is used for classification:</strong> Classification produces probabilities. Cross-entropy measures how surprised you are by the true label given your probability — predicting 0.01 for the correct class incurs enormous loss, creating a steep gradient that pushes probabilities toward 1 for the right class.</div>
+        <div class="concepts-item"><strong>What the gradient of the loss tells the optimizer:</strong> The gradient ∂L/∂ŷ tells gradient descent how much to adjust the prediction. A large gradient means you are far from the minimum — the optimizer takes a big corrective step. Near the minimum the gradient shrinks, slowing updates and allowing fine convergence.</div>
+        <div class="concepts-item"><strong>How Huber loss bridges MSE and MAE:</strong> Huber uses MSE for small errors (where quadratic is smooth and easy to optimise) and MAE for large errors (where quadratic would over-emphasise outliers). A threshold δ controls where the switch happens — Huber gives the best of both worlds for noisy regression problems.</div>
+      </div>
+    </div>
+
+  </div><!-- end left-col -->
+
+  <!-- ══ CENTER: Tab panels ══════════════════════════════════════════ -->
+  <div class="center-col">
+
+    <!-- ─ Tab 1: Loss Landscape ─────────────────────────────────── -->
+    <div class="tab-panel active" id="panel-landscape">
+      <div class="card">
+        <div class="plot-label" id="landscape-label">Loss Landscape — MSE · ŷ vs L(ŷ)</div>
+
+        <div class="landscape-panels">
+
+          <!-- Main loss curve -->
+          <div>
+            <div class="panel-title">Selected Loss: Loss vs Predicted Value</div>
+            <svg id="svg-loss-main">
+              <rect width="100%" height="100%" fill="#FDFAF5"/>
+              <text x="50%" y="43%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="13">
+                Loss curve (D3 rendered)
+              </text>
+              <text x="50%" y="55%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="10">
+                x-axis: ŷ from −0.5 to 1.5 · y-axis: L(ŷ)
+              </text>
+            </svg>
+            <div class="legend" style="justify-content:center;margin-top:.5rem">
+              <span><span class="legend-dash" style="color:var(--g-mid)"></span>True label y</span>
+              <span><span class="legend-dot" style="background:var(--orange)"></span>Current ŷ</span>
+              <span><span style="font-size:.9em">★</span> Minimum</span>
+            </div>
+          </div>
+
+          <!-- Mini comparison grid -->
+          <div>
+            <div class="panel-title">All Four Loss Functions — Quick Comparison</div>
+            <svg id="svg-loss-mini-grid">
+              <rect width="100%" height="100%" fill="#FDFAF5"/>
+              <!-- 2×2 mini chart grid placeholder -->
+              <line x1="50%" y1="0" x2="50%" y2="100%" stroke="#DDD6BE" stroke-width="1"/>
+              <line x1="0" y1="50%" x2="100%" y2="50%" stroke="#DDD6BE" stroke-width="1"/>
+              <text x="25%" y="20%" text-anchor="middle" dominant-baseline="middle"
+                    fill="var(--loss-mse)" font-family="IBM Plex Mono,monospace" font-size="9" font-weight="700">MSE</text>
+              <text x="75%" y="20%" text-anchor="middle" dominant-baseline="middle"
+                    fill="var(--loss-mae)" font-family="IBM Plex Mono,monospace" font-size="9" font-weight="700">MAE</text>
+              <text x="25%" y="70%" text-anchor="middle" dominant-baseline="middle"
+                    fill="var(--loss-ce)" font-family="IBM Plex Mono,monospace" font-size="9" font-weight="700">Cross-Entropy</text>
+              <text x="75%" y="70%" text-anchor="middle" dominant-baseline="middle"
+                    fill="var(--loss-hinge)" font-family="IBM Plex Mono,monospace" font-size="9" font-weight="700">Hinge</text>
+              <text x="25%" y="38%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="8">D3 rendered</text>
+              <text x="75%" y="38%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="8">D3 rendered</text>
+              <text x="25%" y="88%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="8">D3 rendered</text>
+              <text x="75%" y="88%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="8">D3 rendered</text>
+            </svg>
+            <div class="legend" style="justify-content:center;margin-top:.5rem;flex-wrap:wrap">
+              <span><span class="legend-dot" style="background:var(--loss-mse)"></span>MSE</span>
+              <span><span class="legend-dot" style="background:var(--loss-mae)"></span>MAE</span>
+              <span><span class="legend-dot" style="background:var(--loss-ce)"></span>Cross-Entropy</span>
+              <span><span class="legend-dot" style="background:var(--loss-hinge)"></span>Hinge</span>
+            </div>
+          </div>
+
+        </div><!-- end landscape-panels -->
+
+        <div class="anno-box neutral" id="landscape-anno" style="margin-top:.6rem;font-size:.75rem">
+          The loss curve shows L(ŷ) as a function of the predicted value. The orange dot marks your current prediction — drag the slider to move it. The minimum (★) is where the gradient is zero and loss is smallest.
+        </div>
+      </div>
+    </div><!-- end panel-landscape -->
+
+    <!-- ─ Tab 2: Optimization Effect ────────────────────────────── -->
+    <div class="tab-panel" id="panel-optimization">
+      <div class="card">
+        <div class="plot-label">Optimization Effect — Gradient Descent Under Different Losses</div>
+
+        <svg id="svg-optim-scatter">
+          <rect width="100%" height="100%" fill="#FDFAF5"/>
+          <text x="50%" y="42%" text-anchor="middle" dominant-baseline="middle"
+                fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="13">
+            Scatter plot with GD paths (D3 rendered)
+          </text>
+          <text x="50%" y="54%" text-anchor="middle" dominant-baseline="middle"
+                fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="10">
+            ~20 data points · coloured paths show convergence under each loss
+          </text>
+        </svg>
+
+        <div class="legend" style="justify-content:center;margin-top:.55rem">
+          <span><span class="legend-dot" style="background:var(--loss-mse)"></span>MSE path</span>
+          <span><span class="legend-dot" style="background:var(--loss-mae)"></span>MAE path</span>
+          <span><span class="legend-dot" style="background:var(--loss-ce)"></span>Cross-Entropy path</span>
+          <span><span class="legend-dot" style="background:var(--loss-hinge)"></span>Hinge path</span>
+        </div>
+
+        <!-- Gradient magnitude chart -->
+        <div class="panel-title" style="margin-top:.75rem">Gradient Magnitude vs Prediction</div>
+        <svg id="svg-grad-magnitude">
+          <rect width="100%" height="100%" fill="#FDFAF5"/>
+          <text x="50%" y="44%" text-anchor="middle" dominant-baseline="middle"
+                fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="11">
+            |∂L/∂ŷ| vs ŷ for each loss (D3 rendered)
+          </text>
+        </svg>
+
+        <div class="anno-box neutral" id="optimization-anno" style="margin-top:.5rem;font-size:.75rem">
+          Press Play to watch gradient descent update the prediction under each loss function simultaneously. Notice how MSE has steeper gradients far from the truth, while MAE has constant gradient magnitude regardless of distance.
+        </div>
+      </div>
+    </div><!-- end panel-optimization -->
+
+    <!-- ─ Tab 3: When to Use Which ────────────────────────────────── -->
+    <div class="tab-panel" id="panel-whentouse">
+      <div class="card">
+        <div class="plot-label">When to Use Which Loss Function</div>
+
+        <div class="scenario-panels">
+
+          <!-- Scenario 1: Regression with outliers -->
+          <div class="scenario-card">
+            <div class="scenario-badge regression">Regression</div>
+            <div class="scenario-card-title">Outlier Robustness</div>
+            <div class="scenario-card-sub">MSE pulled toward outliers; MAE ignores them</div>
+            <svg id="svg-scenario-regression" class="scenario-svg">
+              <rect width="100%" height="100%" fill="#FDFAF5"/>
+              <text x="50%" y="40%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="9">
+                Scatter + MSE fit (blue)
+              </text>
+              <text x="50%" y="56%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="8">
+                MAE fit (green) · D3 rendered
+              </text>
+            </svg>
+            <div class="legend" style="flex-direction:column;gap:.2rem;margin-top:0">
+              <span><span class="legend-line" style="background:var(--loss-mse)"></span>MSE fit — pulled toward outlier</span>
+              <span><span class="legend-line" style="background:var(--loss-mae)"></span>MAE fit — robust to outlier</span>
+            </div>
+          </div>
+
+          <!-- Scenario 2: Binary classification -->
+          <div class="scenario-card">
+            <div class="scenario-badge binary-cls">Binary Classification</div>
+            <div class="scenario-card-title">Decision Boundary</div>
+            <div class="scenario-card-sub">Cross-Entropy vs Hinge for two-class separation</div>
+            <svg id="svg-scenario-binary" class="scenario-svg">
+              <rect width="100%" height="100%" fill="#FDFAF5"/>
+              <text x="50%" y="40%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="9">
+                Two Gaussian classes
+              </text>
+              <text x="50%" y="56%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="8">
+                CE boundary (orange) · Hinge (purple) · D3 rendered
+              </text>
+            </svg>
+            <div class="legend" style="flex-direction:column;gap:.2rem;margin-top:0">
+              <span><span class="legend-dash" style="color:var(--loss-ce)"></span>Cross-Entropy boundary</span>
+              <span><span class="legend-dash" style="color:var(--loss-hinge)"></span>Hinge (max-margin) boundary</span>
+            </div>
+          </div>
+
+          <!-- Scenario 3: Multi-class softmax -->
+          <div class="scenario-card">
+            <div class="scenario-badge multi-cls">Multi-Class</div>
+            <div class="scenario-card-title">Softmax Output</div>
+            <div class="scenario-card-sub">Cross-Entropy distributes loss across all class probabilities</div>
+            <svg id="svg-scenario-multiclass" class="scenario-svg">
+              <rect width="100%" height="100%" fill="#FDFAF5"/>
+              <text x="50%" y="40%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="9">
+                Softmax bar chart
+              </text>
+              <text x="50%" y="56%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="8">
+                −log(p_true) highlighted · D3 rendered
+              </text>
+            </svg>
+            <div class="legend" style="flex-direction:column;gap:.2rem;margin-top:0">
+              <span><span class="legend-dot" style="background:var(--g-mid)"></span>Predicted probability per class</span>
+              <span><span class="legend-dot" style="background:var(--orange)"></span>True class (cross-entropy applied here)</span>
+            </div>
+          </div>
+
+        </div><!-- end scenario-panels -->
+
+        <div class="anno-box neutral" id="whentouse-anno" style="margin-top:.6rem;font-size:.75rem">
+          Use the outlier slider (left panel) to see how MSE and MAE diverge as outliers are added. The blue fit line (MSE) gets pulled toward extremes while the green line (MAE) stays close to the bulk of the data.
+        </div>
+      </div>
+    </div><!-- end panel-whentouse -->
+
+  </div><!-- end center-col -->
+
+  <!-- ══ RIGHT: Live stats ════════════════════════════════════════════ -->
+  <div class="right-col">
+
+    <!-- Current loss value -->
+    <div class="card" id="card-gnn-rp1">
+      <div class="card-title">Current Loss</div>
+      <div class="loss-display">
+        <span class="loss-big" id="rp-loss-val" style="color:var(--loss-mse)">—</span>
+        <div class="loss-big-lbl" id="rp-loss-lbl">L(ŷ) · MSE</div>
+      </div>
+    </div>
+
+    <!-- Current gradient -->
+    <div class="card">
+      <div class="card-title">Gradient ∂L/∂ŷ</div>
+      <div class="grad-box">
+        <span class="grad-val" id="rp-grad-val" style="color:var(--text-muted)">—</span>
+        <div class="grad-lbl">slope of loss at current ŷ</div>
+      </div>
+      <div style="font-size:.63rem;color:var(--text-muted);margin-top:.3rem;
+                  line-height:1.5;font-style:italic">
+        Negative = loss decreases as ŷ increases. Optimizer moves opposite gradient direction.
+      </div>
+    </div>
+
+    <!-- Formula display -->
+    <div class="card">
+      <div class="card-title">Formula</div>
+      <div class="formula-panel">
+        <div class="formula-label" id="rp-formula-name">MSE</div>
+        <div class="formula-eq" id="rp-formula-eq">L = (ŷ − y)²</div>
+      </div>
+      <div style="font-size:.63rem;color:var(--text-muted);margin-top:.3rem;line-height:1.5">
+        <span id="rp-formula-note">Smooth everywhere · derivative = 2(ŷ−y)</span>
+      </div>
+    </div>
+
+    <!-- Comparison table -->
+    <div class="card">
+      <div class="card-title">All Losses at ŷ</div>
+      <table class="cmp-table" id="cmp-table">
+        <thead>
+          <tr><th>Loss</th><th style="text-align:right">L(ŷ)</th></tr>
+        </thead>
+        <tbody>
+          <tr class="active-loss" id="cmp-mse">
+            <td class="cmp-name"><span class="legend-dot" style="background:var(--loss-mse)"></span>MSE</td>
+            <td class="cmp-val" id="cmp-mse-val">—</td>
+          </tr>
+          <tr id="cmp-mae">
+            <td class="cmp-name"><span class="legend-dot" style="background:var(--loss-mae)"></span>MAE</td>
+            <td class="cmp-val" id="cmp-mae-val">—</td>
+          </tr>
+          <tr id="cmp-ce">
+            <td class="cmp-name"><span class="legend-dot" style="background:var(--loss-ce)"></span>C-Entropy</td>
+            <td class="cmp-val" id="cmp-ce-val">—</td>
+          </tr>
+          <tr id="cmp-hinge">
+            <td class="cmp-name"><span class="legend-dot" style="background:var(--loss-hinge)"></span>Hinge</td>
+            <td class="cmp-val" id="cmp-hinge-val">—</td>
+          </tr>
+          <tr id="cmp-huber">
+            <td class="cmp-name"><span class="legend-dot" style="background:var(--loss-huber)"></span>Huber</td>
+            <td class="cmp-val" id="cmp-huber-val">—</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="hint-txt" style="margin-top:.3rem">at current ŷ and y</div>
+    </div>
+
+  </div><!-- end right-col -->
+
+</div><!-- end .explorer-grid -->
+
+</div><!-- end .wrap -->
+
+<footer id="course-nav-footer" style="margin-top:1.5rem;padding:0.75rem 0 0 1rem;border-top:1px solid #E0DAC0;font-size:0.8rem;color:#78786A;text-align:left;">
+  <a href="../" style="color:#2e7d32;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">&larr; All course visualizations</a>
+</footer>
+<script>
+if (window.self !== window.top) { var f = document.getElementById('course-nav-footer'); if (f) { f.style.display = 'none'; } }
+</script>
+
+</body>
+</html>
