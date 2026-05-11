@@ -403,7 +403,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     </div>
 
     <!-- GCN layers -->
-    <div class="card">
+    <div class="card" id="card-gnn-arch">
       <div class="card-title">Architecture</div>
       <div class="param-lbl">GCN Layers</div>
       <div class="toggle-grp" id="layers-selector">
@@ -421,7 +421,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     </div>
 
     <!-- Playback controls -->
-    <div class="card">
+    <div class="card" id="card-gnn-playback">
       <div class="card-title">Playback</div>
       <div class="ctrl-btns" style="margin-bottom:.45rem">
         <button id="btn-play" class="pbtn primary" style="flex:1">⏵ Play</button>
@@ -663,7 +663,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   <div class="right-col">
 
     <!-- Selected node info -->
-    <div class="card">
+    <div class="card" id="card-gnn-rp1">
       <div class="card-title">Selected Node</div>
       <div class="stat-row">
         <span class="sr-lbl">Node ID</span>
@@ -689,7 +689,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     </div>
 
     <!-- Neighbor messages -->
-    <div class="card">
+    <div class="card" id="card-gnn-rp2">
       <div class="card-title">Incoming Messages</div>
       <div class="msg-list" id="msg-list">
         <div class="msg-item" style="opacity:.4">
@@ -718,7 +718,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     </div>
 
     <!-- Aggregated message -->
-    <div class="card">
+    <div class="card" id="card-gnn-rp3">
       <div class="card-title">Aggregated Message</div>
       <div class="agg-box">
         <span class="agg-val" id="agg-val" style="color:var(--text-muted)">—</span>
@@ -731,7 +731,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     </div>
 
     <!-- Updated feature -->
-    <div class="card">
+    <div class="card" id="card-gnn-rp4">
       <div class="card-title">Updated Feature</div>
       <div class="stat-row">
         <span class="sr-lbl">h_v^(l+1)</span>
@@ -1230,6 +1230,16 @@ document.querySelectorAll('#tab-bar button').forEach(function(btn){
     document.getElementById('panel-'+tab).classList.add('active');
     if(tab==='graphconv') setTimeout(renderGCNTab, 0);
     else if(tab==='applications') renderAppsTab();
+    // Tab-aware show/hide
+    var _gnnv=function(id,vis){var el=document.getElementById(id);if(el)el.style.display=vis?'':'none';};
+    var _gnnMP=tab==='msgpass';
+    var _gnnApp=tab==='applications';
+    _gnnv('card-gnn-arch',    !_gnnApp);
+    _gnnv('card-gnn-playback', _gnnMP);
+    _gnnv('card-gnn-rp1',     _gnnMP);
+    _gnnv('card-gnn-rp2',     _gnnMP);
+    _gnnv('card-gnn-rp3',     _gnnMP);
+    _gnnv('card-gnn-rp4',     _gnnMP);
   });
 });
 

@@ -388,7 +388,7 @@ select.param-sel:focus{border-color:var(--g-mid)}
   <div class="left-col">
 
     <!-- Filter type -->
-    <div class="card">
+    <div class="card" id="card-cv-filter">
       <div class="card-title">Filter</div>
 
       <div class="param-lbl">Input Pattern</div>
@@ -717,7 +717,7 @@ select.param-sel:focus{border-color:var(--g-mid)}
   <div class="right-col">
 
     <!-- Kernel position -->
-    <div class="card">
+    <div class="card" id="card-cv-pos">
       <div class="card-title">Kernel Position</div>
       <div class="stat-row">
         <span class="sr-lbl">Row</span>
@@ -734,7 +734,7 @@ select.param-sel:focus{border-color:var(--g-mid)}
     </div>
 
     <!-- Receptive field -->
-    <div class="card">
+    <div class="card" id="card-cv-rf">
       <div class="card-title">Receptive Field</div>
       <div id="rf-display" style="display:flex;justify-content:center;margin-bottom:.3rem">
         <!-- 3×3 or 5×5 patch rendered by JS -->
@@ -748,7 +748,7 @@ select.param-sel:focus{border-color:var(--g-mid)}
     </div>
 
     <!-- Dot product -->
-    <div class="card">
+    <div class="card" id="card-cv-dp">
       <div class="card-title">Dot Product</div>
       <div id="dp-display">
         <div style="font-size:.68rem;color:var(--text-muted);font-style:italic;text-align:center;padding:.4rem 0;line-height:1.6">
@@ -1304,6 +1304,13 @@ document.getElementById('tab-bar').addEventListener('click',function(e){
   btn.classList.add('active');
   document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('active');});
   document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
+  // Tab-aware: filter card and step-level right panel only relevant on Filters tab
+  var _cvv=function(id,vis){var el=document.getElementById(id);if(el)el.style.display=vis?'':'none';};
+  var _isFilters=btn.dataset.tab==='filters';
+  _cvv('card-cv-filter',_isFilters);
+  _cvv('card-cv-pos',_isFilters);
+  _cvv('card-cv-rf',_isFilters);
+  _cvv('card-cv-dp',_isFilters);
 });
 
 document.getElementById('concepts-toggle').addEventListener('click',function(){

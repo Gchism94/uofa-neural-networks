@@ -395,7 +395,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   <div class="left-col">
 
     <!-- Model & dataset selectors -->
-    <div class="card">
+    <div class="card" id="card-lime-model">
       <div class="card-title">Model &amp; Data</div>
 
       <div class="param-lbl">Model</div>
@@ -414,7 +414,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     </div>
 
     <!-- LIME parameters -->
-    <div class="card">
+    <div class="card" id="card-lime-params">
       <div class="card-title">LIME Parameters</div>
 
       <div class="param-lbl">Neighborhood Radius</div>
@@ -435,7 +435,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     </div>
 
     <!-- Click instruction -->
-    <div class="card">
+    <div class="card" id="card-lime-explain">
       <div class="card-title">Explain a Point</div>
       <div style="display:flex;justify-content:center;margin-bottom:.55rem">
         <span class="click-pill">
@@ -699,7 +699,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   <div class="right-col">
 
     <!-- Selected point info -->
-    <div class="card">
+    <div class="card" id="card-lime-rp1">
       <div class="card-title">Selected Point</div>
       <div class="stat-row">
         <span class="sr-lbl">x₁</span>
@@ -725,7 +725,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     </div>
 
     <!-- LIME explanation weights -->
-    <div class="card">
+    <div class="card" id="card-lime-rp2">
       <div class="card-title">LIME Explanation</div>
       <div id="lime-weights">
         <!-- Rendered by JS -->
@@ -751,7 +751,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     </div>
 
     <!-- Local model fit quality -->
-    <div class="card">
+    <div class="card" id="card-lime-rp3">
       <div class="card-title">Local Model Fit</div>
       <div class="r2-box">
         <span class="r2-val" id="r2-val" style="color:var(--text-muted)">—</span>
@@ -763,7 +763,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     </div>
 
     <!-- Neighborhood info -->
-    <div class="card">
+    <div class="card" id="card-lime-rp4">
       <div class="card-title">Neighborhood</div>
       <div class="nbr-info">
         <div class="nbr-cell">
@@ -1155,6 +1155,16 @@ document.getElementById('tab-bar').addEventListener('click',function(e){
   document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
   if(btn.dataset.tab==='importance') updateTab2();
   if(btn.dataset.tab==='howlime') updateTab3();
+  // Tab-aware: controls and right panel irrelevant on static "How LIME Works" tab
+  var _limev=function(id,vis){var el=document.getElementById(id);if(el)el.style.display=vis?'':'none';};
+  var _limeShow=btn.dataset.tab!=='howlime';
+  _limev('card-lime-model',   _limeShow);
+  _limev('card-lime-params',  _limeShow);
+  _limev('card-lime-explain', _limeShow);
+  _limev('card-lime-rp1',     _limeShow);
+  _limev('card-lime-rp2',     _limeShow);
+  _limev('card-lime-rp3',     _limeShow);
+  _limev('card-lime-rp4',     _limeShow);
 });
 
 document.getElementById('concepts-toggle').addEventListener('click',function(){

@@ -376,7 +376,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     </div>
 
     <!-- Simulation controls -->
-    <div class="card">
+    <div class="card" id="card-bn-sim">
       <div class="card-title">Simulation</div>
       <div class="ctrl-btns" style="margin-bottom:.45rem">
         <button id="btn-play" class="pbtn primary" style="flex:1">⏵ Play</button>
@@ -643,7 +643,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   <div class="right-col">
 
     <!-- Per-layer mean/variance -->
-    <div class="card">
+    <div class="card" id="card-bn-rp1">
       <div class="card-title">Layer Statistics</div>
       <div class="layer-stat-list" id="layer-stat-list">
 
@@ -673,7 +673,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     </div>
 
     <!-- γ / β learned parameters -->
-    <div class="card">
+    <div class="card" id="card-bn-rp2">
       <div class="card-title">BN Parameters (Layer 1)</div>
       <div class="param-grid">
         <div class="param-block">
@@ -691,7 +691,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     </div>
 
     <!-- Running mean/variance (inference mode) -->
-    <div class="card">
+    <div class="card" id="card-bn-rp3">
       <div class="card-title">Running Stats (Inference)</div>
       <div class="running-stat-row">
         <span class="rsr-lbl">μ_run</span>
@@ -1194,6 +1194,13 @@ document.getElementById('tab-bar').addEventListener('click', e => {
   document.getElementById(`panel-${btn.dataset.tab}`).classList.add('active');
   if(btn.dataset.tab === 'stability') renderStability();
   if(btn.dataset.tab === 'steps') drawBNStepThrough(bnStep);
+  // Tab-aware show/hide: sim card and right panel only relevant during Layer Distributions
+  const _bnVis = (id, vis) => { const el = document.getElementById(id); if(el) el.style.display = vis ? '' : 'none'; };
+  const _bnDistrib = btn.dataset.tab === 'distributions';
+  _bnVis('card-bn-sim', _bnDistrib);
+  _bnVis('card-bn-rp1', _bnDistrib);
+  _bnVis('card-bn-rp2', _bnDistrib);
+  _bnVis('card-bn-rp3', _bnDistrib);
 });
 
 document.getElementById('concepts-toggle').addEventListener('click', () => {

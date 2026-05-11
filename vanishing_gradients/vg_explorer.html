@@ -391,7 +391,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   <div class="left-col">
 
     <!-- Network configuration -->
-    <div class="card">
+    <div class="card" id="card-vg-network">
       <div class="card-title">Network</div>
 
       <div class="param-lbl">Depth (hidden layers)</div>
@@ -412,7 +412,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     </div>
 
     <!-- Training parameters -->
-    <div class="card">
+    <div class="card" id="card-vg-params">
       <div class="card-title">Parameters</div>
 
       <!-- Weight scale -->
@@ -433,7 +433,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     </div>
 
     <!-- Simulation controls -->
-    <div class="card">
+    <div class="card" id="card-vg-sim">
       <div class="card-title">Simulation</div>
       <div class="ctrl-btns" style="margin-bottom:.45rem">
         <button id="btn-play"  class="pbtn primary" style="flex:1">⏵ Play</button>
@@ -673,7 +673,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   <div class="right-col">
 
     <!-- Per-layer gradient magnitudes -->
-    <div class="card">
+    <div class="card" id="card-vg-rp1">
       <div class="card-title">Layer Gradients</div>
       <div class="layer-grad-list" id="layer-grad-list">
         <!-- Rendered by JS: 4–10 rows depending on depth -->
@@ -711,7 +711,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     </div>
 
     <!-- Gradient ratio -->
-    <div class="card">
+    <div class="card" id="card-vg-rp2">
       <div class="card-title">Gradient Ratio</div>
       <div class="ratio-box">
         <span class="ratio-val" id="ratio-val">—</span>
@@ -723,7 +723,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     </div>
 
     <!-- Learning speed per layer -->
-    <div class="card">
+    <div class="card" id="card-vg-rp3">
       <div class="card-title">Learning Speed</div>
       <div id="speed-list">
         <!-- Rendered by JS -->
@@ -1256,6 +1256,17 @@ document.getElementById('tab-bar').addEventListener('click',function(e){
   btn.classList.add('active');
   document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('active');});
   document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
+  // Tab-aware show/hide
+  var _vgv=function(id,vis){var el=document.getElementById(id);if(el)el.style.display=vis?'':'none';};
+  var _vgTab=btn.dataset.tab;
+  var _vgFlow=_vgTab==='flow';
+  var _vgSol=_vgTab==='solutions';
+  _vgv('card-vg-network', !_vgSol);
+  _vgv('card-vg-params',  !_vgSol);
+  _vgv('card-vg-sim',     _vgFlow);
+  _vgv('card-vg-rp1',     _vgFlow);
+  _vgv('card-vg-rp2',     _vgFlow);
+  _vgv('card-vg-rp3',     _vgFlow);
 });
 
 document.getElementById('concepts-toggle').addEventListener('click',function(){

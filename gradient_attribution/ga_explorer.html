@@ -431,7 +431,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     </div>
 
     <!-- Integration settings -->
-    <div class="card">
+    <div class="card" id="card-ga-integration">
       <div class="card-title">Integration</div>
 
       <div class="param-lbl">Steps (m)</div>
@@ -444,7 +444,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     </div>
 
     <!-- Playback controls -->
-    <div class="card">
+    <div class="card" id="card-ga-playback">
       <div class="card-title">Playback</div>
 
       <div class="ctrl-btns" style="margin-bottom:.45rem">
@@ -794,7 +794,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     </div>
 
     <!-- Completeness -->
-    <div class="card">
+    <div class="card" id="card-ga-completeness">
       <div class="card-title">Completeness (IG)</div>
       <div class="metric-box">
         <span class="metric-val" id="completeness-val" style="color:var(--text-muted)">—</span>
@@ -1420,6 +1420,13 @@ document.getElementById('tab-bar').addEventListener('click',function(e){
   activeTab=btn.dataset.tab;
   stopPlay();
   updateCurrentTab();
+  // Tab-aware: Integration and Playback only useful on Integrated Gradients tab
+  var _gav=function(id,vis){var el=document.getElementById(id);if(el)el.style.display=vis?'':'none';};
+  var _gaIsIG=activeTab==='integrated';
+  var _gaIsSal=activeTab==='saliency';
+  _gav('card-ga-integration',  !_gaIsSal);
+  _gav('card-ga-playback',     _gaIsIG);
+  _gav('card-ga-completeness', !_gaIsSal);
 });
 
 document.getElementById('pattern-selector').addEventListener('click',function(e){
