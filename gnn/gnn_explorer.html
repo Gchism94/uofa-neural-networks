@@ -1592,7 +1592,12 @@ function renderCitationGraph(){
     svg.append('line').attr('x1',s.x).attr('y1',s.y).attr('x2',t.x).attr('y2',t.y)
       .attr('stroke','var(--purple)').attr('stroke-width',1.5)
       .attr('stroke-dasharray','4 3').attr('opacity',.8);
-    svg.append('text').attr('x',(s.x+t.x)/2+6).attr('y',(s.y+t.y)/2-5)
+    var lx=(s.x+t.x)/2+6, ly=(s.y+t.y)/2-5;
+    svg.append('rect')
+      .attr('x',lx-11).attr('y',ly-6)
+      .attr('width',22).attr('height',9)
+      .attr('fill','rgba(250,247,240,0.92)').attr('rx',3);
+    svg.append('text').attr('x',lx).attr('y',ly)
       .attr('text-anchor','middle').attr('fill','var(--purple)')
       .attr('font-family',"'IBM Plex Mono',monospace").attr('font-size',6.5).attr('font-weight',700)
       .text(scores[i]);
