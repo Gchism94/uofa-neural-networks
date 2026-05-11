@@ -402,6 +402,22 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
       <div class="hint-txt">Karate = social, Molecule = chemistry</div>
     </div>
 
+    <!-- Custom graph editor (shown when Custom is selected) -->
+    <div class="card" id="card-custom-editor" style="display:none">
+      <div class="card-title">Graph Editor</div>
+      <div class="ctrl-btns" style="gap:.3rem;margin-bottom:.35rem">
+        <button id="ce-mode-node" class="pbtn primary" style="flex:1;font-size:.72rem">⊕ Add Node</button>
+        <button id="ce-mode-edge" class="pbtn" style="flex:1;font-size:.72rem">⟷ Add Edge</button>
+      </div>
+      <svg id="svg-custom-editor" style="width:100%;aspect-ratio:4/3;display:block;background:#FDFAF5;border:1px solid var(--border-lt);border-radius:5px;cursor:crosshair;margin-bottom:.3rem"></svg>
+      <div class="hint-txt">Click canvas to add nodes · Select two nodes to add an edge · Right-click to delete</div>
+      <div id="ce-error" style="display:none;font-size:.7rem;color:#B0321D;margin-top:.2rem;font-style:italic"></div>
+      <div class="ctrl-btns" style="margin-top:.4rem;gap:.3rem">
+        <button id="ce-clear" class="pbtn" style="font-size:.72rem">✕ Clear</button>
+        <button id="ce-use" class="pbtn primary" style="flex:1;font-size:.72rem">✓ Use This Graph</button>
+      </div>
+    </div>
+
     <!-- GCN layers -->
     <div class="card" id="card-gnn-arch">
       <div class="card-title">Architecture</div>
@@ -794,6 +810,17 @@ var GRAPHS = {
   }
 };
 
+/* ── Custom editor state ────────────────────────────────────────────── */
+var ceNodes=[], ceEdges=[], ceMode='node', ceSel=null;
+GRAPHS.custom={
+  name:'Custom',
+  featNames:['f1','f2','f3'],
+  makeNodes:function(){ return ceNodes.map(function(n){ return Object.assign({},n); }); },
+  get edgeList(){ return ceEdges.map(function(e){ return e.slice(); }); },
+  nodeColor:function(){ return '#2e7d32'; },
+  computeFeat:function(n){ return n.feat?n.feat.slice():[Math.random(),Math.random(),Math.random()]; }
+};
+
 /* ── State ─────────────────────────────────────────────────────────── */
 var state = {
   graphKey:'karate', aggFn:'mean', numLayers:1,
@@ -862,19 +889,30 @@ function buildGraph(){
   var nodes=rawNodes.map(function(n){ return Object.assign({},n); });
   var edges=gDef.edgeList.map(function(e){ return {source:e[0],target:e[1]}; });
 
-  var sim=d3.forceSimulation(nodes)
-    .force('link',d3.forceLink(edges).id(function(d){ return d.id; }).distance(88).strength(0.7))
-    .force('charge',d3.forceManyBody().strength(-340))
-    .force('center',d3.forceCenter(W/2,H/2))
-    .force('collision',d3.forceCollide(32))
-    .stop();
-  for(var t=0;t<300;t++) sim.tick();
-
-  var pad=34;
-  nodes.forEach(function(n){
-    n.x=Math.max(pad,Math.min(W-pad,n.x));
-    n.y=Math.max(pad,Math.min(H-pad,n.y));
-  });
+  if(state.graphKey==='custom'){
+    var edEl=document.getElementById('svg-custom-editor');
+    var edW=edEl.clientWidth||220, edH=edEl.clientHeight||165;
+    var nodeById={};
+    nodes.forEach(function(n){
+      n.x=Math.max(34,Math.min(W-34,(n.x/edW)*W));
+      n.y=Math.max(34,Math.min(H-34,(n.y/edH)*H));
+      nodeById[n.id]=n;
+    });
+    edges.forEach(function(e){ e.source=nodeById[e.source]; e.target=nodeById[e.target]; });
+  } else {
+    var sim=d3.forceSimulation(nodes)
+      .force('link',d3.forceLink(edges).id(function(d){ return d.id; }).distance(88).strength(0.7))
+      .force('charge',d3.forceManyBody().strength(-340))
+      .force('center',d3.forceCenter(W/2,H/2))
+      .force('collision',d3.forceCollide(32))
+      .stop();
+    for(var t=0;t<300;t++) sim.tick();
+    var pad=34;
+    nodes.forEach(function(n){
+      n.x=Math.max(pad,Math.min(W-pad,n.x));
+      n.y=Math.max(pad,Math.min(H-pad,n.y));
+    });
+  }
 
   graphData={nodes:nodes,edges:edges};
 
@@ -1188,12 +1226,16 @@ document.getElementById('sld-speed').addEventListener('input',function(){
 
 document.querySelectorAll('#graph-selector .sel-btn').forEach(function(btn){
   btn.addEventListener('click',function(){
-    if(this.dataset.graph==='custom'){
-      setAnno('neutral','Custom graph editor coming in a future update. Try Karate Club or Molecule.');
-      return;
-    }
     document.querySelectorAll('#graph-selector .sel-btn').forEach(function(b){ b.classList.remove('active'); });
     this.classList.add('active');
+    var isCustom=this.dataset.graph==='custom';
+    document.getElementById('card-custom-editor').style.display=isCustom?'':'none';
+    if(isCustom){
+      ceSel=null;
+      ceRedraw();
+      setAnno('neutral','Draw your graph — add nodes then edges, then click ✓ Use This Graph.');
+      return;
+    }
     state.graphKey=this.dataset.graph;
     pausePlay();
     initGraph();
@@ -1647,6 +1689,118 @@ document.querySelectorAll('.app-card').forEach(function(card){
     }
   });
 });
+
+/* ── Custom Graph Editor ─────────────────────────────────────────────── */
+function ceRedraw(){
+  var svgEl=document.getElementById('svg-custom-editor');
+  if(!svgEl) return;
+  var svg=d3.select(svgEl);
+  svg.selectAll('*').remove();
+
+  /* edges */
+  ceEdges.forEach(function(e){
+    var s=ceNodes.find(function(n){ return n.id===e[0]; });
+    var t=ceNodes.find(function(n){ return n.id===e[1]; });
+    if(!s||!t) return;
+    svg.append('line')
+      .attr('x1',s.x).attr('y1',s.y).attr('x2',t.x).attr('y2',t.y)
+      .attr('stroke','#C8BE9A').attr('stroke-width',1.8).attr('stroke-linecap','round');
+  });
+
+  /* nodes */
+  ceNodes.forEach(function(n){
+    var g=svg.append('g').attr('transform','translate('+n.x+','+n.y+')');
+    g.append('circle').attr('r',16)
+      .attr('fill','#2e7d32')
+      .attr('stroke',n.id===ceSel?'var(--orange)':'white')
+      .attr('stroke-width',n.id===ceSel?3:2)
+      .style('cursor',ceMode==='edge'?'pointer':'default');
+    g.append('text')
+      .attr('text-anchor','middle').attr('dominant-baseline','central')
+      .attr('fill','white').attr('font-family',"'IBM Plex Mono',monospace")
+      .attr('font-size',10).attr('font-weight',600).attr('pointer-events','none')
+      .text(n.label);
+    g.on('click',function(event){
+      event.stopPropagation();
+      if(ceMode!=='edge') return;
+      if(ceSel===null){ ceSel=n.id; }
+      else if(ceSel===n.id){ ceSel=null; }
+      else{
+        var a=Math.min(ceSel,n.id), b=Math.max(ceSel,n.id);
+        var dup=ceEdges.some(function(e){ return e[0]===a&&e[1]===b; });
+        if(!dup) ceEdges.push([a,b]);
+        ceSel=null;
+      }
+      ceRedraw();
+    });
+    g.on('contextmenu',function(event){
+      event.preventDefault();
+      var delId=n.id;
+      ceEdges=ceEdges.filter(function(e){ return e[0]!==delId&&e[1]!==delId; });
+      ceNodes=ceNodes.filter(function(nd){ return nd.id!==delId; });
+      var idMap={};
+      ceNodes.forEach(function(nd,i){ idMap[nd.id]=i; });
+      ceEdges=ceEdges.map(function(e){ return [idMap[e[0]],idMap[e[1]]]; });
+      ceNodes.forEach(function(nd,i){ nd.id=i; nd.label=String(i); });
+      if(ceSel===delId) ceSel=null;
+      else if(ceSel!==null&&idMap[ceSel]!==undefined) ceSel=idMap[ceSel];
+      ceRedraw();
+    });
+  });
+
+  /* canvas click — add node */
+  svg.on('click',function(event){
+    if(ceMode!=='node') return;
+    if(ceNodes.length>=10) return;
+    var coords=d3.pointer(event);
+    var id=ceNodes.length;
+    ceNodes.push({id:id,x:coords[0],y:coords[1],label:String(id),
+      feat:[Math.random(),Math.random(),Math.random()]});
+    ceRedraw();
+  });
+
+  svg.style('cursor',ceMode==='node'?'crosshair':'default');
+}
+
+function ceInit(){
+  document.getElementById('ce-mode-node').addEventListener('click',function(){
+    ceMode='node'; ceSel=null;
+    this.classList.add('primary');
+    document.getElementById('ce-mode-edge').classList.remove('primary');
+    ceRedraw();
+  });
+  document.getElementById('ce-mode-edge').addEventListener('click',function(){
+    ceMode='edge';
+    this.classList.add('primary');
+    document.getElementById('ce-mode-node').classList.remove('primary');
+    ceRedraw();
+  });
+  document.getElementById('ce-clear').addEventListener('click',function(){
+    ceNodes=[]; ceEdges=[]; ceSel=null; ceMode='node';
+    document.getElementById('ce-mode-node').classList.add('primary');
+    document.getElementById('ce-mode-edge').classList.remove('primary');
+    document.getElementById('ce-error').style.display='none';
+    ceRedraw();
+  });
+  document.getElementById('ce-use').addEventListener('click',function(){
+    var errEl=document.getElementById('ce-error');
+    if(ceNodes.length<3){
+      errEl.textContent='Need at least 3 nodes before applying.';
+      errEl.style.display=''; return;
+    }
+    if(ceEdges.length<2){
+      errEl.textContent='Need at least 2 edges before applying.';
+      errEl.style.display=''; return;
+    }
+    errEl.style.display='none';
+    state.graphKey='custom';
+    pausePlay();
+    initGraph();
+    setAnno('neutral','Custom graph applied — '+ceNodes.length+' nodes, '+ceEdges.length
+      +' edges. Press Play to watch message passing.');
+  });
+}
+ceInit();
 
 /* ── Init ───────────────────────────────────────────────────────────── */
 function initGraph(){
