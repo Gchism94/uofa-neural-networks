@@ -153,16 +153,16 @@ Add a row to the appropriate table under `## Contents`:
 
 ### Probabilistic Foundations
 
-- `softmax/softmax_temperature_explorer.html`
-- `maxent/maxent_demo.html`
-- `boltzmann_maxent/boltzmann_maxent_random_exchange.html`
+- `softmax/softmax_temperature_explorer.html` (T. Pavlic)
+- `maxent/maxent_demo.html` (T. Pavlic)
+- `boltzmann_maxent/boltzmann_maxent_random_exchange.html` (T. Pavlic)
 
 ### Neural Networks
 
 - `ai_landscape/ai_landscape.html`
-- `single_layer_perceptron/slp_explainer.html`
+- `single_layer_perceptron/slp_explainer.html` (T. Pavlic)
 - `radial_basis_function_nn/rbfnn_explorer.html`
-- `multi_layer_perceptron/mlp_explorer.html`
+- `multi_layer_perceptron/mlp_explorer.html` (T. Pavlic)
 - `optimal_foraging_theory/mvt_explorer.html`
 - `spiking_neural_networks/snn_explorer.html`
 - `memristors/memristor_stdp_array.html`
