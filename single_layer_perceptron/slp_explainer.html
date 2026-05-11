@@ -90,16 +90,16 @@ footer a{color:var(--orange);text-decoration:none}
 .cr-top{
   position:fixed;top:.75rem;right:1rem;z-index:1000;
   font-size:.72rem;color:var(--text-muted);text-align:right;
-  background:rgba(250,247,240,.92);padding:.2rem .5rem;
+  background:rgba(250,247,240,.92);padding:.2rem 1.5rem .2rem .5rem;
   border-radius:5px;backdrop-filter:blur(4px);
-  border:1px solid var(--border-lt);
+  border:1px solid var(--border-lt);white-space:nowrap;min-width:max-content;
 }
 .cr-top a{color:var(--orange);text-decoration:none}
 .cr-top a:hover{text-decoration:underline}
 </style>
 </head>
 <body>
-<div class="cr-top">© 2026 Theodore P. Pavlic<br><a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a></div>
+<div class="cr-top">© 2026 Theodore P. Pavlic &amp; Greg T. Chism · <a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a></div>
 <div class="wrap">
 
 <header>
@@ -1802,7 +1802,7 @@ function tick(ts){
 /* ═════ INIT ══════════════════════════════════════════════════════ */
 buildControls();buildNeuron();buildLever();addNeuronInteractions();addLeverInteractions();buildBellCrank();addBellCrankInteractions();buildF2DFeature();buildF2DLever();addF2DInteractions();addF2DLeverInteractions();refreshEqBar();requestAnimationFrame(tick);
 </script>
-<footer id="course-nav-footer" style="margin-top:0;padding-top:0.75rem;border-top:1px solid #e0e0e0;font-size:0.8rem;color:#888;text-align:left;justify-content:flex-start;">
+<footer id="course-nav-footer" style="margin-top:0;padding:0.75rem 0 0 1rem;border-top:1px solid #E0DAC0;font-size:0.8rem;color:#78786A;text-align:left;">
   <a href="../" style="color:#2e7d32;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">&larr; All course visualizations</a>
 </footer>
 <script>

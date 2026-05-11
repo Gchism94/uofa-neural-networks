@@ -64,10 +64,11 @@ body{
 .cr-top{
   position:fixed;top:.75rem;right:1rem;z-index:1000;
   font-size:.72rem;color:var(--text-muted);text-align:right;
-  background:rgba(250,247,240,.92);padding:.2rem .5rem;
+  background:rgba(250,247,240,.92);padding:.2rem 1.5rem .2rem .5rem;
   border-radius:5px;backdrop-filter:blur(4px);
-  border:1px solid var(--border-lt);
+  border:1px solid var(--border-lt);white-space:nowrap;min-width:max-content;
 }
+.hdr-rule{border:none;border-top:2.5px solid var(--g-dk);margin-top:.55rem}
 .cr-top a{color:var(--orange);text-decoration:none}
 .cr-top a:hover{text-decoration:underline}
 
@@ -142,18 +143,19 @@ body{
 /* Tabs */
 .tab-bar-buttons{
   display:flex;flex-wrap:wrap;gap:.3rem;
-  background:white;border:1px solid var(--border);border-radius:8px;
-  padding:.35rem;box-shadow:0 2px 8px var(--shadow);
+  background:var(--cream-mid);border:1px solid var(--border);border-radius:8px;
+  padding:.35rem;width:fit-content;
 }
 .tab-bar-buttons button{
   font-family:'Outfit',sans-serif;font-size:.86rem;font-weight:500;
-  padding:.45rem .9rem;border:1px solid transparent;background:transparent;
+  padding:.45rem .9rem;border:none;background:transparent;
   color:var(--text-soft);border-radius:6px;cursor:pointer;
-  transition:background .12s,color .12s,border-color .12s;
+  transition:background .12s,color .12s;
 }
-.tab-bar-buttons button:hover{background:var(--cream-mid);color:var(--g-dk)}
+.tab-bar-buttons button:hover{background:white;color:var(--g-dk)}
 .tab-bar-buttons button.active{
-  background:var(--g-dk);color:white;border-color:var(--g-dk);
+  background:white;color:var(--g-dk);font-weight:600;
+  box-shadow:0 1px 4px var(--shadow);
 }
 .tab-bar-buttons button .n{
   font-family:'IBM Plex Mono',monospace;color:var(--orange);
@@ -1877,7 +1879,7 @@ svg.bp-map{
 </style>
 </head>
 <body>
-<div class="cr-top">© 2026 Theodore P. Pavlic<br><a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a></div>
+<div class="cr-top">© 2026 Theodore P. Pavlic &amp; Greg T. Chism · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a></div>
 <div class="wrap">
 
   <header>
@@ -1887,6 +1889,7 @@ svg.bp-map{
         <p class="subtitle">XOR, hidden-layer representations, the chain rule made visible, and depth as a compositional shortcut.</p>
       </div>
     </div>
+    <hr class="hdr-rule">
   </header>
 
   <div class="tab-bar-buttons" id="tab-bar-btns" role="tablist">

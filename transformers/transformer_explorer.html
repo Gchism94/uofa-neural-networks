@@ -57,35 +57,35 @@
 body{
   font-family:var(--sans);background:var(--bg);color:var(--text);
   min-height:100vh;font-size:15px;line-height:1.65;
+  padding:1.25rem 1.75rem 0;
 }
 
 /* ── HEADER ─────────────────────────────────────────────── */
 .hdr{
-  background:var(--green);color:#fff;
-  padding:16px 28px;display:flex;align-items:flex-start;
-  justify-content:space-between;flex-wrap:wrap;gap:8px;
+  display:flex;align-items:flex-start;column-gap:1rem;
+  row-gap:.35rem;flex-wrap:wrap;
 }
-.hdr-title h1{font-size:1.28rem;font-weight:700;line-height:1.2;letter-spacing:.01em}
-.hdr-title .sub{font-size:.76rem;opacity:.68;margin-top:3px}
-.hdr-copy{font-family:var(--mono);font-size:.66rem;opacity:.6;text-align:right;flex-shrink:0}
-.hdr-copy a{color:#fff;opacity:.85;text-decoration:none}
-.hdr-copy a:hover{opacity:1}
+.hdr>div:first-child{flex:1 1 auto;min-width:0}
+.hdr-title h1{font-size:clamp(1.2rem,2.1vw,1.55rem);font-weight:700;color:#1C3A0E;
+  line-height:1.2;letter-spacing:-.02em}
+.hdr-title .sub{font-size:.86rem;color:#888;margin-top:.18rem}
+.hdr-rule{border:none;border-top:2.5px solid #2e7d32;margin-top:.55rem}
 
 /* ── TAB BAR ─────────────────────────────────────────────── */
 .tabbar{
-  background:var(--green);display:flex;
-  border-top:1px solid rgba(255,255,255,.12);overflow-x:auto;
-  -webkit-overflow-scrolling:touch;
+  display:flex;gap:.35rem;background:#F0EBE0;border:1px solid #C8BE9A;
+  border-radius:8px;padding:.3rem;width:fit-content;
+  overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:.75rem;
 }
 .tbtn{
-  flex:1;min-width:max-content;padding:10px 18px;
-  background:none;border:none;border-bottom:3px solid transparent;
-  color:rgba(255,255,255,.58);font-family:var(--sans);font-size:.8rem;
-  font-weight:500;cursor:pointer;transition:color .18s,border-color .18s,background .18s;
-  white-space:nowrap;letter-spacing:.025em;
+  font-family:var(--sans);font-size:.82rem;font-weight:500;
+  padding:.3rem .9rem;border-radius:6px;cursor:pointer;
+  border:none;background:transparent;color:#555;
+  transition:all .15s;white-space:nowrap;
 }
-.tbtn:hover{color:rgba(255,255,255,.9);background:rgba(255,255,255,.06)}
-.tbtn.active{color:#fff;border-bottom-color:var(--orange-hi)}
+.tbtn:hover{background:white;color:#1C3A0E}
+.tbtn.active{background:white;color:#1C3A0E;font-weight:600;
+  box-shadow:0 1px 4px rgba(44,90,27,.10)}
 
 /* ── MAIN ─────────────────────────────────────────────────── */
 .main{max-width:1080px;margin:0 auto;padding:26px 22px 16px}
@@ -356,14 +356,14 @@ input[type=range]{padding:4px 0;accent-color:var(--green);width:100%}
 <div class="cr-top">© 2026 Theodore P. Pavlic &amp; Greg T. Chism · <a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a></div>
 
 <!-- ── HEADER ──────────────────────────────────────────── -->
-<header class="hdr">
-  <div class="hdr-title">
-    <h1>Transformer Architecture Explorer</h1>
-    <div class="sub">Attention · Self-Supervision · Vision Transformers</div>
+<header>
+  <div class="hdr">
+    <div class="hdr-title">
+      <h1>Transformer Architecture Explorer</h1>
+      <div class="sub">Attention · Self-Supervision · Vision Transformers</div>
+    </div>
   </div>
-  <div class="hdr-copy">
-    &copy; 2026 Theodore P. Pavlic<span class="hdr-sep"> &middot; </span><br class="hdr-br"><a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a>
-  </div>
+  <hr class="hdr-rule">
 </header>
 
 <!-- ── TAB BAR ─────────────────────────────────────────── -->
@@ -1169,9 +1169,6 @@ for sequence in corpus:
 
 </main>
 
-<footer class="ftr">
-  <span>&copy; 2026 Theodore P. Pavlic<span class="ftr-sep"> &middot; </span><br class="ftr-br"><a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a></span>
-</footer>
 
 <!-- ══════════════════════════════════════════════════════
      JAVASCRIPT
