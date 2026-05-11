@@ -272,6 +272,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 .formula-term.norm{color:var(--blue)}
 .formula-term.weight{color:var(--orange)}
 .formula-desc{font-size:.68rem;color:var(--text-soft);line-height:1.5;margin-top:.35rem}
+.formula-term{transition:background .25s,box-shadow .25s}
+.formula-term.hl{background:var(--yellow-pale);border-radius:3px;padding:0 2px;
+  box-shadow:0 0 0 1.5px var(--yellow)}
 
 /* ─────────────────────────────────────────────────────────────────── */
 /* ── Tab 3: Applications ────────────────────────────────────────── */
@@ -284,8 +287,15 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 
 .app-card{
   background:white;border:1px solid var(--border-lt);border-radius:7px;
-  padding:.65rem .75rem;
+  padding:.65rem .75rem;cursor:pointer;
+  transition:box-shadow .2s,border-color .2s,opacity .2s;
 }
+.app-card:hover{box-shadow:0 3px 12px var(--shadow);border-color:var(--g-lt)}
+.app-card.expanded{border-color:var(--g-mid);box-shadow:0 4px 16px var(--shadow)}
+.app-card.expanded .app-svg{max-height:260px}
+.app-card.dimmed{opacity:.4;pointer-events:none}
+.app-expand-hint{font-size:.6rem;color:var(--text-muted);text-align:center;
+  margin-top:.2rem;font-style:italic;pointer-events:none}
 .app-card-title{
   font-size:.72rem;font-weight:700;color:var(--g-dk);margin-bottom:.15rem;
 }
@@ -588,6 +598,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
               <span><span class="legend-dot" style="background:var(--community-a)"></span>Community A</span>
               <span><span class="legend-dot" style="background:var(--community-b)"></span>Community B</span>
             </div>
+            <div class="app-expand-hint">Click to expand</div>
           </div>
 
           <!-- Molecule — graph classification -->
@@ -611,6 +622,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
               <span><span class="legend-dot" style="background:var(--blue);width:8px;height:8px"></span>Nitrogen (N)</span>
               <span><span class="legend-dot" style="background:var(--red);width:8px;height:8px"></span>Oxygen (O)</span>
             </div>
+            <div class="app-expand-hint">Click to expand</div>
           </div>
 
           <!-- Citation network — link prediction -->
@@ -634,6 +646,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
               <span style="font-family:'IBM Plex Mono',monospace;font-size:.68rem;
                            color:var(--purple)">- - - Predicted edge</span>
             </div>
+            <div class="app-expand-hint">Click to expand</div>
           </div>
 
         </div><!-- end app-panels -->
@@ -1405,14 +1418,36 @@ function renderGCNTab(){
   var layers=computeGCNLayers();
   renderGCNGraph(layers);
   renderGCNLayerView(layers);
+  pulseFormula(state.numLayers);
   var nid=state.selectedNode!==null?state.selectedNode:0;
   var selfNeigh=(state.adj[nid]||[]).concat([nid]);
+  var numParts=layers.map(function(lf,li){
+    return 'h^('+li+')=['+lf[nid].map(function(v){return v.toFixed(2);}).join(', ')+']';
+  });
   document.getElementById('gcn-anno').textContent=
     state.aggFn.charAt(0).toUpperCase()+state.aggFn.slice(1)
-    +' aggregation (with self-loop) on node v'+nid+': N(v)∪{v} = {'
+    +' agg (self-loop) on v'+nid+' — N(v)∪{v}={'
     +selfNeigh.map(function(n){return 'v'+n;}).join(', ')
-    +'}. After '+state.numLayers+' GCN layer'+(state.numLayers!==1?'s':'')+', each node encodes its '
-    +state.numLayers+'-hop neighborhood. Bars above each node show feature vectors h_v^('+state.numLayers+').';
+    +'}. '+numParts.join(' → ')+'.';
+}
+
+/* ── Formula pulse animation ────────────────────────────────────────── */
+function pulseFormula(nL){
+  var terms=[
+    '.formula-term.norm',
+    '.formula-term:not(.sig):not(.norm):not(.weight)',
+    '.formula-term.weight',
+    '.formula-term.sig'
+  ];
+  document.querySelectorAll('.formula-term').forEach(function(t){ t.classList.remove('hl'); });
+  terms.forEach(function(sel,i){
+    setTimeout(function(){
+      document.querySelectorAll('.formula-eq '+sel).forEach(function(t){ t.classList.add('hl'); });
+    }, i*380);
+    setTimeout(function(){
+      document.querySelectorAll('.formula-eq '+sel).forEach(function(t){ t.classList.remove('hl'); });
+    }, i*380+500);
+  });
 }
 
 /* ── Applications tab panels ────────────────────────────────────────── */
@@ -1571,6 +1606,32 @@ function renderAppsTab(){
     renderCitationGraph();
   }, 30);
 }
+
+/* ── App card expand-on-click ───────────────────────────────────────── */
+document.querySelectorAll('.app-card').forEach(function(card){
+  card.addEventListener('click',function(){
+    var isExp=this.classList.contains('expanded');
+    document.querySelectorAll('.app-card').forEach(function(c){
+      c.classList.remove('expanded','dimmed');
+      var h=c.querySelector('.app-expand-hint');
+      if(h) h.textContent='Click to expand';
+    });
+    if(!isExp){
+      this.classList.add('expanded');
+      document.querySelectorAll('.app-card').forEach(function(c){
+        if(!c.classList.contains('expanded')) c.classList.add('dimmed');
+      });
+      var hint=this.querySelector('.app-expand-hint');
+      if(hint) hint.textContent='Click to collapse';
+      var svg=this.querySelector('.app-svg');
+      if(svg){
+        if(svg.id==='svg-app-social') setTimeout(renderSocialGraph,30);
+        else if(svg.id==='svg-app-molecule') setTimeout(renderMoleculeGraph,30);
+        else if(svg.id==='svg-app-citation') setTimeout(renderCitationGraph,30);
+      }
+    }
+  });
+});
 
 /* ── Init ───────────────────────────────────────────────────────────── */
 function initGraph(){
