@@ -12,7 +12,7 @@
 <meta property="og:type" content="website">
 <meta property="og:title" content="Loss Functions — Interactive Explorer">
 <meta property="og:description" content="See how MSE, MAE, Cross-Entropy, and Hinge loss respond to predictions — and why choosing the right loss function matters for your problem.">
-<meta property="og:image" content="https://gchism94.github.io/uofa-neural-networks/loss_functions/lf_explorer-preview.png">
+<meta property="og:image" content="https://gchism94.github.io/uofa-neural-networks/loss_functions/lf_explorer-preview.svg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="600">
 <meta property="og:url" content="https://gchism94.github.io/uofa-neural-networks/loss_functions/lf_explorer.html">
@@ -22,7 +22,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Loss Functions — Interactive Explorer">
 <meta name="twitter:description" content="See how MSE, MAE, Cross-Entropy, and Hinge loss respond to predictions — and why choosing the right loss function matters for your problem.">
-<meta name="twitter:image" content="https://gchism94.github.io/uofa-neural-networks/loss_functions/lf_explorer-preview.png">
+<meta name="twitter:image" content="https://gchism94.github.io/uofa-neural-networks/loss_functions/lf_explorer-preview.svg">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -247,22 +247,13 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 /* ─────────────────────────────────────────────────────────────────── */
 /* ── Tab 3: When to Use Which ───────────────────────────────────── */
 /* ─────────────────────────────────────────────────────────────────── */
-.scenario-panels{
-  display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem;
-}
-@media(max-width:860px){.scenario-panels{grid-template-columns:1fr 1fr}}
-@media(max-width:540px){.scenario-panels{grid-template-columns:1fr}}
-
+.scenario-panels{display:flex;flex-direction:column;gap:.75rem}
 .scenario-card{
   background:white;border:1px solid var(--border-lt);border-radius:7px;
   padding:.65rem .75rem;
 }
-.scenario-card-title{
-  font-size:.72rem;font-weight:700;color:var(--g-dk);margin-bottom:.1rem;
-}
-.scenario-card-sub{
-  font-size:.64rem;color:var(--text-muted);margin-bottom:.4rem;font-style:italic;
-}
+.scenario-card-title{font-size:.72rem;font-weight:700;color:var(--g-dk);margin-bottom:.1rem}
+.scenario-card-sub{font-size:.64rem;color:var(--text-muted);margin-bottom:.4rem;font-style:italic}
 .scenario-badge{
   display:inline-block;padding:.1rem .45rem;border-radius:4px;
   font-size:.62rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
@@ -271,14 +262,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 .scenario-badge.regression{background:var(--g-pale);color:var(--g-mid)}
 .scenario-badge.binary-cls{background:var(--blue-pale);color:var(--blue)}
 .scenario-badge.multi-cls{background:var(--purple-pale);color:var(--purple)}
-
 .scenario-svg{
   flex:0 0 160px;width:160px;height:160px;display:block;
   border-radius:5px;background:#FDFAF5;border:1px solid var(--border-lt);
 }
-/* vertical-stack scenario layout */
-.scenario-panels{display:flex!important;flex-direction:column!important;
-  grid-template-columns:unset!important}
 .scenario-inner{display:flex;gap:.75rem;align-items:flex-start;margin-top:.4rem}
 .scenario-side{flex:1;min-width:0;display:flex;flex-direction:column;gap:.35rem}
 .decision-guide{
@@ -286,6 +273,12 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   background:var(--cream-mid);border-left:3px solid var(--border);
   border-radius:0 5px 5px 0;padding:.45rem .6rem;margin-top:.35rem;
 }
+/* Optimizer status (right panel, Tab 2) */
+.opt-status-row{display:flex;justify-content:space-between;font-size:.72rem;
+  padding:.22rem 0;border-bottom:1px solid var(--border-lt)}
+.opt-status-row:last-child{border-bottom:none}
+.opt-status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:.35rem;flex-shrink:0}
+.opt-status-val{font-family:'IBM Plex Mono',monospace;font-weight:600;color:var(--g-dk)}
 
 /* ─────────────────────────────────────────────────────────────────── */
 /* ── Right panel ─────────────────────────────────────────────────── */
@@ -380,7 +373,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   <div class="left-col">
 
     <!-- Loss function selector -->
-    <div class="card">
+    <div class="card" id="card-lf-loss">
       <div class="card-title">Loss Function</div>
       <div class="sel-group" id="loss-selector">
         <button class="sel-btn loss-mse active" data-loss="mse">MSE</button>
@@ -393,7 +386,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     </div>
 
     <!-- True label -->
-    <div class="card">
+    <div class="card" id="card-lf-truelabel">
       <div class="card-title">True Label y</div>
 
       <div class="param-lbl">Task type</div>
@@ -423,7 +416,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     </div>
 
     <!-- Prediction slider -->
-    <div class="card">
+    <div class="card" id="card-lf-pred">
       <div class="card-title">Prediction ŷ</div>
       <div class="srow">
         <span class="slbl">ŷ</span>
@@ -434,7 +427,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     </div>
 
     <!-- Outlier slider -->
-    <div class="card">
+    <div class="card" id="card-lf-outlier">
       <div class="card-title">Outliers</div>
       <div class="srow">
         <span class="slbl" style="font-size:.72rem">n</span>
@@ -679,8 +672,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   <!-- ══ RIGHT: Live stats ════════════════════════════════════════════ -->
   <div class="right-col">
 
-    <!-- Current loss value -->
-    <div class="card" id="card-gnn-rp1">
+    <!-- Current loss value (Tab 1) -->
+    <div class="card" id="card-lf-rp1">
       <div class="card-title">Current Loss</div>
       <div class="loss-display">
         <span class="loss-big" id="rp-loss-val" style="color:var(--loss-mse)">—</span>
@@ -688,8 +681,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
       </div>
     </div>
 
-    <!-- Current gradient -->
-    <div class="card">
+    <!-- Current gradient (Tab 1) -->
+    <div class="card" id="card-lf-rp2">
       <div class="card-title">Gradient ∂L/∂ŷ</div>
       <div class="grad-box">
         <span class="grad-val" id="rp-grad-val" style="color:var(--text-muted)">—</span>
@@ -701,8 +694,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
       </div>
     </div>
 
-    <!-- Formula display -->
-    <div class="card">
+    <!-- Formula display (Tab 1) -->
+    <div class="card" id="card-lf-rp3">
       <div class="card-title">Formula</div>
       <div class="formula-panel">
         <div class="formula-label" id="rp-formula-name">MSE</div>
@@ -713,8 +706,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
       </div>
     </div>
 
-    <!-- Comparison table -->
-    <div class="card">
+    <!-- Comparison table (Tab 1) -->
+    <div class="card" id="card-lf-rp4">
       <div class="card-title">All Losses at ŷ</div>
       <table class="cmp-table" id="cmp-table">
         <thead>
@@ -744,6 +737,29 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
         </tbody>
       </table>
       <div class="hint-txt" style="margin-top:.3rem">at current ŷ and y</div>
+    </div>
+
+    <!-- Optimizer status (Tab 2 only) -->
+    <div class="card" id="card-lf-rp-opt" style="display:none">
+      <div class="card-title">Optimizer Status</div>
+      <div id="opt-status-list">
+        <div class="opt-status-row"><span><span class="opt-status-dot" style="background:#2D5A1B"></span>MSE</span><span class="opt-status-val" id="opt-val-mse">—</span></div>
+        <div class="opt-status-row"><span><span class="opt-status-dot" style="background:#E8630A"></span>MAE</span><span class="opt-status-val" id="opt-val-mae">—</span></div>
+        <div class="opt-status-row"><span><span class="opt-status-dot" style="background:#1A56A0"></span>Huber</span><span class="opt-status-val" id="opt-val-huber">—</span></div>
+        <div class="opt-status-row"><span><span class="opt-status-dot" style="background:#7B3FC4"></span>CE (log.)</span><span class="opt-status-val" id="opt-val-ce">—</span></div>
+      </div>
+      <div class="hint-txt" style="margin-top:.3rem">Current loss after GD step <span id="opt-step-display">0</span></div>
+    </div>
+
+    <!-- When to Use summary (Tab 3 only) -->
+    <div class="card" id="card-lf-rp-guide" style="display:none">
+      <div class="card-title">Quick Guide</div>
+      <div style="font-size:.72rem;color:var(--text-soft);line-height:1.6">
+        <div style="margin-bottom:.4rem"><strong style="color:var(--g-mid)">Regression</strong><br>Outliers rare → MSE · Outliers common → MAE · Both → Huber</div>
+        <div style="margin-bottom:.4rem"><strong style="color:var(--blue)">Classification</strong><br>Probabilities → Cross-Entropy · Margin boundary → Hinge</div>
+        <div><strong style="color:var(--purple)">Multi-class</strong><br>Categorical Cross-Entropy is the standard</div>
+      </div>
+      <div class="hint-txt" style="margin-top:.4rem">Switch to Loss Landscape to see live loss values</div>
     </div>
 
   </div><!-- end right-col -->
@@ -1422,7 +1438,7 @@ function startGD(){
         'MSE converges smoothly but is pulled by outliers. MAE is robust but oscillates near the minimum. Huber gets the best of both.';
       return;
     }
-    updateOptScatter();updateLossCurves();
+    updateOptScatter();updateLossCurves();updateOptStatus();
   },ms);
 }
 
@@ -1550,6 +1566,35 @@ function renderWhentouseTab(){
     'Use MSE for regression when outliers are rare. Use MAE when outliers are common. For classification, Cross-Entropy works with probabilities while Hinge enforces a maximum-margin boundary. Add outliers (left panel) to see MSE vs MAE diverge.';
 }
 
+/* ── Tab-aware visibility ────────────────────────────────────── */
+function _lfv(id,vis){var e=document.getElementById(id);if(e)e.style.display=vis?'':'none';}
+function applyTabVis(tab){
+  var isL=tab==='landscape', isO=tab==='optimization', isW=tab==='whentouse';
+  /* Left panel */
+  _lfv('card-lf-loss',      isL);      // loss selector — only meaningful on Tab 1
+  _lfv('card-lf-truelabel', isL);      // true label — only affects Tab 1 curve
+  _lfv('card-lf-pred',      isL);      // prediction slider — only Tab 1
+  _lfv('card-lf-outlier',   isO||isW); // outliers affect Tab 2 dataset and Tab 3 Panel A
+  _lfv('card-playback',     isL||isO); // Tab 3 is static — no animation
+  /* Right panel */
+  _lfv('card-lf-rp1',       isL);
+  _lfv('card-lf-rp2',       isL);
+  _lfv('card-lf-rp3',       isL);
+  _lfv('card-lf-rp4',       isL);
+  _lfv('card-lf-rp-opt',    isO);
+  _lfv('card-lf-rp-guide',  isW);
+}
+
+/* ── Update optimizer status card ────────────────────────────── */
+function updateOptStatus(){
+  OPT.forEach(function(n){
+    var pts=genPts(getOutliers());
+    var loss=pts.reduce(function(a,p){var yh=gSt[n].sl*p.x+gSt[n].ic;var y=n==='ce'?(p.y>=0.5?1:0):p.y;return a+lv3(n,y,yh);},0)/pts.length;
+    setEl3('opt-val-'+n, isFinite(loss)?loss.toFixed(4):'—');
+  });
+  setEl3('opt-step-display', gStep);
+}
+
 /* ── Replace play/step/reset with tab-aware versions ─────────── */
 function cloneBtn(id){
   var old=document.getElementById(id);if(!old) return null;
@@ -1595,7 +1640,8 @@ document.getElementById('tab-bar').addEventListener('click',function(e){
   var btn=e.target.closest('button');if(!btn||!btn.dataset.tab) return;
   var tab=btn.dataset.tab;
   if(tab!=='optimization'&&gPlaying) stopGD();
-  if(tab==='optimization') setTimeout(initOptimTab,30);
+  applyTabVis(tab);
+  if(tab==='optimization') setTimeout(function(){initOptimTab();updateOptStatus();},30);
   if(tab==='whentouse') setTimeout(renderWhentouseTab,30);
   setTimeout(syncPlayBtn,40);
 });
@@ -1628,7 +1674,8 @@ document.getElementById('sld-speed').addEventListener('change',function(){
   if(gPlaying&&currentTab()==='optimization'){stopGD();startGD();}
 });
 
-/* ── Init: pre-run some steps so Tab 2 looks populated ─────── */
+/* ── Init: apply Tab 1 visibility on page load ──────────────── */
+applyTabVis('landscape');
 resetGD();
 
 })();
