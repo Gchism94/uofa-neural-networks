@@ -464,11 +464,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
         Key Concepts <span id="concepts-arrow">▾</span>
       </div>
       <div class="concepts-body" id="concepts-body">
-        <div class="concepts-item"><strong>What is a loss function?</strong> A loss function measures how far a model's prediction is from the true answer. Training minimises this score — so the choice of loss function directly shapes what the model learns to optimise.</div>
-        <div class="concepts-item"><strong>Why MSE penalises outliers more than MAE:</strong> MSE squares the error, so a prediction that is 10× further from the truth contributes 100× as much loss. MAE uses the absolute error, so that same outlier contributes only 10× as much — making MAE far more robust to extreme values.</div>
-        <div class="concepts-item"><strong>Why cross-entropy is used for classification:</strong> Classification produces probabilities. Cross-entropy measures how surprised you are by the true label given your probability — predicting 0.01 for the correct class incurs enormous loss, creating a steep gradient that pushes probabilities toward 1 for the right class.</div>
-        <div class="concepts-item"><strong>What the gradient of the loss tells the optimizer:</strong> The gradient ∂L/∂ŷ tells gradient descent how much to adjust the prediction. A large gradient means you are far from the minimum — the optimizer takes a big corrective step. Near the minimum the gradient shrinks, slowing updates and allowing fine convergence.</div>
-        <div class="concepts-item"><strong>How Huber loss bridges MSE and MAE:</strong> Huber uses MSE for small errors (where quadratic is smooth and easy to optimise) and MAE for large errors (where quadratic would over-emphasise outliers). A threshold δ controls where the switch happens — Huber gives the best of both worlds for noisy regression problems.</div>
+        <div class="concepts-item"><strong>What is a loss function?</strong> A measure of how wrong the model's prediction is — the optimizer minimizes this value by adjusting weights via gradient descent. The choice of loss function shapes what the model learns to optimise.</div>
+        <div class="concepts-item"><strong>MSE vs MAE:</strong> MSE squares the error so large mistakes are penalized much more than small ones — sensitive to outliers. MAE uses absolute error — robust to outliers but has a constant gradient that can oscillate near the minimum.</div>
+        <div class="concepts-item"><strong>Why cross-entropy for classification?</strong> It penalizes confident wrong predictions extremely heavily — log(0) → ∞. This creates strong gradients that push the model away from confident mistakes, making it ideal for probability outputs.</div>
+        <div class="concepts-item"><strong>What does the gradient tell us?</strong> The gradient ∂L/∂ŷ is the slope of the loss curve at the current prediction — it tells the optimizer which direction and how far to move. Large gradient = far from minimum, small gradient = near minimum.</div>
+        <div class="concepts-item"><strong>Huber loss:</strong> combines MSE (for small errors) and MAE (for large errors) using a threshold δ. Smooth gradients near the minimum, robust to outliers far away. Best of both worlds for noisy regression problems.</div>
       </div>
     </div>
 
@@ -564,14 +564,14 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
         </svg>
 
         <div class="legend" style="justify-content:center;margin-top:.55rem">
-          <span><span class="legend-dot" style="background:var(--loss-mse)"></span>MSE path</span>
-          <span><span class="legend-dot" style="background:var(--loss-mae)"></span>MAE path</span>
-          <span><span class="legend-dot" style="background:var(--loss-ce)"></span>Cross-Entropy path</span>
-          <span><span class="legend-dot" style="background:var(--loss-hinge)"></span>Hinge path</span>
+          <span><span class="legend-dot" style="background:#2D5A1B"></span>MSE</span>
+          <span><span class="legend-dot" style="background:var(--loss-mae)"></span>MAE</span>
+          <span><span class="legend-dot" style="background:var(--loss-blue,#1A56A0)"></span>Huber</span>
+          <span><span class="legend-dot" style="background:var(--loss-hinge)"></span>Cross-Entropy (logistic)</span>
         </div>
 
-        <!-- Gradient magnitude chart -->
-        <div class="panel-title" style="margin-top:.75rem">Gradient Magnitude vs Prediction</div>
+        <!-- Loss over GD steps -->
+        <div class="panel-title" style="margin-top:.75rem">Loss over Gradient Descent Steps</div>
         <svg id="svg-grad-magnitude">
           <rect width="100%" height="100%" fill="#FDFAF5"/>
           <text x="50%" y="44%" text-anchor="middle" dominant-baseline="middle"
@@ -1192,6 +1192,405 @@ initMainChart();
 renderMiniGrid();
 updateRightPanel();
 updateAnno();
+
+/* expose API for Stage 3 */
+window.LF={S:S,startPlay:startPlay,stopPlay:stopPlay,doReset:doReset,
+  fullRender:fullRender,updateAll:updateAll,setEl:setEl};
+
+})();
+</script>
+
+<script>
+/* ══════════════════════════════════════════════════════════════
+   STAGE 3 — Optimization Effect + When to Use Which
+══════════════════════════════════════════════════════════════ */
+(function(){'use strict';
+
+var LF2=window.LF||{};
+
+/* ── Helpers ────────────────────────────────────────────────── */
+function setEl3(id,v){var e=document.getElementById(id);if(e)e.textContent=v;}
+function currentTab(){var b=document.querySelector('#tab-bar button.active');return b?b.dataset.tab:'landscape';}
+function getOutliers(){return+(document.getElementById('sld-outliers').value)||0;}
+function getSpeed(){return+(document.getElementById('sld-speed').value)||3;}
+
+/* ── Reimplemented math ─────────────────────────────────────── */
+var HD=0.5;
+function lv3(n,y,yh){
+  switch(n){
+    case 'mse':  return (yh-y)*(yh-y);
+    case 'mae':  return Math.abs(yh-y);
+    case 'huber':{var e=Math.abs(yh-y);return e<=HD?0.5*e*e:HD*(e-0.5*HD);}
+    case 'ce':   {var p=Math.max(0.001,Math.min(0.999,yh));return -(y*Math.log(p)+(1-y)*Math.log(1-p));}
+  }return 0;
+}
+
+/* ── Seeded dataset ─────────────────────────────────────────── */
+var _seed=42;
+function lcg(){_seed=(_seed*1664525+1013904223)>>>0;return _seed/0x100000000;}
+function genPts(nOut){
+  _seed=42;
+  var pts=[];
+  for(var i=0;i<20;i++){
+    var x=0.05+lcg()*0.9;
+    var y=Math.max(0,Math.min(1,0.7*x+0.15+(lcg()-0.5)*0.12));
+    pts.push({x:x,y:y,out:false});
+  }
+  for(var j=0;j<nOut;j++) pts.push({x:0.2+j*0.15,y:0.88-j*0.05,out:true});
+  return pts;
+}
+
+/* ── Closed-form OLS ────────────────────────────────────────── */
+function ols(pts){
+  var n=pts.length,sx=0,sy=0,sxy=0,sx2=0;
+  pts.forEach(function(p){sx+=p.x;sy+=p.y;sxy+=p.x*p.y;sx2+=p.x*p.x;});
+  var sl=(n*sxy-sx*sy)/(n*sx2-sx*sx||1e-9);
+  return{sl:sl,ic:(sy-sl*sx)/n};
+}
+
+/* ── Gradient descent state ─────────────────────────────────── */
+var OPT=['mse','mae','huber','ce'];
+var OC={mse:'#2D5A1B',mae:'#E8630A',huber:'#1A56A0',ce:'#7B3FC4'};
+var LR={mse:0.55,mae:0.04,huber:0.35,ce:0.5};
+var ON={mse:'MSE',mae:'MAE',huber:'Huber',ce:'CE (logistic)'};
+var gSt={},gHist={},gStep=0,gPlaying=false,gTimer=null;
+var MAX_STEPS=80;
+
+function resetGD(){
+  OPT.forEach(function(n){gSt[n]={sl:0,ic:0.5};gHist[n]=[];});
+  gStep=0;
+}
+
+function gdOnce(){
+  if(gStep>=MAX_STEPS) return false;
+  var pts=genPts(getOutliers());
+  OPT.forEach(function(n){
+    var st=gSt[n],N=pts.length,dsl=0,dic=0;
+    pts.forEach(function(p){
+      var yh=st.sl*p.x+st.ic;
+      var y=n==='ce'?(p.y>=0.5?1:0):p.y;
+      if(n==='mse'){var e=yh-y;dsl+=e*p.x;dic+=e;}
+      else if(n==='mae'){var s=yh>y?1:yh<y?-1:0;dsl+=s*p.x;dic+=s;}
+      else if(n==='huber'){var e=yh-y,g=Math.abs(e)<=HD?e:HD*(e>0?1:-1);dsl+=g*p.x;dic+=g;}
+      else if(n==='ce'){var p2=1/(1+Math.exp(-yh*3)),e=p2-y;dsl+=e*p.x;dic+=e;}
+    });
+    var lr=LR[n];
+    st.sl=Math.max(-3,Math.min(3,st.sl-lr*dsl/N));
+    st.ic=Math.max(-0.5,Math.min(1.5,st.ic-lr*dic/N));
+    var loss=pts.reduce(function(a,p){var yh=st.sl*p.x+st.ic;var y=n==='ce'?(p.y>=0.5?1:0):p.y;return a+lv3(n,y,yh);},0)/pts.length;
+    gHist[n].push(loss);
+  });
+  gStep++;
+  return true;
+}
+
+/* ── Optim scatter SVG ──────────────────────────────────────── */
+var OVW=640,OVH=300,OML=45,OMR=15,OMT=20,OMB=38;
+var OPW=OVW-OML-OMR,OPH=OVH-OMT-OMB;
+
+function axStyle(g){
+  g.select('.domain').attr('stroke','#C8BE9A');
+  g.selectAll('text').attr('font-family',"'IBM Plex Mono',monospace").attr('font-size',9).attr('fill','#888');
+  g.selectAll('line').attr('stroke','#C8BE9A');
+}
+
+function initOptScatter(){
+  var svg=d3.select('#svg-optim-scatter');
+  svg.selectAll('*').remove();
+  svg.attr('viewBox','0 0 '+OVW+' '+OVH).attr('preserveAspectRatio','xMidYMid meet');
+  var g=svg.append('g').attr('class','og').attr('transform','translate('+OML+','+OMT+')');
+  g.append('rect').attr('width',OPW).attr('height',OPH).attr('fill','#FDFAF5').attr('rx',3);
+  var xSc=d3.scaleLinear().domain([0,1]).range([0,OPW]);
+  var ySc=d3.scaleLinear().domain([0,1]).range([OPH,0]);
+  var xAx=g.append('g').attr('class','oxa').attr('transform','translate(0,'+OPH+')').call(d3.axisBottom(xSc).ticks(5).tickSize(3));
+  axStyle(xAx);
+  var yAx=g.append('g').attr('class','oya').call(d3.axisLeft(ySc).ticks(5).tickSize(3));
+  axStyle(yAx);
+  g.append('text').attr('x',OPW/2).attr('y',OPH+30).attr('text-anchor','middle').attr('font-family',"'Outfit',sans-serif").attr('font-size',10).attr('fill','#888').text('x');
+  g.append('text').attr('transform','rotate(-90)').attr('x',-OPH/2).attr('y',-33).attr('text-anchor','middle').attr('font-family',"'Outfit',sans-serif").attr('font-size',10).attr('fill','#888').text('y');
+  g.append('line').attr('class','true-l').attr('stroke','#C8BE9A').attr('stroke-width',1.5).attr('stroke-dasharray','6 4');
+  OPT.forEach(function(n){
+    g.append('line').attr('class','ol-'+n).attr('stroke',OC[n]).attr('stroke-width',2.5).attr('opacity',0.92);
+  });
+  g.append('g').attr('class','opt-pts');
+  /* in-chart legend */
+  OPT.forEach(function(n,i){
+    var ly=10+i*18;
+    g.append('line').attr('x1',0).attr('y1',ly).attr('x2',24).attr('y2',ly).attr('stroke',OC[n]).attr('stroke-width',2.5);
+    g.append('text').attr('x',28).attr('y',ly+4).attr('font-family',"'IBM Plex Mono',monospace").attr('font-size',9).attr('fill',OC[n]).attr('font-weight',700).text(ON[n]);
+  });
+}
+
+function updateOptScatter(){
+  var pts=genPts(getOutliers());
+  var xSc=d3.scaleLinear().domain([0,1]).range([0,OPW]);
+  var ySc=d3.scaleLinear().domain([0,1]).range([OPH,0]);
+  var g=d3.select('#svg-optim-scatter .og');
+  if(g.empty()) return;
+  /* true line */
+  g.select('.true-l').attr('x1',xSc(0)).attr('y1',ySc(0.15)).attr('x2',xSc(1)).attr('y2',ySc(0.85));
+  /* prediction lines */
+  OPT.forEach(function(n){
+    var st=gSt[n];
+    g.select('.ol-'+n).attr('x1',xSc(0)).attr('y1',ySc(st.ic)).attr('x2',xSc(1)).attr('y2',ySc(st.sl+st.ic));
+  });
+  /* data points */
+  var ptG=g.select('.opt-pts');
+  ptG.selectAll('*').remove();
+  pts.forEach(function(p){
+    ptG.append('circle').attr('cx',xSc(p.x)).attr('cy',ySc(p.y))
+      .attr('r',p.out?6:4).attr('fill',p.out?'#B0321D':'#1A56A0')
+      .attr('opacity',0.75).attr('stroke','white').attr('stroke-width',1);
+  });
+}
+
+/* ── Loss curves SVG ────────────────────────────────────────── */
+var LVW=640,LVH=130,LML=45,LMR=15,LMT=10,LMB=28;
+var LPW=LVW-LML-LMR,LPH=LVH-LMT-LMB;
+
+function initLossCurves(){
+  var svg=d3.select('#svg-grad-magnitude');
+  svg.selectAll('*').remove();
+  svg.attr('viewBox','0 0 '+LVW+' '+LVH).attr('preserveAspectRatio','xMidYMid meet');
+  var g=svg.append('g').attr('class','lcg').attr('transform','translate('+LML+','+LMT+')');
+  g.append('rect').attr('width',LPW).attr('height',LPH).attr('fill','#FDFAF5').attr('rx',3);
+  g.append('g').attr('class','lcxa').attr('transform','translate(0,'+LPH+')');
+  g.append('g').attr('class','lcya');
+  g.append('text').attr('x',LPW/2).attr('y',LPH+22).attr('text-anchor','middle').attr('font-family',"'Outfit',sans-serif").attr('font-size',9).attr('fill','#888').text('GD Step');
+  g.append('text').attr('transform','rotate(-90)').attr('x',-LPH/2).attr('y',-33).attr('text-anchor','middle').attr('font-family',"'Outfit',sans-serif").attr('font-size',9).attr('fill','#888').text('Loss');
+  OPT.forEach(function(n){
+    g.append('path').attr('class','lc-'+n).attr('fill','none').attr('stroke',OC[n]).attr('stroke-width',1.8).attr('stroke-linecap','round');
+  });
+}
+
+function updateLossCurves(){
+  var maxLen=Math.max.apply(null,OPT.map(function(n){return gHist[n].length;}));
+  if(maxLen===0) return;
+  var g=d3.select('#svg-grad-magnitude .lcg');
+  if(g.empty()) return;
+  var maxL=Math.max.apply(null,OPT.map(function(n){return gHist[n].length>0?gHist[n][0]:0;}));
+  maxL=Math.min(maxL,5)||0.5;
+  var xSc=d3.scaleLinear().domain([0,Math.max(maxLen,1)]).range([0,LPW]);
+  var ySc=d3.scaleLinear().domain([0,maxL]).range([LPH,0]);
+  var xAx=g.select('.lcxa').call(d3.axisBottom(xSc).ticks(5).tickSize(2));
+  axStyle(xAx);
+  var yAx=g.select('.lcya').call(d3.axisLeft(ySc).ticks(3).tickSize(2).tickFormat(d3.format('.2f')));
+  axStyle(yAx);
+  var lFn=d3.line().x(function(d,i){return xSc(i);}).y(function(d){return ySc(Math.min(d,maxL));}).curve(d3.curveCatmullRom.alpha(0.5));
+  OPT.forEach(function(n){g.select('.lc-'+n).datum(gHist[n]).attr('d',lFn);});
+}
+
+/* ── Play control ───────────────────────────────────────────── */
+function syncPlayBtn(){
+  var tab=currentTab();
+  var pb=document.getElementById('btn-play');
+  if(!pb) return;
+  if(tab==='optimization') pb.textContent=gPlaying?'⏸ Pause':'⏵ Play';
+  else pb.textContent=(LF2.S&&LF2.S.playing)?'⏸ Pause':'⏵ Play';
+}
+function stopGD(){gPlaying=false;clearInterval(gTimer);gTimer=null;syncPlayBtn();}
+function startGD(){
+  gPlaying=true;syncPlayBtn();
+  var ms=[800,500,300,180,80][getSpeed()-1]||300;
+  gTimer=setInterval(function(){
+    if(!gdOnce()){
+      stopGD();
+      document.getElementById('optimization-anno').textContent=
+        'Converged after '+gStep+' steps. MSE is pulled by outliers — add some to see it shift. MAE stays robust but oscillates. Huber balances both.';
+      return;
+    }
+    updateOptScatter();updateLossCurves();
+  },ms);
+}
+
+function initOptimTab(){
+  resetGD();
+  initOptScatter();
+  initLossCurves();
+  updateOptScatter();
+  updateLossCurves();
+  document.getElementById('optimization-anno').textContent=
+    'Press Play to watch gradient descent converge under each loss function simultaneously. Add outliers to see MSE get pulled off course while MAE stays robust.';
+  syncPlayBtn();
+}
+
+/* ── When to Use Which ──────────────────────────────────────── */
+function axStyle2(g){
+  g.select('.domain').remove();
+  g.selectAll('line').attr('stroke','#C8BE9A');
+  g.selectAll('text').attr('font-family',"'IBM Plex Mono',monospace").attr('font-size',8).attr('fill','#888');
+}
+
+function renderRegPanel(){
+  var pts=genPts(getOutliers());
+  var mf=ols(pts);
+  /* MAE via many GD steps */
+  var ms2=0,mi2=0.5;
+  for(var s=0;s<300;s++){
+    var dsl=0,dic=0;
+    pts.forEach(function(p){var yh=ms2*p.x+mi2;var sg=yh>p.y?1:yh<p.y?-1:0;dsl+=sg*p.x;dic+=sg;});
+    ms2-=0.035*dsl/pts.length;mi2-=0.035*dic/pts.length;
+  }
+  var svg=d3.select('#svg-scenario-regression');
+  svg.selectAll('*').remove();
+  svg.attr('viewBox','0 0 200 190').attr('preserveAspectRatio','xMidYMid meet');
+  var xSc=d3.scaleLinear().domain([0,1]).range([18,185]);
+  var ySc=d3.scaleLinear().domain([0,1]).range([165,10]);
+  svg.append('rect').attr('width',200).attr('height',190).attr('fill','#FDFAF5');
+  /* axes */
+  svg.append('line').attr('x1',18).attr('y1',165).attr('x2',185).attr('y2',165).attr('stroke','#C8BE9A').attr('stroke-width',0.8);
+  svg.append('line').attr('x1',18).attr('y1',10).attr('x2',18).attr('y2',165).attr('stroke','#C8BE9A').attr('stroke-width',0.8);
+  /* points */
+  pts.forEach(function(p){
+    svg.append('circle').attr('cx',xSc(p.x)).attr('cy',ySc(p.y)).attr('r',p.out?5:3.5)
+      .attr('fill',p.out?'#B0321D':'#555').attr('opacity',0.7).attr('stroke','white').attr('stroke-width',p.out?1.5:0.8);
+  });
+  /* MSE fit (blue) */
+  svg.append('line').attr('x1',xSc(0)).attr('y1',ySc(mf.ic)).attr('x2',xSc(1)).attr('y2',ySc(mf.sl+mf.ic))
+    .attr('stroke','#1A56A0').attr('stroke-width',2.5).attr('opacity',0.9);
+  /* MAE fit (orange) */
+  svg.append('line').attr('x1',xSc(0)).attr('y1',ySc(mi2)).attr('x2',xSc(1)).attr('y2',ySc(ms2+mi2))
+    .attr('stroke','#E8630A').attr('stroke-width',2.5).attr('opacity',0.9);
+  /* labels */
+  svg.append('text').attr('x',100).attr('y',183).attr('text-anchor','middle').attr('font-family',"'IBM Plex Mono',monospace").attr('font-size',8).attr('fill','#888').text('x');
+}
+
+function renderBinaryPanel(){
+  var svg=d3.select('#svg-scenario-binary');
+  svg.selectAll('*').remove();
+  svg.attr('viewBox','0 0 200 190').attr('preserveAspectRatio','xMidYMid meet');
+  svg.append('rect').attr('width',200).attr('height',190).attr('fill','#FDFAF5');
+  var xSc=d3.scaleLinear().domain([0,1]).range([15,185]);
+  var ySc=d3.scaleLinear().domain([0,4]).range([155,10]);
+  function gauss(x,mu,sig){return Math.exp(-0.5*Math.pow((x-mu)/sig,2))/(sig*Math.sqrt(2*Math.PI));}
+  var c0=[],c1=[];
+  for(var xi=0;xi<=1;xi+=0.01){c0.push({x:xi,y:gauss(xi,0.3,0.1)});c1.push({x:xi,y:gauss(xi,0.7,0.1)});}
+  var lineFn=d3.line().x(function(d){return xSc(d.x);}).y(function(d){return ySc(d.y);}).curve(d3.curveCatmullRom.alpha(0.5));
+  var aFn0=d3.area().x(function(d){return xSc(d.x);}).y0(155).y1(function(d){return ySc(d.y);}).curve(d3.curveCatmullRom.alpha(0.5));
+  var aFn1=d3.area().x(function(d){return xSc(d.x);}).y0(155).y1(function(d){return ySc(d.y);}).curve(d3.curveCatmullRom.alpha(0.5));
+  svg.append('path').datum(c0).attr('d',aFn0).attr('fill','#1A56A0').attr('opacity',0.12);
+  svg.append('path').datum(c1).attr('d',aFn1).attr('fill','#E8630A').attr('opacity',0.12);
+  svg.append('path').datum(c0).attr('d',lineFn).attr('fill','none').attr('stroke','#1A56A0').attr('stroke-width',2);
+  svg.append('path').datum(c1).attr('d',lineFn).attr('fill','none').attr('stroke','#E8630A').attr('stroke-width',2);
+  /* margin zone for hinge */
+  var mx0=xSc(0.4),mx1=xSc(0.6);
+  svg.append('rect').attr('x',mx0).attr('y',8).attr('width',mx1-mx0).attr('height',147).attr('fill','#7B3FC4').attr('opacity',0.08);
+  /* CE boundary */
+  var bx=xSc(0.5);
+  svg.append('line').attr('x1',bx).attr('y1',8).attr('x2',bx).attr('y2',155).attr('stroke','#E8630A').attr('stroke-width',2).attr('stroke-dasharray','5 3');
+  /* Hinge margin lines */
+  svg.append('line').attr('x1',mx0).attr('y1',8).attr('x2',mx0).attr('y2',155).attr('stroke','#7B3FC4').attr('stroke-width',1.5).attr('stroke-dasharray','4 3').attr('opacity',0.8);
+  svg.append('line').attr('x1',mx1).attr('y1',8).attr('x2',mx1).attr('y2',155).attr('stroke','#7B3FC4').attr('stroke-width',1.5).attr('stroke-dasharray','4 3').attr('opacity',0.8);
+  svg.append('text').attr('x',xSc(0.25)).attr('y',170).attr('text-anchor','middle').attr('font-family',"'IBM Plex Mono',monospace").attr('font-size',8).attr('fill','#1A56A0').text('Class 0');
+  svg.append('text').attr('x',xSc(0.75)).attr('y',170).attr('text-anchor','middle').attr('font-family',"'IBM Plex Mono',monospace").attr('font-size',8).attr('fill','#E8630A').text('Class 1');
+  svg.append('text').attr('x',bx+3).attr('y',25).attr('font-family',"'IBM Plex Mono',monospace").attr('font-size',7).attr('fill','#E8630A').text('CE bdry');
+  svg.append('text').attr('x',xSc(0.5)).attr('y',183).attr('text-anchor','middle').attr('font-family',"'IBM Plex Mono',monospace").attr('font-size',7).attr('fill','#7B3FC4').text('← Hinge margin →');
+}
+
+function renderMulticlassPanel(){
+  var svg=d3.select('#svg-scenario-multiclass');
+  svg.selectAll('*').remove();
+  svg.attr('viewBox','0 0 200 190').attr('preserveAspectRatio','xMidYMid meet');
+  svg.append('rect').attr('width',200).attr('height',190).attr('fill','#FDFAF5');
+  var logits=[3.2,1.5,0.8,-0.2,2.1];
+  var mx=Math.max.apply(null,logits);
+  var exps=logits.map(function(l){return Math.exp(l-mx);});
+  var sumE=exps.reduce(function(a,b){return a+b;},0);
+  var probs=exps.map(function(e){return e/sumE;});
+  var trueClass=0;
+  var cols=['#E8630A','#2D5A1B','#1A56A0','#888','#7B3FC4'];
+  var bw=26,gap=7,x0=14,barH=110;
+  probs.forEach(function(p,i){
+    var bh=p*barH;
+    var bx=x0+i*(bw+gap);
+    svg.append('rect').attr('x',bx).attr('y',140-bh).attr('width',bw).attr('height',bh)
+      .attr('fill',cols[i]).attr('opacity',i===trueClass?0.9:0.45).attr('rx',3);
+    if(i===trueClass){
+      svg.append('rect').attr('x',bx-2).attr('y',138-bh).attr('width',bw+4).attr('height',bh+4)
+        .attr('fill','none').attr('stroke',cols[i]).attr('stroke-width',2.5).attr('rx',4);
+    }
+    svg.append('text').attr('x',bx+bw/2).attr('y',153).attr('text-anchor','middle').attr('font-family',"'IBM Plex Mono',monospace").attr('font-size',8).attr('fill',cols[i]).attr('font-weight',700).text('C'+i);
+    svg.append('text').attr('x',bx+bw/2).attr('y',133-bh).attr('text-anchor','middle').attr('font-family',"'IBM Plex Mono',monospace").attr('font-size',8).attr('fill','#888').text(p.toFixed(2));
+  });
+  svg.append('text').attr('x',100).attr('y',10).attr('text-anchor','middle').attr('dominant-baseline','hanging').attr('font-family',"'Outfit',sans-serif").attr('font-size',9).attr('fill','#888').text('5-class softmax (true = C0)');
+  var lce=-Math.log(Math.max(0.001,probs[trueClass]));
+  svg.append('rect').attr('x',15).attr('y',163).attr('width',170).attr('height',20).attr('rx',4).attr('fill','#E8630A').attr('opacity',0.1);
+  svg.append('text').attr('x',100).attr('y',173).attr('text-anchor','middle').attr('dominant-baseline','central').attr('font-family',"'IBM Plex Mono',monospace").attr('font-size',9).attr('fill','#E8630A').attr('font-weight',700)
+    .text('L = −log('+probs[trueClass].toFixed(2)+') = '+lce.toFixed(3));
+}
+
+function renderWhentouseTab(){
+  renderRegPanel();
+  renderBinaryPanel();
+  renderMulticlassPanel();
+  document.getElementById('whentouse-anno').textContent=
+    'Use MSE for regression when outliers are rare. Use MAE when outliers are common. For classification, Cross-Entropy works with probabilities while Hinge enforces a maximum-margin boundary. Add outliers (left panel) to see MSE vs MAE diverge.';
+}
+
+/* ── Replace play/step/reset with tab-aware versions ─────────── */
+function cloneBtn(id){
+  var old=document.getElementById(id);if(!old) return null;
+  var n=old.cloneNode(true);old.parentNode.replaceChild(n,old);return n;
+}
+var bPlay=cloneBtn('btn-play');
+var bStep=cloneBtn('btn-step');
+var bReset=cloneBtn('btn-reset');
+
+if(bPlay) bPlay.addEventListener('click',function(){
+  var tab=currentTab();
+  if(tab==='optimization'){gPlaying?stopGD():startGD();}
+  else{if(LF2.S&&LF2.S.playing) LF2.stopPlay&&LF2.stopPlay(); else LF2.startPlay&&LF2.startPlay();}
+  syncPlayBtn();
+});
+
+if(bStep) bStep.addEventListener('click',function(){
+  var tab=currentTab();
+  if(tab==='optimization'){
+    stopGD();gdOnce();updateOptScatter();updateLossCurves();
+  } else {
+    LF2.stopPlay&&LF2.stopPlay();
+    if(LF2.S){
+      LF2.S.yPred=Math.min(1.5,Math.round((LF2.S.yPred+0.05)*100)/100);
+      var sl=document.getElementById('sld-pred');if(sl) sl.value=LF2.S.yPred;
+      LF2.setEl&&LF2.setEl('val-pred',LF2.S.yPred.toFixed(2));
+      LF2.updateAll&&LF2.updateAll();
+    }
+  }
+  syncPlayBtn();
+});
+
+if(bReset) bReset.addEventListener('click',function(){
+  var tab=currentTab();
+  if(tab==='optimization'){stopGD();initOptimTab();}
+  else if(tab==='whentouse') renderWhentouseTab();
+  else LF2.doReset&&LF2.doReset();
+  syncPlayBtn();
+});
+
+/* ── Tab-bar: initialize Tab 2 and Tab 3 on first visit ─────── */
+document.getElementById('tab-bar').addEventListener('click',function(e){
+  var btn=e.target.closest('button');if(!btn||!btn.dataset.tab) return;
+  var tab=btn.dataset.tab;
+  if(tab!=='optimization'&&gPlaying) stopGD();
+  if(tab==='optimization') setTimeout(initOptimTab,30);
+  if(tab==='whentouse') setTimeout(renderWhentouseTab,30);
+  setTimeout(syncPlayBtn,40);
+});
+
+/* ── Outlier slider: live-update Tab 2 and Tab 3 Panel A ─────── */
+document.getElementById('sld-outliers').addEventListener('change',function(){
+  var tab=currentTab();
+  if(tab==='optimization'){stopGD();initOptimTab();}
+  else if(tab==='whentouse') renderRegPanel();
+});
+
+/* ── Speed slider: restart GD play if running ──────────────── */
+document.getElementById('sld-speed').addEventListener('change',function(){
+  if(gPlaying&&currentTab()==='optimization'){stopGD();startGD();}
+});
+
+/* ── Init: pre-run some steps so Tab 2 looks populated ─────── */
+resetGD();
 
 })();
 </script>

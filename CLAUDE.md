@@ -173,6 +173,7 @@ Add a row to the appropriate table under `## Contents`:
 - `transformers/transformer_explorer.html`
 - `transformers/toward_multimodal_AI.html`
 - `activation_functions/af_explorer.html`
+- `loss_functions/lf_explorer.html`
 - `gradient_descent/gd_explorer.html`
 - `backpropagation/bp_explorer.html`
 - `regularization/l1l2_explorer.html`
