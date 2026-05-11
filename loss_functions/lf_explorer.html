@@ -268,14 +268,23 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   font-size:.62rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
   margin-bottom:.35rem;
 }
-.scenario-badge.regression{background:var(--blue-pale);color:var(--blue)}
-.scenario-badge.binary-cls{background:var(--g-pale);color:var(--g-mid)}
-.scenario-badge.multi-cls{background:var(--orange-pale);color:var(--orange-dk)}
+.scenario-badge.regression{background:var(--g-pale);color:var(--g-mid)}
+.scenario-badge.binary-cls{background:var(--blue-pale);color:var(--blue)}
+.scenario-badge.multi-cls{background:var(--purple-pale);color:var(--purple)}
 
 .scenario-svg{
-  width:100%;aspect-ratio:1/1;max-height:180px;display:block;
+  flex:0 0 160px;width:160px;height:160px;display:block;
   border-radius:5px;background:#FDFAF5;border:1px solid var(--border-lt);
-  margin-bottom:.4rem;
+}
+/* vertical-stack scenario layout */
+.scenario-panels{display:flex!important;flex-direction:column!important;
+  grid-template-columns:unset!important}
+.scenario-inner{display:flex;gap:.75rem;align-items:flex-start;margin-top:.4rem}
+.scenario-side{flex:1;min-width:0;display:flex;flex-direction:column;gap:.35rem}
+.decision-guide{
+  font-size:.73rem;color:var(--text-soft);line-height:1.55;
+  background:var(--cream-mid);border-left:3px solid var(--border);
+  border-radius:0 5px 5px 0;padding:.45rem .6rem;margin-top:.35rem;
 }
 
 /* ─────────────────────────────────────────────────────────────────── */
@@ -597,21 +606,22 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
           <div class="scenario-card">
             <div class="scenario-badge regression">Regression</div>
             <div class="scenario-card-title">Outlier Robustness</div>
-            <div class="scenario-card-sub">MSE pulled toward outliers; MAE ignores them</div>
-            <svg id="svg-scenario-regression" class="scenario-svg">
-              <rect width="100%" height="100%" fill="#FDFAF5"/>
-              <text x="50%" y="40%" text-anchor="middle" dominant-baseline="middle"
-                    fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="9">
-                Scatter + MSE fit (blue)
-              </text>
-              <text x="50%" y="56%" text-anchor="middle" dominant-baseline="middle"
-                    fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="8">
-                MAE fit (green) · D3 rendered
-              </text>
-            </svg>
-            <div class="legend" style="flex-direction:column;gap:.2rem;margin-top:0">
-              <span><span class="legend-line" style="background:var(--loss-mse)"></span>MSE fit — pulled toward outlier</span>
-              <span><span class="legend-line" style="background:var(--loss-mae)"></span>MAE fit — robust to outlier</span>
+            <div class="scenario-card-sub">MSE is pulled toward outliers; MAE ignores them</div>
+            <div class="scenario-inner">
+              <svg id="svg-scenario-regression" class="scenario-svg"></svg>
+              <div class="scenario-side">
+                <div class="legend" style="flex-direction:column;gap:.25rem">
+                  <span><span class="legend-line" style="background:#1A56A0"></span>MSE fit — pulled toward outlier</span>
+                  <span><span class="legend-line" style="background:#E8630A"></span>MAE fit — robust to outlier</span>
+                  <span><span class="legend-dot" style="background:#B0321D"></span>Outlier point</span>
+                </div>
+                <div style="margin-top:.3rem">
+                  <button id="btn-toggle-outliers" class="pbtn" style="font-size:.72rem;width:100%">＋ Add Outliers</button>
+                </div>
+                <div class="decision-guide">
+                  <strong style="color:var(--g-mid)">When to use:</strong> Use MSE when outliers are rare and you want smooth gradients. Use MAE when outliers are common and robustness matters. Use Huber for a balance between the two.
+                </div>
+              </div>
             </div>
           </div>
 
@@ -620,20 +630,19 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
             <div class="scenario-badge binary-cls">Binary Classification</div>
             <div class="scenario-card-title">Decision Boundary</div>
             <div class="scenario-card-sub">Cross-Entropy vs Hinge for two-class separation</div>
-            <svg id="svg-scenario-binary" class="scenario-svg">
-              <rect width="100%" height="100%" fill="#FDFAF5"/>
-              <text x="50%" y="40%" text-anchor="middle" dominant-baseline="middle"
-                    fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="9">
-                Two Gaussian classes
-              </text>
-              <text x="50%" y="56%" text-anchor="middle" dominant-baseline="middle"
-                    fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="8">
-                CE boundary (orange) · Hinge (purple) · D3 rendered
-              </text>
-            </svg>
-            <div class="legend" style="flex-direction:column;gap:.2rem;margin-top:0">
-              <span><span class="legend-dash" style="color:var(--loss-ce)"></span>Cross-Entropy boundary</span>
-              <span><span class="legend-dash" style="color:var(--loss-hinge)"></span>Hinge (max-margin) boundary</span>
+            <div class="scenario-inner">
+              <svg id="svg-scenario-binary" class="scenario-svg"></svg>
+              <div class="scenario-side">
+                <div class="legend" style="flex-direction:column;gap:.25rem">
+                  <span><span class="legend-dot" style="background:#1A56A0"></span>Class 0</span>
+                  <span><span class="legend-dot" style="background:#E8630A"></span>Class 1</span>
+                  <span><span class="legend-dash" style="color:#E8630A"></span>Cross-Entropy boundary</span>
+                  <span><span class="legend-dash" style="color:#7B3FC4"></span>Hinge margin zone</span>
+                </div>
+                <div class="decision-guide">
+                  <strong style="color:var(--g-mid)">When to use:</strong> Use Cross-Entropy for probabilistic outputs (logistic regression, neural nets). Use Hinge for margin-based classifiers (SVM-style) when you want a hard decision boundary.
+                </div>
+              </div>
             </div>
           </div>
 
@@ -641,21 +650,19 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
           <div class="scenario-card">
             <div class="scenario-badge multi-cls">Multi-Class</div>
             <div class="scenario-card-title">Softmax Output</div>
-            <div class="scenario-card-sub">Cross-Entropy distributes loss across all class probabilities</div>
-            <svg id="svg-scenario-multiclass" class="scenario-svg">
-              <rect width="100%" height="100%" fill="#FDFAF5"/>
-              <text x="50%" y="40%" text-anchor="middle" dominant-baseline="middle"
-                    fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="9">
-                Softmax bar chart
-              </text>
-              <text x="50%" y="56%" text-anchor="middle" dominant-baseline="middle"
-                    fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="8">
-                −log(p_true) highlighted · D3 rendered
-              </text>
-            </svg>
-            <div class="legend" style="flex-direction:column;gap:.2rem;margin-top:0">
-              <span><span class="legend-dot" style="background:var(--g-mid)"></span>Predicted probability per class</span>
-              <span><span class="legend-dot" style="background:var(--orange)"></span>True class (cross-entropy applied here)</span>
+            <div class="scenario-card-sub">Categorical Cross-Entropy over all class probabilities</div>
+            <div class="scenario-inner">
+              <svg id="svg-scenario-multiclass" class="scenario-svg"></svg>
+              <div class="scenario-side">
+                <div class="legend" style="flex-direction:column;gap:.25rem">
+                  <span><span class="legend-dot" style="background:#E8630A"></span>True class C0 — loss applied here</span>
+                  <span><span class="legend-dot" style="background:#888"></span>Other classes</span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:.68rem;color:var(--orange)">L = −log(p<sub>true</sub>)</span>
+                </div>
+                <div class="decision-guide">
+                  <strong style="color:var(--g-mid)">When to use:</strong> Categorical Cross-Entropy is the standard for multi-class neural networks — it rewards confident correct predictions and heavily penalizes confident wrong ones.
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1378,6 +1385,22 @@ function updateLossCurves(){
   axStyle(yAx);
   var lFn=d3.line().x(function(d,i){return xSc(i);}).y(function(d){return ySc(Math.min(d,maxL));}).curve(d3.curveCatmullRom.alpha(0.5));
   OPT.forEach(function(n){g.select('.lc-'+n).datum(gHist[n]).attr('d',lFn);});
+  /* convergence dashed vertical line — find where MSE improvement < 0.001 */
+  var mh=gHist['mse'];
+  var convStep=-1;
+  for(var ci=5;ci<mh.length;ci++){
+    if(Math.abs(mh[ci]-mh[ci-5])<0.001){convStep=ci;break;}
+  }
+  g.select('.conv-line').remove();
+  if(convStep>0){
+    g.append('line').attr('class','conv-line')
+      .attr('x1',xSc(convStep)).attr('y1',0).attr('x2',xSc(convStep)).attr('y2',LPH)
+      .attr('stroke','#888').attr('stroke-width',1.5).attr('stroke-dasharray','4 3').attr('opacity',0.7);
+    g.append('text').attr('class','conv-line')
+      .attr('x',xSc(convStep)+3).attr('y',8)
+      .attr('font-family',"'IBM Plex Mono',monospace").attr('font-size',8).attr('fill','#888')
+      .text('≈ converged');
+  }
 }
 
 /* ── Play control ───────────────────────────────────────────── */
@@ -1396,7 +1419,7 @@ function startGD(){
     if(!gdOnce()){
       stopGD();
       document.getElementById('optimization-anno').textContent=
-        'Converged after '+gStep+' steps. MSE is pulled by outliers — add some to see it shift. MAE stays robust but oscillates. Huber balances both.';
+        'MSE converges smoothly but is pulled by outliers. MAE is robust but oscillates near the minimum. Huber gets the best of both.';
       return;
     }
     updateOptScatter();updateLossCurves();
@@ -1577,8 +1600,24 @@ document.getElementById('tab-bar').addEventListener('click',function(e){
   setTimeout(syncPlayBtn,40);
 });
 
+/* ── Panel A outlier toggle button ───────────────────────────── */
+var _panelAOut=0;
+document.addEventListener('click',function(e){
+  if(e.target.id!=='btn-toggle-outliers') return;
+  _panelAOut=_panelAOut>0?0:3;
+  e.target.textContent=_panelAOut>0?'✕ Remove Outliers':'＋ Add Outliers';
+  /* temporarily override the global slider for panel rendering */
+  var saved=document.getElementById('sld-outliers').value;
+  document.getElementById('sld-outliers').value=_panelAOut;
+  renderRegPanel();
+  document.getElementById('sld-outliers').value=saved;
+});
+
 /* ── Outlier slider: live-update Tab 2 and Tab 3 Panel A ─────── */
 document.getElementById('sld-outliers').addEventListener('change',function(){
+  _panelAOut=0;
+  var btn=document.getElementById('btn-toggle-outliers');
+  if(btn) btn.textContent='＋ Add Outliers';
   var tab=currentTab();
   if(tab==='optimization'){stopGD();initOptimTab();}
   else if(tab==='whentouse') renderRegPanel();
