@@ -752,5 +752,449 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 if (window.self !== window.top) { var f = document.getElementById('course-nav-footer'); if (f) { f.style.display = 'none'; } }
 </script>
 
+<script>
+(function(){'use strict';
+
+/* ── Constants ───────────────────────────────────────────────── */
+var PRED_MIN=-0.5, PRED_MAX=1.5, HUBER_DELTA=0.5;
+
+/* ── Loss metadata ───────────────────────────────────────────── */
+var LOSS_META={
+  mse:{name:'MSE',color:'#1A56A0',
+    formula:'L = (ŷ − y)²',
+    note:'Smooth everywhere · gradient = 2(ŷ−y)',
+    hint:'MSE = (ŷ−y)² — penalizes large errors quadratically',
+    penalty:'heavily (quadratic)'},
+  mae:{name:'MAE',color:'#2D5A1B',
+    formula:'L = |ŷ − y|',
+    note:'Non-differentiable at ŷ=y · gradient = ±1 everywhere',
+    hint:'MAE = |ŷ−y| — constant gradient, robust to outliers',
+    penalty:'linearly'},
+  ce:{name:'Cross-Entropy',color:'#E8630A',
+    formula:'L = −(y·log(ŷ) + (1−y)·log(1−ŷ))',
+    note:'ŷ clamped to [0.001,0.999] · strong gradient near 0 or 1',
+    hint:'Cross-Entropy — for probability outputs ŷ ∈ (0,1)',
+    penalty:'logarithmically (strongly near extremes)'},
+  hinge:{name:'Hinge',color:'#7B3FC4',
+    formula:'L = max(0, 1 − y·ŷ)',
+    note:'y ∈ {−1,+1} · zero loss inside the margin',
+    hint:'Hinge — SVM loss, y ∈ {−1,+1}, zero in margin',
+    penalty:'as hinge (zero within the margin)'},
+  huber:{name:'Huber (δ=0.5)',color:'#B08000',
+    formula:'½err² if |err|≤0.5, else δ(|err|−½δ)',
+    note:'δ=0.5 · MSE for small errors, MAE for large errors',
+    hint:'Huber (δ=0.5) — hybrid: MSE near 0, MAE for outliers',
+    penalty:'with Huber (MSE-like near truth, MAE-like for outliers)'}
+};
+
+/* ── State ───────────────────────────────────────────────────── */
+var S={loss:'mse',yTrue:0.5,yPred:0.5,
+  taskType:'regression',trueClass:0,
+  outliers:0,speed:3,playing:false,playTimer:null};
+
+/* ── Math ────────────────────────────────────────────────────── */
+function lossVal(n,y,yh){
+  switch(n){
+    case 'mse':  return (yh-y)*(yh-y);
+    case 'mae':  return Math.abs(yh-y);
+    case 'ce':{var p=Math.max(0.001,Math.min(0.999,yh));return -(y*Math.log(p)+(1-y)*Math.log(1-p));}
+    case 'hinge':{var yt=y>=0.5?1:-1;return Math.max(0,1-yt*yh);}
+    case 'huber':{var e=Math.abs(yh-y);return e<=HUBER_DELTA?0.5*e*e:HUBER_DELTA*(e-0.5*HUBER_DELTA);}
+  }return 0;
+}
+function lossGrad(n,y,yh){
+  switch(n){
+    case 'mse':  return 2*(yh-y);
+    case 'mae':  return yh>y?1:yh<y?-1:0;
+    case 'ce':{var p=Math.max(0.001,Math.min(0.999,yh));return -(y/p-(1-y)/(1-p));}
+    case 'hinge':{var yt=y>=0.5?1:-1;return yt*yh<1?-yt:0;}
+    case 'huber':{var e=yh-y;return Math.abs(e)<=HUBER_DELTA?e:HUBER_DELTA*(e>0?1:-1);}
+  }return 0;
+}
+function buildCurve(n,y){
+  var pts=[],N=200;
+  for(var i=0;i<=N;i++){var x=PRED_MIN+(PRED_MAX-PRED_MIN)*(i/N);pts.push({x:x,y:lossVal(n,y,x)});}
+  return pts;
+}
+function curveYMax(n,curve){
+  var raw=d3.max(curve,function(d){return d.y;});
+  return n==='ce'?Math.min(raw*1.1,8):Math.max(raw*1.1,0.1);
+}
+function minPoint(n,y){
+  if(n==='hinge'){var yt=y>=0.5?1:-1;var xm=Math.max(PRED_MIN,Math.min(PRED_MAX,yt>0?1:-1));return{x:xm,y:0};}
+  var xc=Math.max(PRED_MIN,Math.min(PRED_MAX,y));return{x:xc,y:lossVal(n,y,xc)};
+}
+
+/* ── Main chart dims ─────────────────────────────────────────── */
+var CW=460,CH=310,CML=52,CMR=18,CMT=18,CMB=38;
+var CPW=CW-CML-CMR,CPH=CH-CMT-CMB;
+var chartSc=null; /* cached scales */
+
+function getMainSc(n,y){
+  var c=buildCurve(n,y),ym=curveYMax(n,c);
+  return{xSc:d3.scaleLinear().domain([PRED_MIN,PRED_MAX]).range([0,CPW]),
+         ySc:d3.scaleLinear().domain([0,ym]).range([CPH,0]),yMax:ym,curve:c};
+}
+
+function styleAx(g){
+  g.select('.domain').attr('stroke','#C8BE9A');
+  g.selectAll('text').attr('font-family',"'IBM Plex Mono',monospace").attr('font-size',9).attr('fill','#888');
+  g.selectAll('line').attr('stroke','#C8BE9A');
+}
+
+/* ── Init main chart (static structure) ─────────────────────── */
+function initMainChart(){
+  var svg=d3.select('#svg-loss-main');
+  svg.selectAll('*').remove();
+  svg.attr('viewBox','0 0 '+CW+' '+CH).attr('preserveAspectRatio','xMidYMid meet');
+
+  var defs=svg.append('defs');
+  defs.append('clipPath').attr('id','lf-clip')
+    .append('rect').attr('width',CPW).attr('height',CPH);
+
+  var g=svg.append('g').attr('class','mg').attr('transform','translate('+CML+','+CMT+')');
+
+  g.append('rect').attr('width',CPW).attr('height',CPH).attr('fill','#FDFAF5').attr('rx',3);
+
+  /* grid lines */
+  [-0.25,0,0.25,0.5,0.75,1.0,1.25].forEach(function(v){
+    g.append('line').attr('class','gl').attr('data-v',v)
+      .attr('y1',0).attr('y2',CPH)
+      .attr('stroke',v===0||v===1?'#D8D0BC':'#EEE8DA')
+      .attr('stroke-width',v===0||v===1?1:.5)
+      .attr('stroke-dasharray',v===0||v===1?'none':'3 2');
+  });
+
+  g.append('g').attr('class','x-axis').attr('transform','translate(0,'+CPH+')');
+  g.append('g').attr('class','y-axis');
+  g.append('text').attr('x',CPW/2).attr('y',CPH+32)
+    .attr('text-anchor','middle').attr('font-family',"'Outfit',sans-serif")
+    .attr('font-size',10).attr('fill','#888').text('Predicted value ŷ');
+  g.append('text').attr('transform','rotate(-90)').attr('x',-CPH/2).attr('y',-41)
+    .attr('text-anchor','middle').attr('font-family',"'Outfit',sans-serif")
+    .attr('font-size',10).attr('fill','#888').text('Loss L(ŷ)');
+
+  g.append('path').attr('class','loss-area').attr('clip-path','url(#lf-clip)');
+  g.append('path').attr('class','loss-curve').attr('clip-path','url(#lf-clip)')
+    .attr('fill','none').attr('stroke-width',2.5).attr('stroke-linecap','round');
+
+  /* dynamic elements (draw order = z-order) */
+  g.append('line').attr('class','true-line').attr('y1',0).attr('y2',CPH)
+    .attr('stroke','#2D5A1B').attr('stroke-width',1.5).attr('stroke-dasharray','5 3').attr('opacity',.75);
+  g.append('text').attr('class','true-lbl')
+    .attr('font-family',"'IBM Plex Mono',monospace").attr('font-size',9)
+    .attr('fill','#2D5A1B').attr('text-anchor','middle');
+  g.append('text').attr('class','min-star').attr('text-anchor','middle')
+    .attr('dominant-baseline','middle').attr('font-size',16).attr('fill','#B08000').text('★');
+  g.append('line').attr('class','tang-line')
+    .attr('stroke','#E8630A').attr('stroke-width',1.5).attr('stroke-dasharray','4 3').attr('opacity',.85);
+  g.append('line').attr('class','pred-line').attr('y1',0).attr('y2',CPH)
+    .attr('stroke','#E8630A').attr('stroke-width',1.5).attr('stroke-dasharray','5 3');
+  g.append('circle').attr('class','pred-dot').attr('r',6)
+    .attr('fill','#E8630A').attr('stroke','white').attr('stroke-width',2);
+
+  renderMainChart();
+}
+
+/* ── Full main chart render (curve changes) ─────────────────── */
+function renderMainChart(){
+  var sc=getMainSc(S.loss,S.yTrue);chartSc=sc;
+  var g=d3.select('#svg-loss-main .mg');
+
+  /* update grid line x positions */
+  g.selectAll('.gl').each(function(){
+    var v=+d3.select(this).attr('data-v');
+    d3.select(this).attr('x1',sc.xSc(v)).attr('x2',sc.xSc(v));
+  });
+
+  /* axes */
+  g.select('.x-axis').call(d3.axisBottom(sc.xSc).ticks(5).tickSize(3));
+  styleAx(g.select('.x-axis'));
+  g.select('.y-axis').call(d3.axisLeft(sc.ySc).ticks(4).tickSize(3).tickFormat(d3.format('.2~f')));
+  styleAx(g.select('.y-axis'));
+
+  /* area + curve */
+  var aFn=d3.area().x(function(d){return sc.xSc(d.x);})
+    .y0(CPH).y1(function(d){return sc.ySc(Math.min(d.y,sc.yMax));})
+    .curve(d3.curveCatmullRom.alpha(0.5));
+  var lFn=d3.line().x(function(d){return sc.xSc(d.x);})
+    .y(function(d){return sc.ySc(Math.min(d.y,sc.yMax));})
+    .curve(d3.curveCatmullRom.alpha(0.5));
+
+  g.select('.loss-area').datum(sc.curve).attr('d',aFn)
+    .attr('fill',LOSS_META[S.loss].color).attr('opacity',.09);
+  g.select('.loss-curve').datum(sc.curve).attr('d',lFn)
+    .attr('stroke',LOSS_META[S.loss].color);
+
+  /* true label */
+  var txp=sc.xSc(S.yTrue);
+  g.select('.true-line').attr('x1',txp).attr('x2',txp);
+  g.select('.true-lbl').attr('x',txp).attr('y',-6).text('y='+S.yTrue.toFixed(2));
+
+  /* minimum star */
+  var mp=minPoint(S.loss,S.yTrue);
+  var mxp=sc.xSc(Math.max(PRED_MIN,Math.min(PRED_MAX,mp.x)));
+  var myp=sc.ySc(Math.min(mp.y,sc.yMax));
+  g.select('.min-star').attr('x',mxp).attr('y',myp-12);
+
+  updateDynamic();
+}
+
+/* ── Update only dynamic elements (prediction moves) ─────────── */
+function updateDynamic(){
+  if(!chartSc) return;
+  var sc=chartSc,n=S.loss,y=S.yTrue,yh=S.yPred;
+  var lv=lossVal(n,y,yh),gv=lossGrad(n,y,yh);
+  var g=d3.select('#svg-loss-main .mg');
+
+  var xp=sc.xSc(Math.max(PRED_MIN,Math.min(PRED_MAX,yh)));
+  var yp=sc.ySc(Math.min(lv,sc.yMax));
+
+  g.select('.pred-line').attr('x1',xp).attr('x2',xp);
+  g.select('.pred-dot').attr('cx',xp).attr('cy',yp);
+
+  /* tangent: slope_px = dY_svg/dX_svg = -gv*(CPH/yMax)/(CPW/(PRED_MAX-PRED_MIN)) */
+  var sp=-gv*CPH*(PRED_MAX-PRED_MIN)/(sc.yMax*CPW);
+  var dx=32;
+  var x1t=Math.max(0,xp-dx),x2t=Math.min(CPW,xp+dx);
+  g.select('.tang-line')
+    .attr('x1',x1t).attr('y1',yp+(x1t-xp)*sp)
+    .attr('x2',x2t).attr('y2',yp+(x2t-xp)*sp);
+}
+
+/* ── Mini grid ───────────────────────────────────────────────── */
+var MN=['mse','mae','ce','hinge'];
+var CELL=130,ML2=22,MR2=8,MT2=16,MB2=14;
+var MPW2=CELL-ML2-MR2,MPH2=CELL-MT2-MB2;
+var miniSc={}; /* cached per-loss scales */
+
+function renderMiniGrid(){
+  miniSc={};
+  var svg=d3.select('#svg-loss-mini-grid');
+  svg.selectAll('*').remove();
+  svg.attr('viewBox','0 0 260 260').attr('preserveAspectRatio','xMidYMid meet');
+
+  MN.forEach(function(n,i){
+    var ox=(i%2)*CELL,oy=Math.floor(i/2)*CELL;
+    var meta=LOSS_META[n],isAct=n===S.loss;
+    var c=buildCurve(n,S.yTrue),ym=curveYMax(n,c);
+    var xSc=d3.scaleLinear().domain([PRED_MIN,PRED_MAX]).range([0,MPW2]);
+    var ySc=d3.scaleLinear().domain([0,ym]).range([MPH2,0]);
+    miniSc[n]={xSc:xSc,ySc:ySc,yMax:ym};
+
+    var cell=svg.append('g').attr('class','mc mc-'+n).attr('transform','translate('+ox+','+oy+')');
+    cell.append('rect').attr('width',CELL).attr('height',CELL)
+      .attr('fill','#FDFAF5').attr('stroke',isAct?meta.color:'#DDD6BE').attr('stroke-width',isAct?2:.7);
+
+    var pg=cell.append('g').attr('transform','translate('+ML2+','+MT2+')');
+    pg.append('line').attr('x1',0).attr('y1',MPH2).attr('x2',MPW2).attr('y2',MPH2).attr('stroke','#C8BE9A').attr('stroke-width',.5);
+    pg.append('line').attr('x1',0).attr('y1',0).attr('x2',0).attr('y2',MPH2).attr('stroke','#C8BE9A').attr('stroke-width',.5);
+
+    var lFn=d3.line().x(function(d){return xSc(d.x);})
+      .y(function(d){return ySc(Math.min(d.y,ym));}).curve(d3.curveCatmullRom.alpha(0.5));
+    pg.append('path').datum(c).attr('d',lFn)
+      .attr('fill','none').attr('stroke',meta.color).attr('stroke-width',isAct?2:1.5).attr('stroke-linecap','round');
+
+    var txp=xSc(S.yTrue);
+    pg.append('line').attr('class','mc-yt').attr('x1',txp).attr('x2',txp).attr('y1',0).attr('y2',MPH2)
+      .attr('stroke','#2D5A1B').attr('stroke-width',1).attr('stroke-dasharray','3 2').attr('opacity',.7);
+
+    var xp=xSc(Math.max(PRED_MIN,Math.min(PRED_MAX,S.yPred)));
+    var lv=lossVal(n,S.yTrue,S.yPred);
+    pg.append('line').attr('class','mc-pl').attr('x1',xp).attr('x2',xp).attr('y1',0).attr('y2',MPH2)
+      .attr('stroke','#E8630A').attr('stroke-width',1.5);
+    pg.append('circle').attr('class','mc-dot').attr('cx',xp).attr('cy',ySc(Math.min(lv,ym)))
+      .attr('r',3.5).attr('fill','#E8630A').attr('stroke','white').attr('stroke-width',1.5);
+
+    cell.append('text').attr('x',CELL/2).attr('y',10).attr('text-anchor','middle')
+      .attr('dominant-baseline','middle')
+      .attr('font-family',"'IBM Plex Mono',monospace").attr('font-size',9).attr('font-weight',700)
+      .attr('fill',meta.color).text(meta.name);
+    cell.append('text').attr('class','mc-val').attr('x',CELL/2).attr('y',CELL-3)
+      .attr('text-anchor','middle').attr('font-family',"'IBM Plex Mono',monospace")
+      .attr('font-size',8).attr('fill','#888')
+      .text('L='+(isFinite(lv)?lv.toFixed(3):'∞'));
+  });
+}
+
+function updateMiniGrid(){
+  var svg=d3.select('#svg-loss-mini-grid');
+  if(svg.select('.mc').empty()) return;
+  MN.forEach(function(n){
+    var sc2=miniSc[n];if(!sc2) return;
+    var isAct=n===S.loss,meta=LOSS_META[n];
+    var cell=svg.select('.mc-'+n);
+    cell.select('rect').attr('stroke',isAct?meta.color:'#DDD6BE').attr('stroke-width',isAct?2:.7);
+    var xp=sc2.xSc(Math.max(PRED_MIN,Math.min(PRED_MAX,S.yPred)));
+    var lv=lossVal(n,S.yTrue,S.yPred);
+    cell.select('.mc-pl').attr('x1',xp).attr('x2',xp);
+    cell.select('.mc-dot').attr('cx',xp).attr('cy',sc2.ySc(Math.min(lv,sc2.yMax)));
+    cell.select('.mc-val').text('L='+(isFinite(lv)?lv.toFixed(3):'∞'));
+  });
+}
+
+/* ── Right panel ─────────────────────────────────────────────── */
+function setEl(id,v){var e=document.getElementById(id);if(e)e.textContent=v;}
+
+function updateRightPanel(){
+  var n=S.loss,y=S.yTrue,yh=S.yPred;
+  var meta=LOSS_META[n],lv=lossVal(n,y,yh),gv=lossGrad(n,y,yh);
+
+  var le=document.getElementById('rp-loss-val');
+  if(le){le.textContent=isFinite(lv)?lv.toFixed(4):'∞';le.style.color=meta.color;}
+  setEl('rp-loss-lbl','L(ŷ) · '+meta.name);
+
+  var ge=document.getElementById('rp-grad-val');
+  if(ge){
+    var arr=gv>0.001?'↑':gv<-0.001?'↓':'= 0';
+    ge.textContent=(gv>=0?'+':'')+gv.toFixed(4)+' '+arr;
+    ge.style.color=Math.abs(gv)<0.005?'var(--g-mid)':'var(--text)';
+  }
+  setEl('rp-formula-name',meta.name);
+  setEl('rp-formula-eq',meta.formula);
+  setEl('rp-formula-note',meta.note);
+
+  ['mse','mae','ce','hinge','huber'].forEach(function(k){
+    var v=lossVal(k,y,yh);
+    setEl('cmp-'+k+'-val',isFinite(v)?v.toFixed(3):'∞');
+    var row=document.getElementById('cmp-'+k);
+    if(row) row.classList.toggle('active-loss',k===n);
+  });
+}
+
+/* ── Annotation ──────────────────────────────────────────────── */
+function updateAnno(){
+  var n=S.loss,y=S.yTrue,yh=S.yPred;
+  var meta=LOSS_META[n],lv=lossVal(n,y,yh),gv=lossGrad(n,y,yh);
+  var absErr=Math.abs(yh-y);
+  var txt,cls='neutral';
+
+  if(absErr<0.01){
+    txt='✓ Perfect prediction — loss = 0, gradient = 0. No update needed.';cls='good';
+  } else if(n==='mse'&&absErr>0.5){
+    txt='MSE squares the error — large errors are penalized much more than small ones. This makes MSE sensitive to outliers. Gradient = '+gv.toFixed(3)+' pushes prediction toward truth.';cls='warn';
+  } else if(n==='mae'){
+    txt='MAE uses absolute error — the gradient is always ±1 regardless of error size. Robust to outliers but can oscillate near the minimum. Gradient = '+gv.toFixed(3)+'.';
+  } else if(n==='ce'&&(yh<0.05||yh>0.95)){
+    txt='Cross-entropy approaches infinity as prediction reaches 0 or 1 — this creates strong gradients ('+gv.toFixed(2)+') that push confident wrong predictions hard.';cls='warn';
+  } else if(n==='hinge'){
+    if(lv<=0){txt='Hinge loss = 0 — the prediction is inside the margin. No gradient update.';cls='good';}
+    else{txt='Hinge penalizes predictions outside the margin. Gradient = '+gv.toFixed(3)+'. Once the margin is satisfied (L=0) the gradient becomes zero.';}
+  } else {
+    txt='Error = '+(yh-y>0?'+':'')+(yh-y).toFixed(3)+' — '+meta.name+' penalizes this '+meta.penalty+'. Gradient = '+gv.toFixed(3)+' pushes prediction toward truth.';
+  }
+  ['anno-box','landscape-anno'].forEach(function(id){
+    var box=document.getElementById(id);
+    if(box){box.className='anno-box '+cls;box.textContent=txt;}
+  });
+}
+
+/* ── updateAll (called on prediction slider change) ──────────── */
+function updateAll(){
+  updateDynamic();updateMiniGrid();updateRightPanel();updateAnno();
+  setEl('landscape-label','Loss Landscape — '+LOSS_META[S.loss].name+' · y='+S.yTrue.toFixed(2));
+}
+function fullRender(){
+  renderMainChart();renderMiniGrid();updateRightPanel();updateAnno();
+  setEl('landscape-label','Loss Landscape — '+LOSS_META[S.loss].name+' · y='+S.yTrue.toFixed(2));
+  setEl('loss-hint',LOSS_META[S.loss].hint);
+}
+
+/* ── Playback ────────────────────────────────────────────────── */
+function speedMs(){return[800,500,300,180,80][S.speed-1]||300;}
+function stopPlay(){
+  S.playing=false;clearInterval(S.playTimer);S.playTimer=null;
+  var b=document.getElementById('btn-play');if(b)b.textContent='⏵ Play';
+}
+function startPlay(){
+  S.playing=true;
+  var b=document.getElementById('btn-play');if(b)b.textContent='⏸ Pause';
+  S.playTimer=setInterval(function(){
+    var nxt=Math.round((S.yPred+0.02)*100)/100;
+    if(nxt>PRED_MAX){stopPlay();return;}
+    S.yPred=nxt;
+    var sl=document.getElementById('sld-pred');if(sl)sl.value=S.yPred;
+    setEl('val-pred',S.yPred.toFixed(2));updateAll();
+  },speedMs());
+}
+function doReset(){
+  stopPlay();S.yPred=0.5;S.yTrue=0.5;
+  var ps=document.getElementById('sld-pred'),ts=document.getElementById('sld-true-label');
+  if(ps)ps.value=0.5;if(ts)ts.value=0.5;
+  setEl('val-pred','0.50');setEl('val-true-label','0.50');
+  fullRender();
+}
+
+/* ── Event wiring ────────────────────────────────────────────── */
+document.getElementById('tab-bar').addEventListener('click',function(e){
+  var btn=e.target.closest('button');if(!btn||!btn.dataset.tab) return;
+  document.querySelectorAll('#tab-bar button').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('active');});
+  document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
+  if(btn.dataset.tab==='landscape') setTimeout(fullRender,30);
+});
+
+document.getElementById('loss-selector').addEventListener('click',function(e){
+  var btn=e.target.closest('.sel-btn');if(!btn||!btn.dataset.loss) return;
+  document.querySelectorAll('#loss-selector .sel-btn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');S.loss=btn.dataset.loss;fullRender();
+});
+
+document.getElementById('task-selector').addEventListener('click',function(e){
+  var btn=e.target.closest('button');if(!btn||!btn.dataset.task) return;
+  document.querySelectorAll('#task-selector button').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');S.taskType=btn.dataset.task;
+  document.getElementById('true-label-regression').style.display=S.taskType==='regression'?'':'none';
+  document.getElementById('true-label-classification').style.display=S.taskType==='classification'?'':'none';
+});
+
+document.getElementById('class-selector').addEventListener('click',function(e){
+  var btn=e.target.closest('button');if(!btn||btn.dataset['class']===undefined) return;
+  document.querySelectorAll('#class-selector button').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');S.trueClass=+btn.dataset['class'];
+  S.yTrue=S.trueClass===1?1.0:0.0;
+  var ts=document.getElementById('sld-true-label');if(ts)ts.value=S.yTrue;
+  setEl('val-true-label',S.yTrue.toFixed(2));fullRender();
+});
+
+document.getElementById('sld-true-label').addEventListener('input',function(){
+  S.yTrue=+this.value;setEl('val-true-label',S.yTrue.toFixed(2));fullRender();
+});
+document.getElementById('sld-pred').addEventListener('input',function(){
+  S.yPred=+this.value;setEl('val-pred',S.yPred.toFixed(2));updateAll();
+});
+document.getElementById('sld-outliers').addEventListener('input',function(){
+  S.outliers=+this.value;setEl('val-outliers',this.value);
+});
+document.getElementById('sld-speed').addEventListener('input',function(){
+  S.speed=+this.value;setEl('val-speed',this.value+'×');
+  if(S.playing){stopPlay();startPlay();}
+});
+document.getElementById('btn-play').addEventListener('click',function(){
+  if(S.playing){stopPlay();}else{if(S.yPred>=PRED_MAX)S.yPred=PRED_MIN;startPlay();}
+});
+document.getElementById('btn-step').addEventListener('click',function(){
+  stopPlay();S.yPred=Math.min(PRED_MAX,Math.round((S.yPred+0.05)*100)/100);
+  var sl=document.getElementById('sld-pred');if(sl)sl.value=S.yPred;
+  setEl('val-pred',S.yPred.toFixed(2));updateAll();
+});
+document.getElementById('btn-reset').addEventListener('click',doReset);
+document.getElementById('concepts-toggle').addEventListener('click',function(){
+  var body=document.getElementById('concepts-body'),arrow=document.getElementById('concepts-arrow');
+  body.classList.toggle('collapsed');
+  arrow.textContent=body.classList.contains('collapsed')?'▸':'▾';
+});
+
+/* ── Init ────────────────────────────────────────────────────── */
+setEl('val-speed','3×');
+initMainChart();
+renderMiniGrid();
+updateRightPanel();
+updateAnno();
+
+})();
+</script>
+
 </body>
 </html>
