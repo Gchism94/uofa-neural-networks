@@ -1,0 +1,20 @@
+{
+  "name": "uofa-neural-networks",
+  "version": "1.0.0",
+  "description": "Supplemental web visualizations for **CSE/IEE 598: Bio-Inspired AI & Optimization** at [Arizona State University](https://www.asu.edu/), taught by [Theodore P. Pavlic](https://search.asu.edu/profile/1995237) (Associate Professor, [SCAI](https://scai.engineering.asu.edu/) & [SOLS](https://sols.asu.edu/)).",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Gchism94/uofa-neural-networks.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Gchism94/uofa-neural-networks/issues"
+  },
+  "homepage": "https://github.com/Gchism94/uofa-neural-networks#readme"
+}

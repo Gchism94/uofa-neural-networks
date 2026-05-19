@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<!-- Copyright © 2026 Greg T. Chism. University of Arizona, College of Information Science.
+     INFO 557: Neural Networks. MIT License. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Learning Rate Schedules — Interactive Explorer | INFO 557: Neural Networks</title>
+<meta name="description" content="Watch how learning rate schedules shape training — compare constant, step decay, cosine annealing, warmup, and cyclical strategies side by side.">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Learning Rate Schedules — Interactive Explorer">
+<meta property="og:description" content="Watch how learning rate schedules shape training — compare constant, step decay, cosine annealing, warmup, and cyclical strategies side by side.">
+<meta property="og:image" content="https://gchism94.github.io/uofa-neural-networks/learning_rate/lr_explorer-preview.svg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="600">
+<meta property="og:url" content="https://gchism94.github.io/uofa-neural-networks/learning_rate/lr_explorer.html">
+<meta property="fb:app_id" content="2385695445236853">
+
+<!-- Twitter/X card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Learning Rate Schedules — Interactive Explorer">
+<meta name="twitter:description" content="Watch how learning rate schedules shape training — compare constant, step decay, cosine annealing, warmup, and cyclical strategies side by side.">
+<meta name="twitter:image" content="https://gchism94.github.io/uofa-neural-networks/learning_rate/lr_explorer-preview.svg">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+
+<style>
+/* ── Design tokens ──────────────────────────────────────────────── */
+:root{
+  --cream:#FAF7F0;--cream-mid:#F0EBE0;--cream-dk:#E2D9C5;
+  --g-dk:#1C3A0E;--g-mid:#2D5A1B;--g-lt:#4A8C2F;--g-pale:#C8E6A8;
+  --orange:#E8630A;--orange-lt:#F08C50;--orange-dk:#C0500A;
+  --orange-pale:#FDE8D8;
+  --blue:#1A56A0;--blue-pale:#D0E4F8;
+  --red:#B0321D;--red-pale:#F8DDD8;
+  --purple:#7B3FC4;--purple-pale:#E8D8F8;
+  --yellow:#B08000;--yellow-pale:#FBF0C8;
+  --teal:#0E7A8A;--teal-pale:#C8EEF4;
+  --text:#1A1A1A;--text-muted:#888;--text-soft:#555;
+  --border:#C8BE9A;--border-lt:#DDD6BE;--shadow:rgba(44,90,27,.10);
+
+  /* Schedule-specific colour palette */
+  --lr-constant:#888;          /* Constant — gray */
+  --lr-step:#2D5A1B;           /* Step Decay — green */
+  --lr-exp:#E8630A;            /* Exponential Decay — orange */
+  --lr-cosine:#1A56A0;         /* Cosine Annealing — blue */
+  --lr-warmup:#7B3FC4;         /* Warmup + Cosine — purple */
+  --lr-cyclical:#B08000;       /* Cyclical — gold */
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:'Outfit',sans-serif;background:var(--cream);color:var(--text);
+  padding:1.25rem 1rem 2rem;min-height:100vh;line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:.85rem}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+.hdr{display:flex;justify-content:space-between;align-items:flex-start;
+  column-gap:1rem;row-gap:.35rem;flex-wrap:wrap}
+.hdr>div:first-child{flex:1 1 auto;min-width:0}
+.hdr h1{font-size:clamp(1.2rem,2.1vw,1.55rem);font-weight:700;color:var(--g-dk);
+  letter-spacing:-.02em;line-height:1.2}
+.hdr p.subtitle{font-size:.86rem;color:var(--text-muted);margin-top:.18rem}
+.hdr-rule{border:none;border-top:2.5px solid var(--g-dk);margin-top:.55rem}
+
+/* ── Fixed copyright ─────────────────────────────────────────────── */
+.cr-top{
+  position:fixed;top:.75rem;right:1rem;z-index:1000;
+  font-size:.72rem;color:var(--text-muted);text-align:right;
+  background:rgba(250,247,240,.92);padding:.2rem 1.5rem .2rem .5rem;
+  border-radius:5px;backdrop-filter:blur(4px);
+  border:1px solid var(--border-lt);white-space:nowrap;min-width:max-content;
+}
+.cr-top a{color:var(--orange);text-decoration:none}
+.cr-top a:hover{text-decoration:underline}
+
+/* ── Tab bar ─────────────────────────────────────────────────────── */
+.tab-bar{
+  display:flex;gap:.35rem;background:var(--cream-mid);
+  border:1px solid var(--border);border-radius:8px;
+  padding:.3rem;width:fit-content;
+}
+.tab-bar button{
+  font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:500;
+  padding:.3rem .9rem;border-radius:6px;cursor:pointer;
+  border:none;background:transparent;color:var(--text-soft);transition:all .15s;
+}
+.tab-bar button:hover{background:white;color:var(--g-dk)}
+.tab-bar button.active{background:white;color:var(--g-dk);font-weight:600;
+  box-shadow:0 1px 4px var(--shadow);}
+
+/* ── Explorer grid ───────────────────────────────────────────────── */
+.explorer-grid{
+  display:grid;
+  grid-template-columns:260px 1fr 210px;
+  gap:.85rem;align-items:start;
+}
+@media(max-width:980px){
+  .explorer-grid{grid-template-columns:260px 1fr}
+  .right-col{display:none}
+}
+@media(max-width:680px){.explorer-grid{grid-template-columns:1fr}}
+.left-col{display:flex;flex-direction:column;gap:.75rem}
+.center-col{display:flex;flex-direction:column;gap:.75rem}
+.right-col{display:flex;flex-direction:column;gap:.75rem}
+
+/* ── Cards ───────────────────────────────────────────────────────── */
+.card{background:white;border:1px solid var(--border);border-radius:8px;
+  padding:.85rem 1rem;box-shadow:0 2px 8px var(--shadow)}
+.card-title{font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--g-dk);margin-bottom:.55rem}
+
+/* ── Selectors ───────────────────────────────────────────────────── */
+.sel-group{display:flex;gap:.3rem;flex-wrap:wrap;margin-bottom:.45rem}
+.sel-btn{
+  font-family:'Outfit',sans-serif;font-size:.75rem;font-weight:500;
+  padding:.25rem .6rem;border-radius:5px;cursor:pointer;
+  border:1.5px solid var(--border-lt);background:var(--cream);color:var(--text-soft);
+  transition:all .12s;
+}
+.sel-btn:hover{background:var(--cream-mid)}
+.sel-btn.active{background:var(--g-mid);border-color:var(--g-mid);color:white}
+
+/* Colour-coded schedule selectors */
+.sel-btn.sch-constant.active{ background:var(--lr-constant);border-color:var(--lr-constant)}
+.sel-btn.sch-step.active{     background:var(--lr-step);    border-color:var(--lr-step)}
+.sel-btn.sch-exp.active{      background:var(--lr-exp);     border-color:var(--lr-exp)}
+.sel-btn.sch-cosine.active{   background:var(--lr-cosine);  border-color:var(--lr-cosine)}
+.sel-btn.sch-warmup.active{   background:var(--lr-warmup);  border-color:var(--lr-warmup)}
+.sel-btn.sch-cyclical.active{ background:var(--lr-cyclical);border-color:var(--lr-cyclical)}
+
+/* ── Toggle groups ───────────────────────────────────────────────── */
+.toggle-grp{
+  display:flex;gap:0;border-radius:6px;overflow:hidden;
+  border:1.5px solid var(--border);margin-bottom:.45rem;
+}
+.toggle-grp button{
+  font-family:'Outfit',sans-serif;font-size:.78rem;font-weight:500;
+  padding:.28rem 0;flex:1;border:none;cursor:pointer;
+  background:var(--cream);color:var(--text-soft);transition:all .12s;
+}
+.toggle-grp button.active{background:var(--g-mid);color:white}
+.toggle-grp button:not(.active):hover{background:var(--cream-mid)}
+
+/* ── Sliders ─────────────────────────────────────────────────────── */
+.srow{display:flex;align-items:center;gap:.45rem;margin-bottom:.2rem}
+.slbl{font-family:'IBM Plex Mono',monospace;font-size:.8rem;font-weight:500;
+  color:var(--g-dk);min-width:28px}
+input[type=range]{flex:1;appearance:none;-webkit-appearance:none;height:4px;
+  background:var(--cream-dk);border-radius:2px;cursor:pointer;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
+  border-radius:50%;background:var(--g-mid);border:2.5px solid white;
+  box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:pointer}
+.sval{font-family:'IBM Plex Mono',monospace;font-size:.76rem;
+  color:var(--text-muted);min-width:52px;text-align:right}
+.hint-txt{font-size:.7rem;color:var(--text-muted);font-style:italic;margin-top:.15rem}
+.param-lbl{font-size:.72rem;color:var(--text-soft);margin-bottom:.25rem;font-weight:500}
+
+/* ── Buttons ─────────────────────────────────────────────────────── */
+.ctrl-btns{display:flex;gap:.45rem;flex-wrap:wrap}
+.pbtn{
+  font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:600;
+  padding:.35rem .9rem;border-radius:6px;cursor:pointer;
+  border:1.5px solid var(--border);background:var(--cream);color:var(--g-dk);
+  transition:all .12s;
+}
+.pbtn:hover{background:var(--g-pale);border-color:var(--g-lt)}
+.pbtn.primary{background:var(--g-mid);border-color:var(--g-mid);color:white}
+.pbtn.primary:hover{background:var(--g-dk);border-color:var(--g-dk)}
+
+/* ── Annotation box ──────────────────────────────────────────────── */
+.anno-box{
+  border-radius:6px;padding:.55rem .75rem;font-size:.78rem;line-height:1.55;
+  background:var(--blue-pale);color:var(--blue);border-left:3px solid var(--blue);
+  min-height:3.2rem;
+}
+.anno-box.warn{background:var(--red-pale);color:var(--red);border-color:var(--red)}
+.anno-box.good{background:var(--g-pale);color:var(--g-dk);border-color:var(--g-mid)}
+.anno-box.neutral{background:var(--cream-mid);color:var(--text-soft);border-color:var(--border)}
+
+/* ── Key Concepts ────────────────────────────────────────────────── */
+.concepts-body{overflow:hidden;max-height:900px;transition:max-height .3s ease}
+.concepts-body.collapsed{max-height:0;margin-bottom:-.55rem}
+.concepts-item{font-size:.74rem;color:var(--text-soft);line-height:1.5;
+  margin-bottom:.45rem;padding-left:.9rem;position:relative}
+.concepts-item:last-child{margin-bottom:0}
+.concepts-item::before{content:'●';color:#2e7d32;position:absolute;left:0;top:0}
+.concepts-item strong{color:#2e7d32;font-weight:600}
+
+/* ── Plot label / panel title ───────────────────────────────────── */
+.plot-label{font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--text-muted);text-align:center;margin-bottom:.5rem}
+.panel-title{font-size:.78rem;font-weight:700;color:var(--g-dk);margin-bottom:.2rem;text-align:center}
+
+/* ── Legend ──────────────────────────────────────────────────────── */
+.legend{display:flex;gap:.75rem;flex-wrap:wrap;font-size:.72rem;
+  color:var(--text-soft);margin-top:.5rem;align-items:center}
+.legend-dot{width:10px;height:10px;border-radius:50%;display:inline-block;
+  vertical-align:middle;margin-right:.25rem;flex-shrink:0}
+.legend-sq{width:12px;height:8px;border-radius:2px;display:inline-block;
+  vertical-align:middle;margin-right:.25rem;flex-shrink:0}
+.legend-line{width:18px;height:3px;display:inline-block;
+  vertical-align:middle;margin-right:.25rem;flex-shrink:0;border-radius:2px}
+.legend-dash{width:18px;height:0;display:inline-block;
+  vertical-align:middle;margin-right:.25rem;flex-shrink:0;
+  border-top:2px dashed currentColor}
+
+/* ── Tab panels ──────────────────────────────────────────────────── */
+.tab-panel{display:none}
+.tab-panel.active{display:flex;flex-direction:column;gap:.75rem}
+
+/* ── Speed row ───────────────────────────────────────────────────── */
+.speed-row{display:flex;align-items:center;gap:.45rem;margin-top:.35rem}
+
+/* ── Stat rows (right panel) ─────────────────────────────────────── */
+.stat-row{
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:.7rem;padding:.22rem 0;border-bottom:1px solid var(--border-lt);
+}
+.stat-row:last-child{border-bottom:none}
+.sr-lbl{color:var(--text-muted);font-family:'IBM Plex Mono',monospace}
+.sr-val{font-weight:600;font-family:'IBM Plex Mono',monospace;color:var(--g-dk)}
+
+/* ── LR big display ──────────────────────────────────────────────── */
+.lr-display{text-align:center;padding:.5rem .25rem .25rem}
+.lr-big{
+  display:block;font-family:'IBM Plex Mono',monospace;font-size:1.5rem;
+  font-weight:700;line-height:1.1;color:var(--g-dk);
+}
+.lr-big-lbl{font-size:.6rem;color:var(--text-muted);margin-top:.15rem;
+  letter-spacing:.06em;text-transform:uppercase}
+
+/* ── Formula display (right panel) ──────────────────────────────── */
+.formula-panel{
+  background:var(--cream-mid);border:1px solid var(--border-lt);
+  border-radius:6px;padding:.6rem .75rem;margin-top:.25rem;
+}
+.formula-label{font-size:.64rem;font-weight:600;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--text-muted);margin-bottom:.3rem}
+.formula-eq{
+  font-family:'IBM Plex Mono',monospace;font-size:.8rem;
+  color:var(--g-dk);line-height:1.8;overflow-x:auto;
+}
+.formula-desc{font-size:.68rem;color:var(--text-soft);line-height:1.5;margin-top:.35rem}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* ── Tab 1: Schedule Comparison ─────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────── */
+#svg-schedule-compare{
+  width:100%;aspect-ratio:16/7;max-height:400px;display:block;
+  border-radius:6px;background:#FDFAF5;
+}
+
+/* Highlighted schedule info strip */
+.sch-highlight{
+  display:flex;align-items:flex-start;gap:.75rem;
+  background:var(--cream-mid);border:1px solid var(--border-lt);
+  border-radius:6px;padding:.55rem .75rem;margin-top:.5rem;
+  font-size:.75rem;
+}
+.sch-highlight-dot{
+  width:12px;height:12px;border-radius:50%;flex-shrink:0;margin-top:2px;
+}
+.sch-highlight-name{font-weight:700;color:var(--g-dk);margin-bottom:.15rem;font-size:.8rem}
+.sch-highlight-formula{
+  font-family:'IBM Plex Mono',monospace;font-size:.72rem;
+  color:var(--text-soft);line-height:1.6;
+}
+
+/* Log scale toggle */
+.log-toggle{
+  display:flex;align-items:center;gap:.35rem;
+  font-size:.72rem;color:var(--text-soft);cursor:pointer;
+  user-select:none;margin-top:.3rem;
+}
+.log-toggle input[type=checkbox]{
+  width:13px;height:13px;accent-color:var(--g-mid);cursor:pointer;
+}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* ── Tab 2: Training Effect ─────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────── */
+.training-panels{
+  display:grid;grid-template-columns:1fr 1fr;gap:.85rem;align-items:start;
+}
+@media(max-width:640px){.training-panels{grid-template-columns:1fr}}
+
+#svg-loss-curve{
+  width:100%;aspect-ratio:4/3;max-height:300px;display:block;
+  border-radius:6px;background:#FDFAF5;
+}
+#svg-acc-curve{
+  width:100%;aspect-ratio:4/3;max-height:300px;display:block;
+  border-radius:6px;background:#FDFAF5;
+}
+
+/* Outperformance annotation */
+.outperf-box{
+  display:flex;align-items:flex-start;gap:.5rem;
+  background:var(--g-pale);border:1px solid var(--g-mid);
+  border-radius:6px;padding:.5rem .65rem;margin-top:.5rem;
+  font-size:.75rem;color:var(--g-dk);line-height:1.5;
+}
+.outperf-icon{font-size:1rem;flex-shrink:0;line-height:1}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* ── Tab 3: Schedule Builder ─────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────── */
+.builder-layout{
+  display:grid;grid-template-columns:1fr 1fr;gap:.85rem;align-items:start;
+}
+@media(max-width:720px){.builder-layout{grid-template-columns:1fr}}
+
+.phase-cards{display:flex;flex-direction:column;gap:.65rem}
+
+.phase-card{
+  background:white;border:2px solid var(--border-lt);border-radius:8px;
+  padding:.75rem .85rem;
+  transition:border-color .15s;
+}
+.phase-card:hover{border-color:var(--border)}
+.phase-card.active-phase{border-color:var(--g-mid)}
+
+.phase-header{
+  display:flex;align-items:center;gap:.5rem;margin-bottom:.55rem;
+}
+.phase-badge{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:20px;height:20px;border-radius:50%;
+  font-size:.68rem;font-weight:700;flex-shrink:0;
+}
+.phase-badge.p1{background:var(--orange-pale);color:var(--orange-dk)}
+.phase-badge.p2{background:var(--blue-pale);color:var(--blue)}
+.phase-badge.p3{background:var(--g-pale);color:var(--g-mid)}
+.phase-title{font-size:.75rem;font-weight:700;color:var(--g-dk)}
+.phase-sub{font-size:.64rem;color:var(--text-muted);font-style:italic;margin-left:auto}
+
+.phase-decay-select{
+  display:flex;gap:.25rem;flex-wrap:wrap;margin-bottom:.35rem;
+}
+.phase-decay-btn{
+  font-family:'Outfit',sans-serif;font-size:.7rem;font-weight:500;
+  padding:.2rem .5rem;border-radius:4px;cursor:pointer;
+  border:1.5px solid var(--border-lt);background:var(--cream);color:var(--text-soft);
+  transition:all .12s;
+}
+.phase-decay-btn:hover{background:var(--cream-mid)}
+.phase-decay-btn.active{background:var(--blue);border-color:var(--blue);color:white}
+
+/* Builder preview chart */
+#svg-builder-preview{
+  width:100%;aspect-ratio:16/9;max-height:300px;display:block;
+  border-radius:6px;background:#FDFAF5;
+}
+
+/* Apply button */
+.apply-btn-wrap{
+  display:flex;align-items:center;gap:.65rem;
+  margin-top:.5rem;flex-wrap:wrap;
+}
+.apply-hint{font-size:.68rem;color:var(--text-muted);font-style:italic}
+</style>
+</head>
+<body>
+
+<div class="cr-top">© 2026 Greg T. Chism · <a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a></div>
+
+<div class="wrap">
+
+<header>
+  <div class="hdr">
+    <div>
+      <h1>Learning Rate Schedules — Interactive Explorer</h1>
+      <p class="subtitle">Watch how learning rate schedules shape training — compare constant, step decay, cosine annealing, warmup, and cyclical strategies</p>
+    </div>
+  </div>
+  <hr class="hdr-rule">
+</header>
+
+<!-- Tab bar -->
+<div class="tab-bar" id="tab-bar">
+  <button class="active" data-tab="compare">Schedule Comparison</button>
+  <button data-tab="training">Training Effect</button>
+  <button data-tab="builder">Schedule Builder</button>
+</div>
+
+<!-- Main explorer -->
+<div class="explorer-grid">
+
+  <!-- ══ LEFT: Controls ══════════════════════════════════════════════ -->
+  <div class="left-col">
+
+    <!-- Schedule selector -->
+    <div class="card" id="card-lr-schedule">
+      <div class="card-title">Schedule</div>
+      <div class="sel-group" id="schedule-selector">
+        <button class="sel-btn sch-constant active" data-sch="constant">Constant</button>
+        <button class="sel-btn sch-step"            data-sch="step">Step Decay</button>
+        <button class="sel-btn sch-exp"             data-sch="exp">Exp. Decay</button>
+        <button class="sel-btn sch-cosine"          data-sch="cosine">Cosine</button>
+        <button class="sel-btn sch-warmup"          data-sch="warmup">Warmup+Cos</button>
+        <button class="sel-btn sch-cyclical"        data-sch="cyclical">Cyclical</button>
+      </div>
+      <div class="hint-txt" id="sch-hint">Fixed LR throughout training — simple but rarely optimal</div>
+    </div>
+
+    <!-- Core hyperparameters -->
+    <div class="card" id="card-lr-params">
+      <div class="card-title">Hyperparameters</div>
+
+      <div class="param-lbl">Initial Learning Rate</div>
+      <div class="srow">
+        <span class="slbl" style="font-size:.7rem">η₀</span>
+        <input type="range" id="sld-lr0" min="-3" max="-1" step="0.01" value="-2">
+        <span class="sval" id="val-lr0">0.010</span>
+      </div>
+      <div class="hint-txt">Log scale: 10<sup>slider</sup></div>
+
+      <div class="param-lbl" style="margin-top:.45rem">Epochs</div>
+      <div class="srow">
+        <span class="slbl" style="font-size:.7rem">T</span>
+        <input type="range" id="sld-epochs" min="20" max="200" step="5" value="100">
+        <span class="sval" id="val-epochs">100</span>
+      </div>
+    </div>
+
+    <!-- Conditional: decay controls (Step Decay, Exponential) -->
+    <div class="card" id="card-lr-decay" style="display:none">
+      <div class="card-title">Decay Settings</div>
+
+      <div class="param-lbl">Decay Rate γ</div>
+      <div class="srow">
+        <span class="slbl" style="font-size:.7rem">γ</span>
+        <input type="range" id="sld-decay" min="0.1" max="0.99" step="0.01" value="0.95">
+        <span class="sval" id="val-decay">0.95</span>
+      </div>
+      <div class="hint-txt">Multiply LR by γ at each step (or epoch)</div>
+
+      <div id="step-size-row" style="display:none">
+        <div class="param-lbl" style="margin-top:.45rem">Step Size (epochs)</div>
+        <div class="srow">
+          <span class="slbl" style="font-size:.7rem">s</span>
+          <input type="range" id="sld-step-size" min="5" max="30" step="1" value="10">
+          <span class="sval" id="val-step-size">10</span>
+        </div>
+        <div class="hint-txt">Decay every s epochs</div>
+      </div>
+    </div>
+
+    <!-- Conditional: warmup controls (Warmup + Cosine) -->
+    <div class="card" id="card-lr-warmup" style="display:none">
+      <div class="card-title">Warmup Settings</div>
+
+      <div class="param-lbl">Warmup Epochs</div>
+      <div class="srow">
+        <span class="slbl" style="font-size:.7rem">Tw</span>
+        <input type="range" id="sld-warmup" min="0" max="20" step="1" value="5">
+        <span class="sval" id="val-warmup">5</span>
+      </div>
+      <div class="hint-txt">Linearly ramp LR from 0 before main schedule</div>
+    </div>
+
+    <!-- Conditional: cyclical controls (Cyclical) -->
+    <div class="card" id="card-lr-cyclical" style="display:none">
+      <div class="card-title">Cycle Settings</div>
+
+      <div class="param-lbl">Cycle Length (epochs)</div>
+      <div class="srow">
+        <span class="slbl" style="font-size:.7rem">Tc</span>
+        <input type="range" id="sld-cycle" min="5" max="30" step="1" value="10">
+        <span class="sval" id="val-cycle">10</span>
+      </div>
+      <div class="hint-txt">Epochs per full LR cycle (up + down)</div>
+    </div>
+
+    <!-- Playback controls -->
+    <div class="card" id="card-playback">
+      <div class="card-title">Playback</div>
+      <div class="ctrl-btns" style="margin-bottom:.45rem">
+        <button id="btn-play" class="pbtn primary" style="flex:1">⏵ Play</button>
+        <button id="btn-step" class="pbtn">→ Step</button>
+        <button id="btn-reset" class="pbtn">↺ Reset</button>
+      </div>
+      <div class="speed-row">
+        <span class="slbl" style="min-width:44px;font-size:.7rem">Speed</span>
+        <input type="range" id="sld-speed" min="1" max="5" step="1" value="3">
+        <span class="sval" id="val-speed">3×</span>
+      </div>
+    </div>
+
+    <!-- Annotation -->
+    <div class="card">
+      <div class="card-title">What's happening?</div>
+      <div class="anno-box neutral" id="anno-box">
+        Select a schedule and press Play to animate training. Watch how each strategy shapes the learning rate over time — and how it affects convergence speed and final accuracy.
+      </div>
+    </div>
+
+    <!-- Key Concepts — collapsible, open by default -->
+    <div class="card">
+      <div class="card-title" style="cursor:pointer;user-select:none" id="concepts-toggle">
+        Key Concepts <span id="concepts-arrow">▾</span>
+      </div>
+      <div class="concepts-body" id="concepts-body">
+        <div class="concepts-item"><strong>Why learning rate matters:</strong> The learning rate controls how big a step the optimizer takes each update. Too high and training diverges — the loss explodes. Too low and training is painfully slow and may get stuck in a sharp local minimum. The right LR is the single most impactful hyperparameter.</div>
+        <div class="concepts-item"><strong>LR too high vs too low:</strong> A high LR causes the optimizer to overshoot the minimum — loss oscillates or diverges. A low LR makes the gradient steps tiny — training converges but takes far more epochs and may settle in a flat, suboptimal region. The sweet spot is problem-dependent.</div>
+        <div class="concepts-item"><strong>What warmup does:</strong> At initialization, weights are random and gradients are noisy and large. Starting with a very small LR and ramping up prevents catastrophic early updates from damaging the model before it has learned anything useful. Warmup is especially important for Transformers.</div>
+        <div class="concepts-item"><strong>Why cosine annealing works well:</strong> Cosine schedules smoothly reduce the LR following a half-cosine curve — fast initial progress when far from the minimum, gentle fine-tuning near convergence. The smooth decay avoids the abrupt jumps of step decay and often finds flatter, more generalizable minima.</div>
+        <div class="concepts-item"><strong>What cyclical LR captures:</strong> Cyclical learning rates periodically increase the LR after decreasing it. This "annealing with restarts" helps escape sharp local minima and saddle points — the optimizer can explore more of the loss landscape and often settles in a wider, flatter minimum with better generalization.</div>
+      </div>
+    </div>
+
+  </div><!-- end left-col -->
+
+  <!-- ══ CENTER: Tab panels ══════════════════════════════════════════ -->
+  <div class="center-col">
+
+    <!-- ─ Tab 1: Schedule Comparison ───────────────────────────── -->
+    <div class="tab-panel active" id="panel-compare">
+      <div class="card">
+        <div class="plot-label" id="compare-label">Schedule Comparison — All 6 Strategies · Epoch 0 of 100</div>
+
+        <svg id="svg-schedule-compare">
+          <rect width="100%" height="100%" fill="#FDFAF5"/>
+          <text x="50%" y="43%" text-anchor="middle" dominant-baseline="middle"
+                fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="13">
+            LR vs Epoch (D3 rendered)
+          </text>
+          <text x="50%" y="55%" text-anchor="middle" dominant-baseline="middle"
+                fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="10">
+            6 schedules · click any line to highlight · vertical line = current epoch
+          </text>
+        </svg>
+
+        <!-- Log scale toggle + legend -->
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.5rem;margin-top:.5rem">
+          <div class="legend">
+            <span><span class="legend-line" style="background:var(--lr-constant)"></span>Constant</span>
+            <span><span class="legend-line" style="background:var(--lr-step)"></span>Step Decay</span>
+            <span><span class="legend-line" style="background:var(--lr-exp)"></span>Exp. Decay</span>
+            <span><span class="legend-line" style="background:var(--lr-cosine)"></span>Cosine</span>
+            <span><span class="legend-line" style="background:var(--lr-warmup)"></span>Warmup+Cos</span>
+            <span><span class="legend-line" style="background:var(--lr-cyclical)"></span>Cyclical</span>
+          </div>
+          <label class="log-toggle">
+            <input type="checkbox" id="chk-log-scale">
+            Log y-axis
+          </label>
+        </div>
+
+        <!-- Highlighted schedule info (shown when a line is clicked) -->
+        <div class="sch-highlight" id="sch-highlight" style="display:none">
+          <span class="sch-highlight-dot" id="sch-hl-dot"></span>
+          <div>
+            <div class="sch-highlight-name" id="sch-hl-name">—</div>
+            <div class="sch-highlight-formula" id="sch-hl-formula">—</div>
+          </div>
+        </div>
+
+        <div class="anno-box neutral" id="compare-anno" style="margin-top:.6rem;font-size:.75rem">
+          All 6 schedules start from the same initial LR. Press Play to step through epochs — watch how each strategy evolves differently. Click any line to highlight it and see its formula.
+        </div>
+      </div>
+    </div><!-- end panel-compare -->
+
+    <!-- ─ Tab 2: Training Effect ────────────────────────────────── -->
+    <div class="tab-panel" id="panel-training">
+      <div class="card">
+        <div class="plot-label" id="training-label">Training Effect — Cosine vs Constant LR</div>
+
+        <div class="training-panels">
+
+          <!-- Loss curves -->
+          <div>
+            <div class="panel-title">Training Loss</div>
+            <svg id="svg-loss-curve">
+              <rect width="100%" height="100%" fill="#FDFAF5"/>
+              <text x="50%" y="42%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="12">
+                Loss over epochs (D3 rendered)
+              </text>
+              <text x="50%" y="56%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="9">
+                selected schedule vs constant LR baseline
+              </text>
+            </svg>
+            <div class="legend" style="justify-content:center;margin-top:.4rem">
+              <span><span class="legend-line" style="background:var(--g-mid)"></span>Selected schedule</span>
+              <span><span class="legend-dash" style="color:var(--orange)"></span>Constant LR</span>
+            </div>
+          </div>
+
+          <!-- Accuracy curves -->
+          <div>
+            <div class="panel-title">Validation Accuracy</div>
+            <svg id="svg-acc-curve">
+              <rect width="100%" height="100%" fill="#FDFAF5"/>
+              <text x="50%" y="42%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="12">
+                Accuracy over epochs (D3 rendered)
+              </text>
+              <text x="50%" y="56%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="9">
+                selected schedule vs constant LR baseline
+              </text>
+            </svg>
+            <div class="legend" style="justify-content:center;margin-top:.4rem">
+              <span><span class="legend-line" style="background:var(--g-mid)"></span>Selected schedule</span>
+              <span><span class="legend-dash" style="color:var(--orange)"></span>Constant LR</span>
+            </div>
+          </div>
+
+        </div><!-- end training-panels -->
+
+        <!-- Outperformance annotation (shown when schedule wins) -->
+        <div class="outperf-box" id="outperf-box" style="display:none">
+          <span class="outperf-icon">🎯</span>
+          <span id="outperf-text">Schedule outperforms constant LR starting at epoch —</span>
+        </div>
+
+        <div class="anno-box neutral" id="training-anno" style="margin-top:.5rem;font-size:.75rem">
+          Press Play to animate training epoch by epoch. The green curve shows your selected schedule; the orange dashed line is a constant LR baseline. Watch for where the schedule starts to outperform.
+        </div>
+      </div>
+    </div><!-- end panel-training -->
+
+    <!-- ─ Tab 3: Schedule Builder ────────────────────────────────── -->
+    <div class="tab-panel" id="panel-builder">
+      <div class="card">
+        <div class="plot-label">Schedule Builder — Custom Three-Phase Schedule</div>
+
+        <div class="builder-layout">
+
+          <!-- Phase cards (left column) -->
+          <div class="phase-cards">
+
+            <!-- Phase 1: Warmup -->
+            <div class="phase-card" id="phase-card-1">
+              <div class="phase-header">
+                <span class="phase-badge p1">1</span>
+                <span class="phase-title">Warmup</span>
+                <span class="phase-sub">linear ramp-up</span>
+              </div>
+
+              <div class="param-lbl">Duration (epochs)</div>
+              <div class="srow">
+                <span class="slbl" style="font-size:.7rem">T₁</span>
+                <input type="range" id="sld-p1-dur" min="0" max="30" step="1" value="5">
+                <span class="sval" id="val-p1-dur">5</span>
+              </div>
+
+              <div class="param-lbl" style="margin-top:.35rem">Starting LR fraction</div>
+              <div class="srow">
+                <span class="slbl" style="font-size:.7rem">f</span>
+                <input type="range" id="sld-p1-start" min="0.001" max="0.5" step="0.001" value="0.01">
+                <span class="sval" id="val-p1-start">1%</span>
+              </div>
+              <div class="hint-txt">Fraction of η₀ at epoch 0; ramps to η₀ by end of warmup</div>
+            </div>
+
+            <!-- Phase 2: Main decay -->
+            <div class="phase-card active-phase" id="phase-card-2">
+              <div class="phase-header">
+                <span class="phase-badge p2">2</span>
+                <span class="phase-title">Main Decay</span>
+                <span class="phase-sub">primary training</span>
+              </div>
+
+              <div class="param-lbl">Decay type</div>
+              <div class="phase-decay-select">
+                <button class="phase-decay-btn active" data-decay="cosine">Cosine</button>
+                <button class="phase-decay-btn" data-decay="linear">Linear</button>
+                <button class="phase-decay-btn" data-decay="exp">Exponential</button>
+                <button class="phase-decay-btn" data-decay="poly">Polynomial</button>
+              </div>
+
+              <div class="param-lbl">Decay rate / shape</div>
+              <div class="srow">
+                <span class="slbl" style="font-size:.7rem">r</span>
+                <input type="range" id="sld-p2-rate" min="0.1" max="0.99" step="0.01" value="0.9">
+                <span class="sval" id="val-p2-rate">0.90</span>
+              </div>
+              <div class="hint-txt">For cosine: unused (shape is fixed). For exp: multiply by r each epoch.</div>
+            </div>
+
+            <!-- Phase 3: Fine-tuning floor -->
+            <div class="phase-card" id="phase-card-3">
+              <div class="phase-header">
+                <span class="phase-badge p3">3</span>
+                <span class="phase-title">Fine-tuning Floor</span>
+                <span class="phase-sub">stabilise near minimum</span>
+              </div>
+
+              <div class="param-lbl">Minimum LR (fraction of η₀)</div>
+              <div class="srow">
+                <span class="slbl" style="font-size:.7rem">η<sub>min</sub></span>
+                <input type="range" id="sld-p3-min" min="0.001" max="0.1" step="0.001" value="0.01">
+                <span class="sval" id="val-p3-min">1%</span>
+              </div>
+
+              <div class="param-lbl" style="margin-top:.35rem">Activate at epoch (% of total)</div>
+              <div class="srow">
+                <span class="slbl" style="font-size:.7rem">t</span>
+                <input type="range" id="sld-p3-start" min="50" max="95" step="5" value="80">
+                <span class="sval" id="val-p3-start">80%</span>
+              </div>
+              <div class="hint-txt">Hold LR at floor for remaining epochs</div>
+            </div>
+
+          </div><!-- end phase-cards -->
+
+          <!-- Preview chart (right column) -->
+          <div>
+            <div class="panel-title">Live Preview</div>
+            <svg id="svg-builder-preview">
+              <rect width="100%" height="100%" fill="#FDFAF5"/>
+              <text x="50%" y="42%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="12">
+                Custom schedule preview
+              </text>
+              <text x="50%" y="56%" text-anchor="middle" dominant-baseline="middle"
+                    fill="rgba(0,0,0,.12)" font-family="Outfit,sans-serif" font-size="9">
+                updates in real time · D3 rendered
+              </text>
+            </svg>
+            <div class="legend" style="justify-content:center;margin-top:.4rem">
+              <span><span class="legend-dot" style="background:var(--orange)"></span>Phase 1: Warmup</span>
+              <span><span class="legend-dot" style="background:var(--blue)"></span>Phase 2: Decay</span>
+              <span><span class="legend-dot" style="background:var(--g-mid)"></span>Phase 3: Floor</span>
+            </div>
+            <div class="apply-btn-wrap">
+              <button id="btn-apply-custom" class="pbtn primary">⏵ Apply to Training</button>
+              <span class="apply-hint">Runs custom schedule through Tab 2 simulation</span>
+            </div>
+          </div>
+
+        </div><!-- end builder-layout -->
+
+        <div class="anno-box neutral" id="builder-anno" style="margin-top:.6rem;font-size:.75rem">
+          Adjust the three phases to design your custom LR schedule. Phase 1 warms up from near-zero to prevent early instability. Phase 2 is where most training happens. Phase 3 holds a small constant LR to fine-tune near the minimum without overshooting.
+        </div>
+      </div>
+    </div><!-- end panel-builder -->
+
+  </div><!-- end center-col -->
+
+  <!-- ══ RIGHT: Live stats ════════════════════════════════════════════ -->
+  <div class="right-col">
+
+    <!-- Current epoch + LR -->
+    <div class="card" id="card-lr-rp1">
+      <div class="card-title">Current State</div>
+      <div class="lr-display">
+        <span class="lr-big" id="rp-lr-val" style="color:var(--g-mid)">—</span>
+        <div class="lr-big-lbl" id="rp-lr-lbl">LR · Epoch 0</div>
+      </div>
+      <div class="stat-row" style="margin-top:.35rem">
+        <span class="sr-lbl">Epoch</span>
+        <span class="sr-val" id="rp-epoch">0</span>
+      </div>
+      <div class="stat-row">
+        <span class="sr-lbl">% Complete</span>
+        <span class="sr-val" id="rp-pct">0%</span>
+      </div>
+      <div class="stat-row">
+        <span class="sr-lbl">Schedule</span>
+        <span class="sr-val" id="rp-sch-name">Constant</span>
+      </div>
+    </div>
+
+    <!-- Schedule formula -->
+    <div class="card" id="card-lr-rp2">
+      <div class="card-title">Formula</div>
+      <div class="formula-panel">
+        <div class="formula-label" id="rp-formula-name">Constant</div>
+        <div class="formula-eq" id="rp-formula-eq">η(t) = η₀</div>
+      </div>
+      <div class="formula-desc" id="rp-formula-desc">
+        Fixed learning rate throughout all epochs — simple but often suboptimal.
+      </div>
+    </div>
+
+    <!-- LR at key milestones -->
+    <div class="card" id="card-lr-rp3">
+      <div class="card-title">LR at Key Epochs</div>
+      <table style="width:100%;border-collapse:collapse;font-size:.7rem">
+        <thead>
+          <tr>
+            <th style="font-family:'IBM Plex Mono',monospace;font-size:.62rem;color:var(--text-muted);
+                       text-align:left;padding:.18rem .3rem;border-bottom:1.5px solid var(--border)">Epoch</th>
+            <th style="font-family:'IBM Plex Mono',monospace;font-size:.62rem;color:var(--text-muted);
+                       text-align:right;padding:.18rem .3rem;border-bottom:1.5px solid var(--border)">LR</th>
+          </tr>
+        </thead>
+        <tbody id="milestone-table">
+          <tr>
+            <td style="font-family:'IBM Plex Mono',monospace;padding:.22rem .3rem;border-bottom:1px solid var(--border-lt);color:var(--text-soft)">10</td>
+            <td style="font-family:'IBM Plex Mono',monospace;padding:.22rem .3rem;border-bottom:1px solid var(--border-lt);text-align:right;font-weight:600;color:var(--g-dk)" id="ms-10">—</td>
+          </tr>
+          <tr>
+            <td style="font-family:'IBM Plex Mono',monospace;padding:.22rem .3rem;border-bottom:1px solid var(--border-lt);color:var(--text-soft)">25</td>
+            <td style="font-family:'IBM Plex Mono',monospace;padding:.22rem .3rem;border-bottom:1px solid var(--border-lt);text-align:right;font-weight:600;color:var(--g-dk)" id="ms-25">—</td>
+          </tr>
+          <tr>
+            <td style="font-family:'IBM Plex Mono',monospace;padding:.22rem .3rem;border-bottom:1px solid var(--border-lt);color:var(--text-soft)">50</td>
+            <td style="font-family:'IBM Plex Mono',monospace;padding:.22rem .3rem;border-bottom:1px solid var(--border-lt);text-align:right;font-weight:600;color:var(--g-dk)" id="ms-50">—</td>
+          </tr>
+          <tr>
+            <td style="font-family:'IBM Plex Mono',monospace;padding:.22rem .3rem;border-bottom:1px solid var(--border-lt);color:var(--text-soft)">75</td>
+            <td style="font-family:'IBM Plex Mono',monospace;padding:.22rem .3rem;border-bottom:1px solid var(--border-lt);text-align:right;font-weight:600;color:var(--g-dk)" id="ms-75">—</td>
+          </tr>
+          <tr>
+            <td style="font-family:'IBM Plex Mono',monospace;padding:.22rem .3rem;color:var(--text-soft)">100</td>
+            <td style="font-family:'IBM Plex Mono',monospace;padding:.22rem .3rem;text-align:right;font-weight:600;color:var(--g-dk)" id="ms-100">—</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Estimated convergence -->
+    <div class="card" id="card-lr-rp4">
+      <div class="card-title">Convergence Estimate</div>
+      <div class="stat-row">
+        <span class="sr-lbl">Est. conv. epoch</span>
+        <span class="sr-val" id="rp-conv-epoch">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="sr-lbl">LR at conv.</span>
+        <span class="sr-val" id="rp-conv-lr">—</span>
+      </div>
+      <div style="font-size:.63rem;color:var(--text-muted);margin-top:.3rem;
+                  line-height:1.5;font-style:italic">
+        Epoch where loss improvement &lt; 0.1% for 5 consecutive steps
+      </div>
+    </div>
+
+  </div><!-- end right-col -->
+
+</div><!-- end .explorer-grid -->
+
+</div><!-- end .wrap -->
+
+<footer id="course-nav-footer" style="margin-top:1.5rem;padding:0.75rem 0 0 1rem;border-top:1px solid #E0DAC0;font-size:0.8rem;color:#78786A;text-align:left;">
+  <a href="../" style="color:#2e7d32;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">&larr; All course visualizations</a>
+</footer>
+<script>
+if (window.self !== window.top) { var f = document.getElementById('course-nav-footer'); if (f) { f.style.display = 'none'; } }
+</script>
+
+</body>
+</html>
