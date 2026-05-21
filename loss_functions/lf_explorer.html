@@ -569,7 +569,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
           <span><span class="legend-dot" style="background:#2D5A1B"></span>MSE</span>
           <span><span class="legend-dot" style="background:var(--loss-mae)"></span>MAE</span>
           <span><span class="legend-dot" style="background:var(--loss-blue,#1A56A0)"></span>Huber</span>
-          <span><span class="legend-dot" style="background:var(--loss-hinge)"></span>Cross-Entropy (logistic)</span>
         </div>
 
         <!-- Loss over GD steps -->
@@ -578,9 +577,13 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
           <rect width="100%" height="100%" fill="#FDFAF5"/>
           <text x="50%" y="44%" text-anchor="middle" dominant-baseline="middle"
                 fill="rgba(0,0,0,.18)" font-family="Outfit,sans-serif" font-size="11">
-            |∂L/∂ŷ| vs ŷ for each loss (D3 rendered)
+            Loss vs GD step for each regression loss (D3 rendered)
           </text>
         </svg>
+
+        <div class="hint-txt" style="margin-top:.4rem;font-style:normal;color:var(--text-muted)">
+          <strong>Note:</strong> Cross-Entropy is used for classification tasks — see the <em>When to Use Which</em> tab for its behavior on classification problems.
+        </div>
 
         <div class="anno-box neutral" id="optimization-anno" style="margin-top:.5rem;font-size:.75rem">
           Press Play to watch gradient descent update the prediction under each loss function simultaneously. Notice how MSE has steeper gradients far from the truth, while MAE has constant gradient magnitude regardless of distance.
@@ -746,7 +749,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
         <div class="opt-status-row"><span><span class="opt-status-dot" style="background:#2D5A1B"></span>MSE</span><span class="opt-status-val" id="opt-val-mse">—</span></div>
         <div class="opt-status-row"><span><span class="opt-status-dot" style="background:#E8630A"></span>MAE</span><span class="opt-status-val" id="opt-val-mae">—</span></div>
         <div class="opt-status-row"><span><span class="opt-status-dot" style="background:#1A56A0"></span>Huber</span><span class="opt-status-val" id="opt-val-huber">—</span></div>
-        <div class="opt-status-row"><span><span class="opt-status-dot" style="background:#7B3FC4"></span>CE (log.)</span><span class="opt-status-val" id="opt-val-ce">—</span></div>
       </div>
       <div class="hint-txt" style="margin-top:.3rem">Current loss after GD step <span id="opt-step-display">0</span></div>
     </div>
@@ -1259,7 +1261,7 @@ function genPts(nOut){
     var y=Math.max(0,Math.min(1,0.7*x+0.15+(lcg()-0.5)*0.12));
     pts.push({x:x,y:y,out:false});
   }
-  for(var j=0;j<nOut;j++) pts.push({x:0.2+j*0.15,y:0.88-j*0.05,out:true});
+  for(var j=0;j<nOut;j++) pts.push({x:0.22+j*0.12,y:0.97-j*0.04,out:true});
   return pts;
 }
 
@@ -1272,7 +1274,7 @@ function ols(pts){
 }
 
 /* ── Gradient descent state ─────────────────────────────────── */
-var OPT=['mse','mae','huber','ce'];
+var OPT=['mse','mae','huber'];
 var OC={mse:'#2D5A1B',mae:'#E8630A',huber:'#1A56A0',ce:'#7B3FC4'};
 var LR={mse:0.55,mae:0.04,huber:0.35,ce:0.5};
 var ON={mse:'MSE',mae:'MAE',huber:'Huber',ce:'CE (logistic)'};
