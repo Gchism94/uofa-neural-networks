@@ -588,6 +588,19 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
       <div class="card">
         <div class="plot-label" id="training-label">Training Effect — Cosine vs Constant LR</div>
 
+        <!-- Back link: visible only when custom schedule is active -->
+        <div id="training-back-link" style="display:none;margin-bottom:.3rem">
+          <a href="#" id="btn-back-to-builder"
+             style="font-size:.72rem;color:var(--g-mid);text-decoration:none;font-family:'Outfit',sans-serif"
+             onmouseover="this.style.textDecoration='underline'"
+             onmouseout="this.style.textDecoration='none'">← Edit schedule</a>
+        </div>
+
+        <!-- Confirmation banner: shown on Apply, auto-hides after 4 s -->
+        <div id="training-confirm" class="anno-box good" style="display:none;margin-bottom:.5rem;font-size:.75rem">
+          ✓ Custom schedule applied — watching training with your 3-phase schedule vs constant LR baseline
+        </div>
+
         <div class="training-panels">
 
           <!-- Loss curves -->
@@ -1137,19 +1150,29 @@ function updateSummaryRow(ep) {
   if (!row || !TD) return;
   if (ep === 0) { row.style.display = 'none'; return; }
   row.style.display = '';
-  const sl = TD.schLoss[ep]?.toFixed(3)  ?? '—';
-  const cl = TD.constLoss[ep]?.toFixed(3) ?? '—';
-  const sa = TD.schAcc[ep]?.toFixed(1)   ?? '—';
-  const ca = TD.constAcc[ep]?.toFixed(1)  ?? '—';
-  const schWins = parseFloat(sl) < parseFloat(cl);
-  const wb = '<span class="winner-badge">winner</span>';
+  const slv = TD.schLoss[ep]  ?? 0, clv = TD.constLoss[ep] ?? 0;
+  const sav = TD.schAcc[ep]   ?? 0, cav = TD.constAcc[ep]  ?? 0;
+  const sl = slv.toFixed(3), cl = clv.toFixed(3);
+  const sa = sav.toFixed(1),  ca = cav.toFixed(1);
+  const schWins = slv < clv;
   const outEp = firstOutperfEp();
+
+  // Fix 3: custom schedule gets improvement-percentage winner badge
+  let wbLoss = '<span class="winner-badge">winner</span>';
+  let wbAcc  = '<span class="winner-badge">winner</span>';
+  if (schWins && S.sch === 'custom' && clv > 0) {
+    const lossPct = Math.round((clv - slv) / clv * 100);
+    wbLoss = `<span class="winner-badge">Custom wins ${lossPct}%↓</span>`;
+    const accPct = cav > 0 ? Math.round((sav - cav) / cav * 100) : 0;
+    wbAcc  = `<span class="winner-badge">Custom wins +${accPct}%</span>`;
+  }
+
   document.getElementById('ts-final-loss').innerHTML =
-    `<div class="ts-label">Final Loss</div><div class="ts-pair">${schWins?wb:''}<span class="ts-sch">${sl}</span> <span class="ts-vs">vs</span> <span class="ts-con">${cl}</span></div>`;
+    `<div class="ts-label">Final Loss</div><div class="ts-pair">${schWins?wbLoss:''}<span class="ts-sch">${sl}</span> <span class="ts-vs">vs</span> <span class="ts-con">${cl}</span></div>`;
   document.getElementById('ts-conv-epoch').innerHTML =
     `<div class="ts-label">Outperf. Epoch</div><div class="ts-pair">${outEp>0&&S.sch!=='constant'?outEp:'—'}</div>`;
   document.getElementById('ts-final-acc').innerHTML =
-    `<div class="ts-label">Final Accuracy</div><div class="ts-pair">${schWins?wb:''}<span class="ts-sch">${sa}%</span> <span class="ts-vs">vs</span> <span class="ts-con">${ca}%</span></div>`;
+    `<div class="ts-label">Final Accuracy</div><div class="ts-pair">${schWins?wbAcc:''}<span class="ts-sch">${sa}%</span> <span class="ts-vs">vs</span> <span class="ts-con">${ca}%</span></div>`;
 }
 
 // ── Schedule Builder ──────────────────────────────────────────────
@@ -1271,15 +1294,55 @@ function wireBuilder() {
   });
 
   document.getElementById('btn-apply-custom')?.addEventListener('click', () => {
+    // Fix 3: better SIM params so custom schedule visibly outperforms constant
     customPresetFn = computeCustomLR; TD = null; S.epoch = 0;
     SCHEDULES.custom = { label:'Custom', color:'#0E7A8A' };
-    SIM.custom = { floor:0.080, mult:1.08, maxAcc:90 };
+    SIM.custom = { floor:0.055, mult:1.20, maxAcc:93 };
+    S.sch = 'custom'; // ensure computeTrainingData uses custom LR function
+
+    // Switch to Training Effect tab
     document.querySelectorAll('#tab-bar button').forEach(b=>b.classList.remove('active'));
     document.querySelector('[data-tab="training"]').classList.add('active');
     document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
     document.getElementById('panel-training').classList.add('active');
     S.tab = 'training';
-    setTimeout(()=>{ buildTrainingCharts(); drawTrainingCharts(0); }, 30);
+    syncTabUI('training');
+
+    // Fix 2: show confirmation banner, auto-dismiss after 4 s
+    const conf = document.getElementById('training-confirm');
+    if (conf) {
+      conf.style.display = '';
+      clearTimeout(conf._hideTimer);
+      conf._hideTimer = setTimeout(() => { conf.style.display = 'none'; }, 4000);
+    }
+
+    // Fix 4: show back link
+    const bl = document.getElementById('training-back-link');
+    if (bl) bl.style.display = '';
+
+    // Fix 2: update chart title
+    const lbl = document.getElementById('training-label');
+    if (lbl) lbl.textContent = 'CUSTOM SCHEDULE vs Constant LR';
+
+    // Fix 1: build charts then auto-play
+    setTimeout(() => {
+      buildTrainingCharts();
+      drawTrainingCharts(0);
+      setTimeout(startPlay, 60);
+    }, 30);
+  });
+
+  // Fix 4: back-to-builder link
+  document.getElementById('btn-back-to-builder')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    stopPlay();
+    document.querySelectorAll('#tab-bar button').forEach(b=>b.classList.remove('active'));
+    document.querySelector('[data-tab="builder"]').classList.add('active');
+    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+    document.getElementById('panel-builder').classList.add('active');
+    S.tab = 'builder';
+    syncTabUI('builder');
+    setTimeout(() => { buildBuilderChart(); drawBuilderChart(); }, 30);
   });
 
   document.getElementById('btn-save-preset')?.addEventListener('click', () => {
@@ -1357,6 +1420,9 @@ window.addEventListener('load', () => {
   document.getElementById('btn-reset')?.addEventListener('click', () => {
     TD = null;
     if (S.tab === 'training') { S.epoch = 0; drawTrainingCharts(0); }
+    // Hide confirmation banner on reset
+    const conf = document.getElementById('training-confirm');
+    if (conf) { conf.style.display = 'none'; clearTimeout(conf._hideTimer); }
   });
 
   syncTabUI('compare');
