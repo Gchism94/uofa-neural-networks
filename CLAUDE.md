@@ -180,6 +180,7 @@ Add a row to the appropriate table under `## Contents`:
 - `dropout/dropout_explorer.html`
 - `early_stopping/es_explorer.html`
 - `optimizers/optimizer_explorer.html`
+- `learning_rate/lr_explorer.html`
 - `batch_norm/bn_explorer.html`
 - `convolution/conv_explorer.html`
 - `vanishing_gradients/vg_explorer.html`

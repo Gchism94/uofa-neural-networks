@@ -365,6 +365,20 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   margin-top:.5rem;flex-wrap:wrap;
 }
 .apply-hint{font-size:.68rem;color:var(--text-muted);font-style:italic}
+
+/* ── Training summary row ───────────────────────────────────────── */
+.ts-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.45rem;margin-top:.5rem}
+@media(max-width:480px){.ts-grid{grid-template-columns:1fr 1fr}}
+.ts-card{background:var(--cream-mid);border:1px solid var(--border-lt);border-radius:6px;
+  padding:.4rem .55rem;text-align:center}
+.ts-label{font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--text-muted);margin-bottom:.2rem}
+.ts-pair{font-family:'IBM Plex Mono',monospace;font-size:.78rem;font-weight:600;color:var(--g-dk)}
+.ts-sch{color:#2e7d32}.ts-con{color:#E8630A}
+.ts-vs{color:var(--text-muted);font-weight:400;font-size:.68rem}
+.winner-badge{display:inline-block;background:#2e7d32;color:white;font-size:.56rem;
+  font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:.08rem .28rem;
+  border-radius:3px;margin-right:.2rem;vertical-align:middle}
 </style>
 </head>
 <body>
@@ -508,11 +522,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
         Key Concepts <span id="concepts-arrow">▾</span>
       </div>
       <div class="concepts-body" id="concepts-body">
-        <div class="concepts-item"><strong>Why learning rate matters:</strong> The learning rate controls how big a step the optimizer takes each update. Too high and training diverges — the loss explodes. Too low and training is painfully slow and may get stuck in a sharp local minimum. The right LR is the single most impactful hyperparameter.</div>
-        <div class="concepts-item"><strong>LR too high vs too low:</strong> A high LR causes the optimizer to overshoot the minimum — loss oscillates or diverges. A low LR makes the gradient steps tiny — training converges but takes far more epochs and may settle in a flat, suboptimal region. The sweet spot is problem-dependent.</div>
-        <div class="concepts-item"><strong>What warmup does:</strong> At initialization, weights are random and gradients are noisy and large. Starting with a very small LR and ramping up prevents catastrophic early updates from damaging the model before it has learned anything useful. Warmup is especially important for Transformers.</div>
-        <div class="concepts-item"><strong>Why cosine annealing works well:</strong> Cosine schedules smoothly reduce the LR following a half-cosine curve — fast initial progress when far from the minimum, gentle fine-tuning near convergence. The smooth decay avoids the abrupt jumps of step decay and often finds flatter, more generalizable minima.</div>
-        <div class="concepts-item"><strong>What cyclical LR captures:</strong> Cyclical learning rates periodically increase the LR after decreasing it. This "annealing with restarts" helps escape sharp local minima and saddle points — the optimizer can explore more of the loss landscape and often settles in a wider, flatter minimum with better generalization.</div>
+        <div class="concepts-item"><strong>Why learning rate matters:</strong> Too high and training overshoots the minimum and diverges — the loss explodes. Too low and training converges too slowly or gets stuck in a suboptimal region. LR is the single most impactful hyperparameter in any gradient-based optimizer.</div>
+        <div class="concepts-item"><strong>Step decay:</strong> Drops LR by a fixed factor every N epochs — simple and effective but the abrupt jumps can cause brief instability when the LR suddenly halves or thirds. The staircase pattern in the loss curve is its signature.</div>
+        <div class="concepts-item"><strong>Cosine annealing:</strong> Smoothly reduces LR following a cosine curve from initLR to near-zero — widely used in modern deep learning (ResNets, ViTs). Reaches lower final loss than constant or step decay and often finds flatter, more generalizable minima.</div>
+        <div class="concepts-item"><strong>Warmup:</strong> Start with a very small LR and linearly increase to initLR over the first few epochs — prevents large unstable updates when weights are randomly initialized. Especially important for Transformers, where attention gradients can explode early in training.</div>
+        <div class="concepts-item"><strong>Cyclical LR:</strong> Periodically increase and decrease LR — the rises help escape local minima and saddle points. Used in super-convergence training; the optimizer explores more of the loss landscape and can settle in a wider, flatter minimum with better generalization.</div>
       </div>
     </div>
 
@@ -624,8 +638,26 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
           <span id="outperf-text">Schedule outperforms constant LR starting at epoch —</span>
         </div>
 
+        <!-- Summary comparison row -->
+        <div id="ts-row" style="display:none">
+          <div class="ts-grid">
+            <div class="ts-card" id="ts-final-loss">
+              <div class="ts-label">Final Loss</div>
+              <div class="ts-pair">—</div>
+            </div>
+            <div class="ts-card" id="ts-conv-epoch">
+              <div class="ts-label">Outperf. Epoch</div>
+              <div class="ts-pair">—</div>
+            </div>
+            <div class="ts-card" id="ts-final-acc">
+              <div class="ts-label">Final Accuracy</div>
+              <div class="ts-pair">—</div>
+            </div>
+          </div>
+        </div>
+
         <div class="anno-box neutral" id="training-anno" style="margin-top:.5rem;font-size:.75rem">
-          Press Play to animate training epoch by epoch. The green curve shows your selected schedule; the orange dashed line is a constant LR baseline. Watch for where the schedule starts to outperform.
+          Press Play to animate training epoch by epoch. Green = selected schedule, orange dashed = constant LR baseline.
         </div>
       </div>
     </div><!-- end panel-training -->
@@ -736,8 +768,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
             </div>
             <div class="apply-btn-wrap">
               <button id="btn-apply-custom" class="pbtn primary">⏵ Apply to Training</button>
-              <span class="apply-hint">Runs custom schedule through Tab 2 simulation</span>
+              <button id="btn-save-preset" class="pbtn" style="border-color:var(--teal);color:var(--teal)">⊕ Save as Preset</button>
             </div>
+            <div class="apply-hint" style="margin-top:.3rem">Apply → Tab 2 simulation · Save → adds teal line to Tab 1</div>
           </div>
 
         </div><!-- end builder-layout -->
@@ -850,6 +883,426 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   <a href="../" style="color:#2e7d32;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">&larr; All course visualizations</a>
 </footer>
 <script>
+/* ═══════════════════════════════════════════════════════════════════
+   Learning Rate Schedules — Stage 3: Training Effect + Builder
+   ═══════════════════════════════════════════════════════════════════ */
+
+// ── State extensions ──────────────────────────────────────────────
+// S is defined in Stage 2; extend it here
+// S.tab tracks the active tab for animation routing
+// B holds builder phase settings
+
+const B = {
+  p1Dur:5, p1Start:0.01,
+  p2Decay:'cosine', p2Rate:0.9,
+  p3Start:80, p3Min:0.01,
+};
+
+// ── Seeded RNG ────────────────────────────────────────────────────
+function seededRNG(seed) {
+  let s = ((seed * 1664525) + 1013904223) >>> 0;
+  return () => { s = ((s * 1664525) + 1013904223) >>> 0; return s / 0x100000000; };
+}
+
+// ── Loss simulation ───────────────────────────────────────────────
+const SIM = {
+  constant: { floor:0.120, mult:1.00, maxAcc:83 },
+  step:     { floor:0.090, mult:1.05, maxAcc:88 },
+  exp:      { floor:0.100, mult:1.05, maxAcc:87 },
+  cosine:   { floor:0.070, mult:1.10, maxAcc:91 },
+  warmup:   { floor:0.065, mult:1.12, maxAcc:92 },
+  cyclical: { floor:0.090, mult:1.02, maxAcc:88 },
+  custom:   { floor:0.080, mult:1.08, maxAcc:90 },
+};
+
+function simulateLoss(sch, customFn) {
+  const cfg = SIM[sch] || SIM.custom;
+  const seedIdx = ['constant','step','exp','cosine','warmup','cyclical','custom'].indexOf(sch);
+  const rng = seededRNG(seedIdx * 17 + 42);
+  const T = S.totalEpochs;
+  const losses = [0.85];
+  let loss = 0.85;
+  for (let e = 1; e <= T; e++) {
+    const lr = (sch === 'custom' && customFn)
+      ? customFn(e)
+      : lrCompute(sch, e, T, S.initLR, S.decayRate, S.stepSize, S.warmupEpochs);
+    const lrR = Math.max(lr / S.initLR, 0.001);
+    const gap = loss - cfg.floor;
+    const decay = gap * lrR * 0.18 * cfg.mult;
+    const noise = (rng() * 2 - 1) * 0.013 * lrR;
+    loss = Math.max(cfg.floor + 0.001, loss - decay + noise);
+    losses.push(loss);
+  }
+  return losses;
+}
+
+function lossToAcc(losses, sch) {
+  const maxAcc = (SIM[sch] || SIM.custom).maxAcc;
+  return losses.map(l => Math.min(maxAcc, Math.max(0, maxAcc * (1 - l))));
+}
+
+let TD = null; // cached training data { schLoss, constLoss, schAcc, constAcc }
+let customPresetFn = null; // set by Save as Preset
+let customPresetCache = null; // precomputed LR array for preset
+
+function computeTrainingData() {
+  const sch = S.sch;
+  // If custom preset is applied (from builder Apply button), use it as 'custom'
+  const schFn = (sch === 'custom') ? customPresetFn : null;
+  const schLoss   = simulateLoss(sch, schFn);
+  const constLoss = simulateLoss('constant', null);
+  TD = { schLoss, constLoss, schAcc:lossToAcc(schLoss,sch), constAcc:lossToAcc(constLoss,'constant') };
+}
+
+// ── Training Effect D3 charts ─────────────────────────────────────
+const TM = { top:14, right:24, bottom:30, left:44 };
+let tLG = null, tAG = null;
+
+function buildOneTrainChart(svgId) {
+  const node = document.getElementById(svgId);
+  if (!node) return null;
+  d3.select(node).selectAll('*').remove();
+  const bb = node.getBoundingClientRect();
+  const W = Math.max((bb.width  || 240) - TM.left - TM.right, 140);
+  const H = Math.max((bb.height || 180) - TM.top  - TM.bottom, 100);
+  const svg = d3.select(node).attr('viewBox',`0 0 ${W+TM.left+TM.right} ${H+TM.top+TM.bottom}`);
+  const g = svg.append('g').attr('transform',`translate(${TM.left},${TM.top})`);
+  g.append('rect').attr('width',W).attr('height',H).attr('fill','#FDFAF5').attr('rx',4);
+  g.append('g').attr('class','tc-xa').attr('transform',`translate(0,${H})`);
+  g.append('g').attr('class','tc-ya');
+  g.append('path').attr('class','tc-base').attr('fill','none').attr('stroke','#E8630A').attr('stroke-width',1.5).attr('stroke-dasharray','5,3').attr('opacity',0.85);
+  g.append('path').attr('class','tc-sch').attr('fill','none').attr('stroke','#2e7d32').attr('stroke-width',2.5);
+  g.append('text').attr('class','tc-sch-lbl').attr('font-size',9).attr('font-family','IBM Plex Mono,monospace').attr('fill','#2e7d32').attr('dominant-baseline','middle');
+  g.append('text').attr('class','tc-base-lbl').attr('font-size',9).attr('font-family','IBM Plex Mono,monospace').attr('fill','#E8630A').attr('dominant-baseline','middle');
+  g._W = W; g._H = H;
+  return g;
+}
+
+function buildTrainingCharts() {
+  tLG = buildOneTrainChart('svg-loss-curve');
+  tAG = buildOneTrainChart('svg-acc-curve');
+  if (tLG) {
+    tLG.append('line').attr('class','tc-thresh')
+      .attr('stroke','#888').attr('stroke-width',1).attr('stroke-dasharray','3,3').attr('opacity',0);
+    tLG.append('text').attr('class','tc-thresh-lbl')
+      .attr('font-size',8).attr('font-family','Outfit,sans-serif').attr('fill','#888');
+  }
+}
+
+function drawTrainingCharts(ep) {
+  if (!tLG || !tAG) return;
+  if (!TD) computeTrainingData();
+  const { schLoss, constLoss, schAcc, constAcc } = TD;
+  const cap = Math.min(ep, S.totalEpochs);
+
+  const W = tLG._W, H = tLG._H;
+  const Wa = tAG._W, Ha = tAG._H;
+  const xL = d3.scaleLinear().domain([0,S.totalEpochs]).range([0,W]);
+  const yL = d3.scaleLinear().domain([0,0.9]).range([H,0]);
+  const xA = d3.scaleLinear().domain([0,S.totalEpochs]).range([0,Wa]);
+  const yA = d3.scaleLinear().domain([0,100]).range([Ha,0]);
+
+  const axFmt = ax => ax
+    .call(a=>a.selectAll('text').attr('font-size',8).attr('font-family','IBM Plex Mono,monospace').attr('fill','#888'))
+    .call(a=>a.selectAll('line,path').attr('stroke','#C8BE9A'));
+
+  tLG.select('.tc-xa').call(d3.axisBottom(xL).ticks(5).tickSize(3)).call(axFmt);
+  tLG.select('.tc-ya').call(d3.axisLeft(yL).ticks(5).tickFormat(d3.format('.1f')).tickSize(3)).call(axFmt);
+  tAG.select('.tc-xa').call(d3.axisBottom(xA).ticks(5).tickSize(3)).call(axFmt);
+  tAG.select('.tc-ya').call(d3.axisLeft(yA).ticks(5).tickFormat(d=>d+'%').tickSize(3)).call(axFmt);
+
+  const lLine = d3.line().x((d,i)=>xL(i)).y(d=>yL(d)).curve(d3.curveMonotoneX);
+  const aLine = d3.line().x((d,i)=>xA(i)).y(d=>yA(d)).curve(d3.curveMonotoneX);
+
+  const sL = schLoss.slice(0,cap+1), cL = constLoss.slice(0,cap+1);
+  const sA = schAcc.slice(0,cap+1),  cA = constAcc.slice(0,cap+1);
+
+  tLG.select('.tc-base').attr('d', cL.length>1 ? lLine(cL) : null);
+  tLG.select('.tc-sch').attr('d',  sL.length>1 ? lLine(sL) : null);
+  tAG.select('.tc-base').attr('d', cA.length>1 ? aLine(cA) : null);
+  tAG.select('.tc-sch').attr('d',  sA.length>1 ? aLine(sA) : null);
+
+  if (cap > 0) {
+    const sl = sL[sL.length-1], cl = cL[cL.length-1];
+    const sa = sA[sA.length-1], ca = cA[cA.length-1];
+    tLG.select('.tc-sch-lbl').attr('x',xL(cap)+3).attr('y',yL(sl)).text(sl.toFixed(3));
+    tLG.select('.tc-base-lbl').attr('x',xL(cap)+3).attr('y',yL(cl)).text(cl.toFixed(3));
+    tAG.select('.tc-sch-lbl').attr('x',xA(cap)+3).attr('y',yA(sa)).text(sa.toFixed(1)+'%');
+    tAG.select('.tc-base-lbl').attr('x',xA(cap)+3).attr('y',yA(ca)).text(ca.toFixed(1)+'%');
+  }
+
+  const ty = yL(0.1);
+  if (ty >= 0 && ty <= H) {
+    tLG.select('.tc-thresh').attr('x1',0).attr('x2',W).attr('y1',ty).attr('y2',ty).attr('opacity',0.5);
+    tLG.select('.tc-thresh-lbl').attr('x',2).attr('y',ty-3).text('convergence = 0.10');
+  }
+
+  updateTrainingAnno(cap);
+  updateSummaryRow(cap);
+}
+
+function firstOutperfEp() {
+  if (!TD) return -1;
+  for (let e = 1; e <= S.totalEpochs; e++) {
+    if (TD.schLoss[e] < TD.constLoss[e]) return e;
+  }
+  return -1;
+}
+
+function updateTrainingAnno(ep) {
+  const box = document.getElementById('training-anno');
+  if (!box) return;
+  if (!TD) { box.textContent = 'Press Play to simulate training.'; return; }
+  const outEp = firstOutperfEp();
+  const sl = TD.schLoss[ep] ?? 0, cl = TD.constLoss[ep] ?? 0;
+  let msg, cls;
+  if (ep === 0) {
+    msg = 'Press Play to animate training epoch by epoch. Green = selected schedule, orange dashed = constant LR baseline.';
+    cls = 'anno-box neutral';
+  } else if (S.sch === 'constant') {
+    msg = `Constant LR throughout. Final loss: ${sl.toFixed(3)}.`;
+    cls = 'anno-box neutral';
+  } else if (outEp > 0 && ep >= outEp) {
+    msg = `${SCHEDULES[S.sch].label} first outperforms constant LR at epoch ${outEp}. Loss gap: ${(cl-sl).toFixed(3)}.`;
+    cls = 'anno-box good';
+  } else {
+    msg = `Epoch ${ep}/${S.totalEpochs} — ${SCHEDULES[S.sch].label}: ${sl.toFixed(3)} · Constant: ${cl.toFixed(3)}`;
+    cls = 'anno-box neutral';
+  }
+  box.className = cls; box.textContent = msg;
+
+  const ob = document.getElementById('outperf-box');
+  if (outEp > 0 && ep >= outEp && S.sch !== 'constant') {
+    ob.style.display = 'flex';
+    document.getElementById('outperf-text').textContent =
+      `${SCHEDULES[S.sch].label} outperforms constant LR starting at epoch ${outEp}`;
+  } else {
+    ob.style.display = 'none';
+  }
+
+  const lbl = document.getElementById('training-label');
+  if (lbl) lbl.textContent = `Training Effect — ${SCHEDULES[S.sch]?.label||S.sch} vs Constant LR · Epoch ${ep}`;
+}
+
+function updateSummaryRow(ep) {
+  const row = document.getElementById('ts-row');
+  if (!row || !TD) return;
+  if (ep === 0) { row.style.display = 'none'; return; }
+  row.style.display = '';
+  const sl = TD.schLoss[ep]?.toFixed(3)  ?? '—';
+  const cl = TD.constLoss[ep]?.toFixed(3) ?? '—';
+  const sa = TD.schAcc[ep]?.toFixed(1)   ?? '—';
+  const ca = TD.constAcc[ep]?.toFixed(1)  ?? '—';
+  const schWins = parseFloat(sl) < parseFloat(cl);
+  const wb = '<span class="winner-badge">winner</span>';
+  const outEp = firstOutperfEp();
+  document.getElementById('ts-final-loss').innerHTML =
+    `<div class="ts-label">Final Loss</div><div class="ts-pair">${schWins?wb:''}<span class="ts-sch">${sl}</span> <span class="ts-vs">vs</span> <span class="ts-con">${cl}</span></div>`;
+  document.getElementById('ts-conv-epoch').innerHTML =
+    `<div class="ts-label">Outperf. Epoch</div><div class="ts-pair">${outEp>0&&S.sch!=='constant'?outEp:'—'}</div>`;
+  document.getElementById('ts-final-acc').innerHTML =
+    `<div class="ts-label">Final Accuracy</div><div class="ts-pair">${schWins?wb:''}<span class="ts-sch">${sa}%</span> <span class="ts-vs">vs</span> <span class="ts-con">${ca}%</span></div>`;
+}
+
+// ── Schedule Builder ──────────────────────────────────────────────
+const BM2 = { top:12, right:14, bottom:28, left:50 };
+let bG = null;
+
+function computeCustomLR(epoch) {
+  const T = S.totalEpochs;
+  const p3StartEp = Math.round(T * B.p3Start / 100);
+  const lrMin = S.initLR * B.p3Min;
+  if (epoch >= p3StartEp) return lrMin;
+  if (epoch < B.p1Dur) {
+    const startLR = S.initLR * B.p1Start;
+    return B.p1Dur > 0 ? startLR + (S.initLR - startLR) * (epoch / B.p1Dur) : S.initLR;
+  }
+  const p2Dur = Math.max(p3StartEp - B.p1Dur, 1);
+  const t = epoch - B.p1Dur;
+  switch (B.p2Decay) {
+    case 'cosine': return lrMin + 0.5*(S.initLR-lrMin)*(1+Math.cos(Math.PI*t/p2Dur));
+    case 'linear': return Math.max(lrMin, S.initLR - (S.initLR-lrMin)*t/p2Dur);
+    case 'exp':    return Math.max(lrMin, S.initLR * Math.pow(B.p2Rate, t));
+    case 'poly':   return Math.max(lrMin, S.initLR * Math.pow(1-t/p2Dur, 2));
+    default:       return S.initLR;
+  }
+}
+
+function buildBuilderChart() {
+  const node = document.getElementById('svg-builder-preview');
+  if (!node) return;
+  d3.select(node).selectAll('*').remove();
+  bG = null;
+  const bb = node.getBoundingClientRect();
+  const W = Math.max((bb.width  || 280) - BM2.left - BM2.right, 140);
+  const H = Math.max((bb.height || 180) - BM2.top  - BM2.bottom, 100);
+  const svg = d3.select(node).attr('viewBox',`0 0 ${W+BM2.left+BM2.right} ${H+BM2.top+BM2.bottom}`);
+  bG = svg.append('g').attr('transform',`translate(${BM2.left},${BM2.top})`);
+  bG.append('rect').attr('width',W).attr('height',H).attr('fill','#FDFAF5').attr('rx',4);
+  bG.append('g').attr('class','bx').attr('transform',`translate(0,${H})`);
+  bG.append('g').attr('class','by');
+  bG.append('g').attr('class','b-seg');
+  bG._W = W; bG._H = H;
+}
+
+function drawBuilderChart() {
+  if (!bG) { buildBuilderChart(); if (!bG) return; }
+  const W = bG._W, H = bG._H;
+  const T = S.totalEpochs;
+  const pts = d3.range(0, T+1).map(e => ({ e, lr: computeCustomLR(e) }));
+  const xS = d3.scaleLinear().domain([0,T]).range([0,W]);
+  const yS = d3.scaleLinear().domain([0,S.initLR*1.05]).range([H,0]);
+  const axFmt = ax => ax
+    .call(a=>a.selectAll('text').attr('font-size',8).attr('font-family','IBM Plex Mono,monospace').attr('fill','#888'))
+    .call(a=>a.selectAll('line,path').attr('stroke','#C8BE9A'));
+  bG.select('.bx').call(d3.axisBottom(xS).ticks(5).tickSize(3)).call(axFmt);
+  bG.select('.by').call(d3.axisLeft(yS).ticks(4).tickFormat(d=>d>=0.001?d3.format('.3f')(d):d3.format('.0e')(d)).tickSize(3)).call(axFmt);
+
+  const p3Ep = Math.round(T * B.p3Start / 100);
+  const lineGen = d3.line().x(d=>xS(d.e)).y(d=>yS(d.lr));
+  const seg = bG.select('.b-seg');
+  seg.selectAll('*').remove();
+  [
+    { pts: pts.filter(d=>d.e<=B.p1Dur),               color:'#1A56A0' },
+    { pts: pts.filter(d=>d.e>=B.p1Dur&&d.e<=p3Ep),    color:'#2e7d32' },
+    { pts: pts.filter(d=>d.e>=p3Ep),                   color:'#E8630A' },
+  ].forEach(ph => {
+    if (ph.pts.length > 1) seg.append('path').datum(ph.pts).attr('fill','none').attr('stroke',ph.color).attr('stroke-width',2.2).attr('d',lineGen);
+  });
+  [B.p1Dur, p3Ep].forEach((ep, i) => {
+    if (ep > 0 && ep < T) {
+      seg.append('line').attr('x1',xS(ep)).attr('x2',xS(ep)).attr('y1',0).attr('y2',H)
+        .attr('stroke',i===0?'#1A56A0':'#E8630A').attr('stroke-width',1).attr('stroke-dasharray','3,2').attr('opacity',0.5);
+    }
+  });
+  updateBuilderFormula();
+}
+
+function updateBuilderFormula() {
+  const p3Ep = Math.round(S.totalEpochs * B.p3Start / 100);
+  const parts = [];
+  if (B.p1Dur > 0) parts.push(`0→${B.p1Dur}: warmup`);
+  parts.push(`${B.p1Dur}→${p3Ep}: ${B.p2Decay} decay`);
+  parts.push(`${p3Ep}→${S.totalEpochs}: floor η=${(S.initLR*B.p3Min).toFixed(5)}`);
+  const el = document.getElementById('builder-anno');
+  if (el) { el.className='anno-box neutral'; el.textContent = parts.join('  ·  '); }
+}
+
+// ── Wire builder controls ─────────────────────────────────────────
+function wireBuilder() {
+  function bw(id, valId, parseFn, fmtFn, setFn) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('input', function() {
+      const v = parseFn(this.value); setFn(v);
+      if (valId) { const ve=document.getElementById(valId); if(ve) ve.textContent=fmtFn(v); }
+      drawBuilderChart();
+    });
+  }
+  bw('sld-p1-dur',   'val-p1-dur',   v=>parseInt(v),   v=>''+v,                  v=>{B.p1Dur=v});
+  bw('sld-p1-start', 'val-p1-start', v=>parseFloat(v), v=>Math.round(v*100)+'%', v=>{B.p1Start=v});
+  bw('sld-p2-rate',  'val-p2-rate',  v=>parseFloat(v), v=>v.toFixed(2),          v=>{B.p2Rate=v});
+  bw('sld-p3-min',   'val-p3-min',   v=>parseFloat(v), v=>Math.round(v*100)+'%', v=>{B.p3Min=v});
+  bw('sld-p3-start', 'val-p3-start', v=>parseInt(v),   v=>v+'%',                 v=>{B.p3Start=v});
+
+  document.querySelectorAll('.phase-decay-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.phase-decay-btn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      B.p2Decay = btn.dataset.decay;
+      drawBuilderChart();
+    });
+  });
+
+  document.getElementById('btn-apply-custom')?.addEventListener('click', () => {
+    customPresetFn = computeCustomLR; TD = null; S.epoch = 0;
+    SCHEDULES.custom = { label:'Custom', color:'#0E7A8A' };
+    SIM.custom = { floor:0.080, mult:1.08, maxAcc:90 };
+    document.querySelectorAll('#tab-bar button').forEach(b=>b.classList.remove('active'));
+    document.querySelector('[data-tab="training"]').classList.add('active');
+    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+    document.getElementById('panel-training').classList.add('active');
+    S.tab = 'training';
+    setTimeout(()=>{ buildTrainingCharts(); drawTrainingCharts(0); }, 30);
+  });
+
+  document.getElementById('btn-save-preset')?.addEventListener('click', () => {
+    customPresetCache = d3.range(0, S.totalEpochs+1).map(e => computeCustomLR(e));
+    SCHEDULES.custom = { label:'Custom', color:'#0E7A8A' };
+    SIM.custom = { floor:0.080, mult:1.08, maxAcc:90 };
+    // Switch to Tab 1 and rebuild with 7th line
+    document.querySelectorAll('#tab-bar button').forEach(b=>b.classList.remove('active'));
+    document.querySelector('[data-tab="compare"]').classList.add('active');
+    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+    document.getElementById('panel-compare').classList.add('active');
+    S.tab = 'compare';
+    setTimeout(()=>{ buildChart(); updateRightPanel(); }, 30);
+  });
+}
+
+// ── Tab tracking (adds to Stage 2 listener) ───────────────────────
+document.querySelectorAll('#tab-bar button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (!window.S) return;
+    S.tab = btn.dataset.tab || 'compare';
+    if (S.tab === 'training') {
+      TD = null; S.epoch = 0;
+      setTimeout(()=>{ buildTrainingCharts(); drawTrainingCharts(0); }, 30);
+    } else if (S.tab === 'builder') {
+      setTimeout(()=>{ buildBuilderChart(); drawBuilderChart(); }, 30);
+    }
+  });
+});
+
+// Invalidate TD on param changes
+['sld-lr0','sld-epochs','sld-decay','sld-step-size','sld-warmup','sld-cycle'].forEach(id => {
+  document.getElementById(id)?.addEventListener('input', () => { TD = null; });
+});
+
+// ── Init (runs after Stage 2 load handler so all Stage 2 fns exist) ──
+window.addEventListener('load', () => {
+  S.tab = 'compare';
+
+  // Override getLR to support saved custom preset
+  const _origGetLR = getLR;
+  window.getLR = function(key, ep) {
+    if (key === 'custom' && customPresetCache) {
+      return customPresetCache[Math.min(ep, customPresetCache.length-1)] ?? S.initLR;
+    }
+    return _origGetLR(key, ep);
+  };
+
+  // Override selectSchedule to invalidate cached training data
+  const _origSS = selectSchedule;
+  window.selectSchedule = function(key) { TD = null; _origSS(key); };
+
+  // Override doTick to be tab-aware (Stage 2 fn declaration already set window.doTick)
+  window.doTick = function() {
+    S.epoch = Math.min(S.epoch + 1, S.totalEpochs);
+    if (S.tab === 'training') {
+      drawTrainingCharts(S.epoch);
+      updateRightPanel();
+      if (S.epoch >= S.totalEpochs) { stopPlay(); return; }
+      S.animTimer = setTimeout(window.doTick, SPEED_DELAY[S.speed] || 80);
+    } else {
+      drawChart();
+      updateRightPanel();
+      updateAnno();
+      if (S.epoch >= S.totalEpochs) { stopPlay(); return; }
+      S.animTimer = setTimeout(window.doTick, SPEED_DELAY[S.speed] || 80);
+    }
+  };
+
+  wireBuilder();
+  document.getElementById('val-p1-dur').textContent   = B.p1Dur;
+  document.getElementById('val-p1-start').textContent = Math.round(B.p1Start*100)+'%';
+  document.getElementById('val-p2-rate').textContent  = B.p2Rate.toFixed(2);
+  document.getElementById('val-p3-min').textContent   = Math.round(B.p3Min*100)+'%';
+  document.getElementById('val-p3-start').textContent = B.p3Start+'%';
+});
+</script>
+
+<script>
 if (window.self !== window.top) { var f = document.getElementById('course-nav-footer'); if (f) { f.style.display = 'none'; } }
 </script>
 
@@ -859,7 +1312,7 @@ if (window.self !== window.top) { var f = document.getElementById('course-nav-fo
    ═══════════════════════════════════════════════════════════════════ */
 
 // ── Schedule definitions & colors ────────────────────────────────
-const SCHEDULES = {
+var SCHEDULES = {
   constant: { label:'Constant',    color:'#888888' },
   step:     { label:'Step Decay',  color:'#E8630A' },
   exp:      { label:'Exp. Decay',  color:'#1A56A0' },
@@ -938,7 +1391,7 @@ const SCH_HINTS = {
 };
 
 // ── App state ─────────────────────────────────────────────────────
-const S = {
+var S = {
   sch: 'constant',
   epoch: 0,
   totalEpochs: 100,
@@ -1258,7 +1711,7 @@ function selectSchedule(key) {
 }
 
 // ── Playback ──────────────────────────────────────────────────────
-const SPEED_DELAY = [null, 320, 160, 80, 40, 16];
+var SPEED_DELAY = [null, 320, 160, 80, 40, 16];
 
 function doTick() {
   S.epoch = Math.min(S.epoch + 1, S.totalEpochs);
