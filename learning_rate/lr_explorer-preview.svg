@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" width="1200" height="600">
+
+  <!-- Background -->
+  <rect width="1200" height="600" fill="#FAF7F0"/>
+
+  <!-- Plot background -->
+  <rect x="85" y="52" width="1065" height="456" fill="#FDFAF5" rx="5" stroke="#C8BE9A" stroke-width="1"/>
+
+  <!-- Horizontal grid lines (lr = 0.0075, 0.005, 0.0025) -->
+  <line x1="85" y1="166" x2="1150" y2="166" stroke="#E2D9C5" stroke-width="1"/>
+  <line x1="85" y1="280" x2="1150" y2="280" stroke="#E2D9C5" stroke-width="1"/>
+  <line x1="85" y1="394" x2="1150" y2="394" stroke="#E2D9C5" stroke-width="1"/>
+
+  <!-- Vertical grid lines (epoch 25, 50, 75) -->
+  <line x1="351" y1="52" x2="351" y2="508" stroke="#E2D9C5" stroke-width="1"/>
+  <line x1="618" y1="52" x2="618" y2="508" stroke="#E2D9C5" stroke-width="1"/>
+  <line x1="884" y1="52" x2="884" y2="508" stroke="#E2D9C5" stroke-width="1"/>
+
+  <!-- Y-axis label -->
+  <text transform="rotate(-90)" x="-280" y="28" text-anchor="middle"
+        font-family="Outfit,system-ui,sans-serif" font-size="16" fill="#888">Learning Rate</text>
+
+  <!-- X-axis label -->
+  <text x="618" y="564" text-anchor="middle"
+        font-family="Outfit,system-ui,sans-serif" font-size="16" fill="#888">Epoch</text>
+
+  <!-- X-axis tick labels -->
+  <text x="85"  y="528" text-anchor="middle" font-family="'IBM Plex Mono','Courier New',monospace" font-size="12" fill="#888">0</text>
+  <text x="351" y="528" text-anchor="middle" font-family="'IBM Plex Mono','Courier New',monospace" font-size="12" fill="#888">25</text>
+  <text x="618" y="528" text-anchor="middle" font-family="'IBM Plex Mono','Courier New',monospace" font-size="12" fill="#888">50</text>
+  <text x="884" y="528" text-anchor="middle" font-family="'IBM Plex Mono','Courier New',monospace" font-size="12" fill="#888">75</text>
+  <text x="1150" y="528" text-anchor="middle" font-family="'IBM Plex Mono','Courier New',monospace" font-size="12" fill="#888">100</text>
+
+  <!-- Y-axis tick labels (0.01, 0.005, 0) -->
+  <text x="78"  y="56"  text-anchor="end" font-family="'IBM Plex Mono','Courier New',monospace" font-size="11" fill="#888">0.0100</text>
+  <text x="78"  y="284" text-anchor="end" font-family="'IBM Plex Mono','Courier New',monospace" font-size="11" fill="#888">0.0050</text>
+  <text x="78"  y="512" text-anchor="end" font-family="'IBM Plex Mono','Courier New',monospace" font-size="11" fill="#888">0.0000</text>
+
+  <!-- ═══ Schedule curves ═══ -->
+  <!-- Coordinate mapping:
+       x(e)  = 85 + e * 10.65  (e = 0..100)
+       y(lr) = 52 + (1 - lr/0.01) * 456  (lr = 0..0.01)
+       So: lr=0.01 → y=52 (top), lr=0 → y=508 (bottom)  -->
+
+  <!-- Constant — gray #888, flat at y=52 -->
+  <line x1="85" y1="52" x2="1150" y2="52"
+        stroke="#888888" stroke-width="3.5" stroke-linecap="round"/>
+
+  <!-- Step Decay — orange #E8630A, staircase (γ=0.7, s=20)
+       y at each step: 0.01→52, 0.007→188, 0.0049→285, 0.00343→352, 0.0024→400 -->
+  <polyline fill="none" stroke="#E8630A" stroke-width="3.5" stroke-linejoin="miter"
+    points="85,52 298,52 298,188 511,188 511,285 724,285 724,352 937,352 937,400 1150,400"/>
+
+  <!-- Exponential Decay — blue #1A56A0 (γ=0.95)
+       Key points every 10 epochs -->
+  <polyline fill="none" stroke="#1A56A0" stroke-width="3.5" stroke-linejoin="round"
+    points="85,52 192,236 298,346 405,411 511,451 618,474 724,489 830,497 937,502 1043,505 1150,507"/>
+
+  <!-- Cosine Annealing — green #2e7d32, smooth S-curve
+       Key points: e=0→y=52, e=25→y=118, e=50→y=280, e=75→y=440, e=100→y=505 -->
+  <path fill="none" stroke="#2e7d32" stroke-width="3.5"
+    d="M85,52 C190,54 270,88 351,118 C440,152 540,240 618,280 C696,320 790,402 884,440 C960,464 1060,498 1150,505"/>
+
+  <!-- Warmup + Cosine — purple #7B3FC4 (warmup 10 epochs, then cosine)
+       e=0→y=508 (lr≈0), e=10→y=52, then cosine to e=100→y=505 -->
+  <path fill="none" stroke="#7B3FC4" stroke-width="3.5"
+    d="M85,508 L192,52 C310,54 370,92 448,144 C546,212 586,256 650,294 C730,338 810,400 910,452 C975,484 1064,500 1150,505"/>
+
+  <!-- Cyclical — red #B0321D, triangular wave (period≈33 epochs)
+       Starts at lrMin≈y=505, rises to y=52 at half-period, back down -->
+  <polyline fill="none" stroke="#B0321D" stroke-width="3.5" stroke-linejoin="round"
+    points="85,505 253,52 421,505 589,52 757,505 925,52 1093,505 1150,505"/>
+
+  <!-- ═══ Legend box (top-right, inside plot) ═══ -->
+  <rect x="878" y="60" width="260" height="198" fill="rgba(250,247,240,0.96)" rx="8" stroke="#C8BE9A" stroke-width="1.5"/>
+  <text x="896" y="85" font-family="Outfit,system-ui,sans-serif" font-size="14" font-weight="700" fill="#1C3A0E">Schedules</text>
+
+  <line x1="896" y1="104" x2="930" y2="104" stroke="#888888" stroke-width="3"/>
+  <text x="938" y="108" font-family="Outfit,system-ui,sans-serif" font-size="13" fill="#555">Constant</text>
+
+  <line x1="896" y1="124" x2="930" y2="124" stroke="#E8630A" stroke-width="3"/>
+  <text x="938" y="128" font-family="Outfit,system-ui,sans-serif" font-size="13" fill="#555">Step Decay</text>
+
+  <line x1="896" y1="144" x2="930" y2="144" stroke="#1A56A0" stroke-width="3"/>
+  <text x="938" y="148" font-family="Outfit,system-ui,sans-serif" font-size="13" fill="#555">Exp. Decay</text>
+
+  <line x1="896" y1="164" x2="930" y2="164" stroke="#2e7d32" stroke-width="3"/>
+  <text x="938" y="168" font-family="Outfit,system-ui,sans-serif" font-size="13" fill="#555">Cosine Annealing</text>
+
+  <line x1="896" y1="184" x2="930" y2="184" stroke="#7B3FC4" stroke-width="3"/>
+  <text x="938" y="188" font-family="Outfit,system-ui,sans-serif" font-size="13" fill="#555">Warmup + Cosine</text>
+
+  <line x1="896" y1="204" x2="930" y2="204" stroke="#B0321D" stroke-width="3"/>
+  <text x="938" y="208" font-family="Outfit,system-ui,sans-serif" font-size="13" fill="#555">Cyclical</text>
+
+  <!-- ═══ Title (bottom-left) ═══ -->
+  <text x="85" y="588" font-family="Outfit,system-ui,sans-serif" font-size="18" font-weight="700" fill="#2e7d32">Learning Rate Schedules — Interactive Explorer</text>
+
+  <!-- Sub-caption (top of chart) -->
+  <text x="85" y="36" font-family="Outfit,system-ui,sans-serif" font-size="13" fill="#888">INFO 557: Neural Networks · University of Arizona</text>
+
+</svg>

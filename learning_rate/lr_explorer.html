@@ -898,6 +898,54 @@ const B = {
   p3Start:80, p3Min:0.01,
 };
 
+// ── Tab-aware UI sync ─────────────────────────────────────────────
+function syncTabUI(tab) {
+  function vis(id, on) { var el=document.getElementById(id); if(el) el.style.display=on?'':'none'; }
+  var isCompare  = tab === 'compare';
+  var isBuilder  = tab === 'builder';
+  var notBuilder = !isBuilder;
+
+  // Left panel show/hide
+  vis('card-lr-schedule', notBuilder);
+  vis('card-lr-params',   notBuilder);
+  vis('card-playback',    notBuilder);
+
+  // Conditional cards: hide all on builder; otherwise mirror current schedule
+  if (isBuilder) {
+    vis('card-lr-decay',    false);
+    vis('step-size-row',    false);
+    vis('card-lr-warmup',   false);
+    vis('card-lr-cyclical', false);
+  } else if (window.S) {
+    var sch = S.sch;
+    vis('card-lr-decay',    sch==='step'||sch==='exp');
+    vis('step-size-row',    sch==='step');
+    vis('card-lr-warmup',   sch==='warmup');
+    vis('card-lr-cyclical', sch==='cyclical');
+  }
+
+  // Right panel: milestone table only on Tab 1; most cards hidden on builder
+  vis('card-lr-rp1', notBuilder);
+  vis('card-lr-rp2', true);
+  vis('card-lr-rp3', isCompare);
+  vis('card-lr-rp4', notBuilder);
+
+  // Builder tab: show custom schedule formula in right panel formula card
+  if (isBuilder && window.S) {
+    var p3Ep = Math.round(S.totalEpochs * B.p3Start / 100);
+    var pcs = [];
+    if (B.p1Dur > 0) pcs.push('0→' + B.p1Dur + ': warmup');
+    pcs.push(B.p1Dur + '→' + p3Ep + ': ' + B.p2Decay + ' decay');
+    pcs.push(p3Ep + '→T: floor ηₘᴵⁿ');
+    var nm=document.getElementById('rp-formula-name');
+    var eq=document.getElementById('rp-formula-eq');
+    var ds=document.getElementById('rp-formula-desc');
+    if(nm) nm.textContent='Custom Schedule';
+    if(eq) eq.textContent=pcs.join('  |  ');
+    if(ds) ds.textContent='Warmup → '+B.p2Decay+' decay → constant floor.';
+  }
+}
+
 // ── Seeded RNG ────────────────────────────────────────────────────
 function seededRNG(seed) {
   let s = ((seed * 1664525) + 1013904223) >>> 0;
@@ -1186,6 +1234,14 @@ function updateBuilderFormula() {
   parts.push(`${p3Ep}→${S.totalEpochs}: floor η=${(S.initLR*B.p3Min).toFixed(5)}`);
   const el = document.getElementById('builder-anno');
   if (el) { el.className='anno-box neutral'; el.textContent = parts.join('  ·  '); }
+  if (window.S && S.tab === 'builder') {
+    const nm=document.getElementById('rp-formula-name');
+    const eq=document.getElementById('rp-formula-eq');
+    const ds=document.getElementById('rp-formula-desc');
+    if(nm) nm.textContent='Custom Schedule';
+    if(eq) eq.textContent=parts.join('  |  ');
+    if(ds) ds.textContent='Warmup → '+B.p2Decay+' decay → constant floor.';
+  }
 }
 
 // ── Wire builder controls ─────────────────────────────────────────
@@ -1245,6 +1301,7 @@ document.querySelectorAll('#tab-bar button').forEach(btn => {
   btn.addEventListener('click', () => {
     if (!window.S) return;
     S.tab = btn.dataset.tab || 'compare';
+    syncTabUI(S.tab);
     if (S.tab === 'training') {
       TD = null; S.epoch = 0;
       setTimeout(()=>{ buildTrainingCharts(); drawTrainingCharts(0); }, 30);
@@ -1272,9 +1329,9 @@ window.addEventListener('load', () => {
     return _origGetLR(key, ep);
   };
 
-  // Override selectSchedule to invalidate cached training data
+  // Override selectSchedule to invalidate training cache and re-sync UI
   const _origSS = selectSchedule;
-  window.selectSchedule = function(key) { TD = null; _origSS(key); };
+  window.selectSchedule = function(key) { TD = null; _origSS(key); syncTabUI(S.tab || 'compare'); };
 
   // Override doTick to be tab-aware (Stage 2 fn declaration already set window.doTick)
   window.doTick = function() {
@@ -1293,6 +1350,16 @@ window.addEventListener('load', () => {
     }
   };
 
+  // Tab 2 step/reset: additional handlers that fire after Stage 2's handlers
+  document.getElementById('btn-step')?.addEventListener('click', () => {
+    if (S.tab === 'training' && !S.playing) drawTrainingCharts(S.epoch);
+  });
+  document.getElementById('btn-reset')?.addEventListener('click', () => {
+    TD = null;
+    if (S.tab === 'training') { S.epoch = 0; drawTrainingCharts(0); }
+  });
+
+  syncTabUI('compare');
   wireBuilder();
   document.getElementById('val-p1-dur').textContent   = B.p1Dur;
   document.getElementById('val-p1-start').textContent = Math.round(B.p1Start*100)+'%';
@@ -1812,9 +1879,10 @@ window.addEventListener('load', () => {
 });
 
 window.addEventListener('resize', () => {
-  if (document.getElementById('panel-compare').classList.contains('active')) {
-    buildChart();
-  }
+  const tab = (window.S && S.tab) || 'compare';
+  if (tab === 'compare') buildChart();
+  else if (tab === 'training' && typeof buildTrainingCharts === 'function') { buildTrainingCharts(); if (window.TD) drawTrainingCharts(S.epoch); }
+  else if (tab === 'builder' && typeof buildBuilderChart === 'function') { buildBuilderChart(); drawBuilderChart(); }
 });
 </script>
 
